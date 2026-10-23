@@ -12,7 +12,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { esc, onGmRequest, classLevel } from "./util.mjs";
-import { variantEffect, variantOf, variantsAllowed, chooseVariant, clearVariant, applyVariant, channelBonus, VARIANTS } from "./variant-channeling.mjs";
+import { variantEffect, variantOf, variantsAllowed, chooseVariant, clearVariant, applyVariant, channelBonus, isVariantFeature, VARIANTS } from "./variant-channeling.mjs";
 
 const RADIUS = 30;
 const isChannel = (item) => item?.type === "feat" && item.system.tag === "classFeat_channelEnergy";
@@ -189,6 +189,7 @@ onGmRequest("channel", async (message, data) => {
 });
 
 registerFootnote((item) => {
+  if (isVariantFeature(item)) return ["Chosen once from Channel Energy (it can't be changed; the GM can reset it there). Channeling applies the halving and the effect automatically for Luck, and shows the effect for other portfolios."];
   if (!isChannel(item)) return null;
   const content = [
     "Automated: Use rolls the channel and lists every creature of the affected type within 30 ft (centered on you, no template). Healing is applied (up to max HP); harmed creatures roll their Will save and take full or half. You can leave yourself out; others only with Selective Channeling. The card's own Apply buttons aren't needed.",

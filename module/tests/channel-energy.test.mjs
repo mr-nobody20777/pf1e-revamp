@@ -3,7 +3,7 @@
 
 import { createTestActor, waitFor, waitForItem, cleanup, useTestScene, placeToken, deleteTokens } from "./helpers.mjs";
 import { creaturesInBurst, isUndead } from "../channel-energy.mjs";
-import { setVariant } from "../variant-channeling.mjs";
+import { setVariant, clearVariant } from "../variant-channeling.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -77,6 +77,7 @@ export function registerChannelEnergyTests(quench) {
 
         it("Luck variant channeling: half healing, then a +1 on the creature's next roll", async () => {
           await setVariant(channelItem, "Luck");
+          assert.ok(cleric.items.getName("Variant Channeling (Luck)"), "shown on the sheet as a class feature");
           try {
             await ally.update({ "system.attributes.hp.value": 1 });
             const msg = await use("Positive - Heal living", [tokens.ally.object]);
@@ -88,8 +89,9 @@ export function registerChannelEnergyTests(quench) {
             assert.match(save.rolls[0].formula, /1\[Luck channel\]/);
             await waitFor(() => !buff.isActive, { what: "the bonus to be used up" });
           } finally {
-            await channelItem.unsetFlag(MODULE_ID, "variantChanneling");
+            await clearVariant(channelItem);
           }
+          assert.isUndefined(cleric.items.getName("Variant Channeling (Luck)"), "reset removes it");
         });
 
         it("heal living: applied to the targets, never above max HP, and spends a use", async () => {

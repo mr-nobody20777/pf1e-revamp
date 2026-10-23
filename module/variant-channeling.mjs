@@ -37,8 +37,43 @@ Hooks.once("init", () => {
 
 export const variantsAllowed = () => game.settings.get(MODULE_ID, SETTING);
 export const variantOf = (channelItem) => channelItem?.getFlag(MODULE_ID, FLAG) ?? null;
-export const setVariant = (channelItem, name) => channelItem.setFlag(MODULE_ID, FLAG, name);
-export const clearVariant = (channelItem) => channelItem.unsetFlag(MODULE_ID, FLAG);
+
+// The choice lives on Channel Energy; a "Variant Channeling (Luck)" class feature shows it on the sheet
+const FEATURE_FLAG = "variantFeature";
+const featuresOf = (channelItem) => channelItem.actor?.itemTypes.feat.filter((f) => f.flags[MODULE_ID]?.[FEATURE_FLAG]) ?? [];
+
+function featureData(channelItem, name) {
+  const { heal, harm } = VARIANTS[name];
+  return {
+    name: `Variant Channeling (${name})`,
+    type: "feat",
+    img: channelItem.img,
+    system: {
+      subType: "classFeat",
+      class: channelItem.system.class,
+      description: {
+        value: `<p><strong>Heal:</strong> ${esc(heal)}</p><p><strong>Harm:</strong> ${esc(harm)}</p>
+          <p>Variant channeling (<em>Ultimate Magic</em>): when using positive energy to heal, affected creatures gain only half the normal amount of healing but also receive the effect above. When channeling negative energy to harm, affected creatures take only half the normal damage but take the additional effect; a successful saving throw negates the additional effect but does not reduce the damage any further. A "channel bonus" is +1, increasing to +2 at cleric level 5 and for every 5 cleric levels thereafter (to a maximum of +5).</p>`,
+      },
+    },
+    flags: { [MODULE_ID]: { [FEATURE_FLAG]: channelItem.id } },
+  };
+}
+
+export async function setVariant(channelItem, name) {
+  await channelItem.setFlag(MODULE_ID, FLAG, name);
+  const old = featuresOf(channelItem);
+  if (old.length) await channelItem.actor.deleteEmbeddedDocuments("Item", old.map((f) => f.id));
+  if (channelItem.actor) await channelItem.actor.createEmbeddedDocuments("Item", [featureData(channelItem, name)]);
+}
+
+export async function clearVariant(channelItem) {
+  await channelItem.unsetFlag(MODULE_ID, FLAG);
+  const old = featuresOf(channelItem);
+  if (old.length) await channelItem.actor.deleteEmbeddedDocuments("Item", old.map((f) => f.id));
+}
+
+export const isVariantFeature = (item) => !!item.flags?.[MODULE_ID]?.[FEATURE_FLAG];
 
 /** +1, +2 at level 5, +1 per 5 levels after, max +5 */
 export const channelBonus = (level) => Math.min(5, 1 + Math.floor(level / 5));
