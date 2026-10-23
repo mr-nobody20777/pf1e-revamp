@@ -20,9 +20,10 @@ export function registerChannelEnergyTests(quench) {
         // Use one of Channel Energy's actions on the given tokens; returns the summary message once applied
         async function use(actionPrefix, targets) {
           const before = new Set(game.messages.keys());
+          const applied = new Promise((resolve) => Hooks.once(`${MODULE_ID}.channelApplied`, (data, results) => resolve({ ...data, results, before })));
           const actionId = channelItem.actions.find((a) => a.name.startsWith(actionPrefix)).id;
           await channelItem.use({ skipDialog: true, actionId, options: { channelTargets: targets } });
-          return waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.getFlag(MODULE_ID, "channel")?.results));
+          return applied;
         }
 
         before(async () => {
@@ -80,12 +81,16 @@ export function registerChannelEnergyTests(quench) {
           assert.ok(cleric.items.getName("Variant Channeling (Luck)"), "shown on the sheet as a class feature");
           try {
             await ally.update({ "system.attributes.hp.value": 1 });
-            const msg = await use("Positive - Heal living", [tokens.ally.object]);
-            const { variant, amount, card } = msg.getFlag(MODULE_ID, "channel");
+            // Lowest roll: halved, it must still heal at least 1 ("damage and hit points have a minimum of 1")
+            const randomUniform = CONFIG.Dice.randomUniform;
+            CONFIG.Dice.randomUniform = () => 0.999;
+            const msg = await use("Positive - Heal living", [tokens.ally.object]).finally(() => (CONFIG.Dice.randomUniform = randomUniform));
+            const { variant, amount, card } = msg;
             assert.isTrue(variant.halved);
             // PF1's own card shows the halved roll, so there's one number in chat
             const roll = (await fromUuid(card)).systemRolls.attacks[0].damage[0];
-            assert.match(roll.formula, /^floor\(/);
+            assert.match(roll.formula, /^max\(1,\s*floor\(/);
+            assert.isAtLeast(amount, 1);
             assert.equal(roll.total, amount);
             assert.equal(ally.system.attributes.hp.value, 1 + amount);
             const buff = await waitFor(() => ally.itemTypes.buff.find((b) => b.flags[MODULE_ID]?.channelLuck?.bonus === 1 && b.isActive));
@@ -102,18 +107,17 @@ export function registerChannelEnergyTests(quench) {
           const max = ally.system.attributes.hp.max;
           await ally.update({ "system.attributes.hp.value": max - 1 });
           const usesBefore = channelItem.system.uses.value;
-          const message = await use("Positive - Heal", [tokens.ally.object]);
+          const applied = await use("Positive - Heal", [tokens.ally.object]);
           assert.equal(ally.system.attributes.hp.value, max, "capped at max");
           assert.equal(channelItem.system.uses.value, usesBefore - 1);
-          assert.match(message.content, /\+1 \(to max\)/);
+          assert.match(applied.results[0].text, /\+1 \(to max\)/);
+          await waitFor(() => !game.messages.contents.some((m) => !applied.before.has(m.id) && m.getFlag(MODULE_ID, "channel")), { what: "the GM's request to be deleted once applied" });
         });
 
         it("harm undead: Will save rolled, full or half damage applied", async () => {
           const max = zombie.system.attributes.hp.max;
           await zombie.update({ "system.attributes.hp.value": max });
-          const message = await use("Positive - Harm", [tokens.zombie.object]);
-          const [result] = message.getFlag(MODULE_ID, "channel").results;
-          const { amount } = message.getFlag(MODULE_ID, "channel");
+          const { results: [result], amount } = await use("Positive - Harm", [tokens.zombie.object]);
           const expected = /saved/.test(result.text) ? Math.floor(amount / 2) : amount;
           assert.equal(zombie.system.attributes.hp.value, max - expected);
         });

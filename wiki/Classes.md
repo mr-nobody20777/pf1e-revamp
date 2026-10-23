@@ -42,7 +42,7 @@ Removing the bloodline, domain or school removes the powers it added. The item's
 - With **Selective Channeling**, you can also uncheck up to your Charisma modifier in other creatures.
 - **Healing** is applied to everyone checked, never above their maximum HP.
 - **Harm**: each creature rolls its Will save (DC 10 + ½ cleric level + Cha) and takes full or half damage.
-- One summary appears in chat, e.g. *"Positive – Heal living (6): Valeros +4 (to max) · Seelah already full"*.
+- Chat stays clean: PF1's own channel card shows the amount, and harmed creatures' Will saves get their own cards. (Behind the scenes, the request to the GM is whispered and removed once applied.)
 - Cancelling the checklist gives the use back.
 
 The cleric's token must be on the scene. Applying the results needs a GM logged in (see [Compatibility](Compatibility#multiplayer)).
@@ -57,13 +57,13 @@ The cleric's token must be on the scene. Applying the results needs a GM logged 
 
 The choice shows on the character sheet as a **Variant Channeling (Luck)** class feature, with the portfolio's rules text as its description.
 
-**Channeling with a variant.** Healing with positive energy, or harming with negative energy, is **halved**, as the rules require: the normal dice are rolled and the total halved right on PF1's chat card, so the number you see is the number applied. The summary below it says "halved by Luck variant" and shows the portfolio's effect. Harming undead with positive energy, or healing undead with negative energy, is unchanged. With a variant, a successful Will save negates the extra effect but doesn't halve the damage again. A few portfolios say they work "like a standard channel (not halved)", and those aren't halved.
+**Channeling with a variant.** Healing with positive energy, or harming with negative energy, is **halved**, as the rules require: the normal dice are rolled and the total halved right on PF1's chat card, so the number you see is the number applied. Halving never goes below 1 ("damage and hit points have a minimum of 1"). The portfolio's effect is shown in the target list when you channel. Harming undead with positive energy, or healing undead with negative energy, is unchanged. With a variant, a successful Will save negates the extra effect but doesn't halve the damage again. A few portfolios say they work "like a standard channel (not halved)", and those aren't halved.
 
 **Luck** is fully automated:
 - **Heal:** every creature healed gets **Luck Channel (+1)**, rising to +2 at cleric level 5 and +1 per 5 levels after that (max +5). The rules let each creature pick which roll (attack, CMB check, save or skill check) gets it, so every roll window shows a ticked **Luck channel +1 (one roll)** box: leave it ticked to use it, untick it to save it for a later roll. It counts as a sacred bonus; a button on the buff switches it to a luck bonus, since the rules let the creature choose. It lasts until the end of the cleric's next turn.
 - **Harm** (negative energy): a penalty of the same size on all d20 rolls until the end of the cleric's next turn, negated by the save.
 
-The other portfolios' effects appear in the summary for the table to apply by hand. They'll be automated as players pick them.
+The other portfolios' effects are shown in the target list for the table to apply by hand. They'll be automated as players pick them.
 
 ### Spontaneous Casting
 **Before:** losing a prepared spell to cast a cure spell meant adjusting the spellbook by hand.

@@ -132,9 +132,13 @@ export async function channel(actionUse, { targets = null } = {}) {
     if (!Array.isArray(chosen)) return refund();
   }
 
+  if (!chosen.length) return;
+  // A request to the active GM (players can't change other characters' HP), whispered and deleted once applied:
+  // PF1's own card already shows the amount, and saves get their own cards
   return ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
-    content: `<p><strong>${esc(action.name)}</strong>: ${chosen.length ? "applying…" : "no creatures affected."}</p>`,
+    whisper: game.users.filter((u) => u.isGM).map((u) => u.id),
+    content: `<p><strong>${esc(action.name)}</strong>: applying to ${chosen.length} creature(s)…</p>`,
     flags: {
       [MODULE_ID]: {
         channel: {
@@ -150,7 +154,7 @@ export async function channel(actionUse, { targets = null } = {}) {
 Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
   if (!isChannel(action.item) || !variantEffect(action.item, modeOf(action))?.halved) return;
   for (const part of parts) {
-    part.base = `floor((${[part.base, ...part.extra].join(" + ")}) / 2)`;
+    part.base = `max(1, floor((${[part.base, ...part.extra].join(" + ")}) / 2))`; // halved, but "damage and hit points have a minimum of 1"
     part.extra = [];
   }
 });
@@ -186,17 +190,12 @@ onGmRequest("channel", async (message, data) => {
     const extra = variant ? await applyVariant(actor, variant, { bonus: variant.bonus, saved, source: variant.source }) : null;
     results.push({ name: actor.name, text: extra ? `${text}, ${extra}` : text });
   }
-  const list = results.map((r) => `${esc(r.name)} ${esc(r.text)}`).join(" · ");
-  const amountText = variant?.halved ? `${data.amount}, halved by ${esc(variant.name)} variant` : `${data.amount}`;
-  const saveText = data.heal ? "" : variant ? `, Will DC ${data.dc} negates ${esc(variant.name)} effect` : `, Will DC ${data.dc} half`;
-  await message.update({
-    content: `<p><strong>${esc(data.label)}</strong> (${amountText}${saveText}): ${list || "no creatures affected."}</p>${variant ? `<p style="font-size:11px"><strong>${esc(variant.name)} variant:</strong> ${esc(variant.text)}</p>` : ""}`,
-    [`flags.${MODULE_ID}.channel.results`]: results,
-  });
+  Hooks.callAll(`${MODULE_ID}.channelApplied`, data, results); // macros and tests
+  await message.delete();
 });
 
 registerFootnote((item) => {
-  if (isVariantFeature(item)) return ["Chosen once from Channel Energy (it can't be changed; the GM can reset it there). Channeling applies the halving and the effect automatically for Luck, and shows the effect for other portfolios."];
+  if (isVariantFeature(item)) return ["Chosen once from Channel Energy (it can't be changed; the GM can reset it there). Channeling halves the healing or damage; Luck's effect is applied automatically, other portfolios' effects are shown in the target list when you channel."];
   if (!isChannel(item)) return null;
   const content = [
     "Automated: Use rolls the channel and lists every creature of the affected type within 30 ft (centered on you, no template). Healing is applied (up to max HP); harmed creatures roll their Will save and take full or half. You can leave yourself out; others only with Selective Channeling. The card's own Apply buttons aren't needed.",
