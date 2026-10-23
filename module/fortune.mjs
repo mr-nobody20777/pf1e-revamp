@@ -21,7 +21,7 @@
 
 import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { isActiveGM, ownerWhisper } from "./util.mjs";
+import { esc, isActiveGM, ownerWhisper } from "./util.mjs";
 
 const KEEP_HIGHEST = "2d20kh";
 const MARK = "pf1eRevampFortune";
@@ -32,9 +32,21 @@ const NEXT_ROLL = [
   { label: "True Strike", bonus: 20, kinds: ["attack"], match: (b) => b.flags[MODULE_ID]?.trueStrike },
   { label: "Guidance", bonus: 1, kinds: ["attack", "Save", "Skill"], match: (b) => b.name.toLowerCase() === "guidance" },
   // Luck variant channeling: "a channel bonus or a luck bonus (creature's choice) on one roll (attack roll, CMB check,
-  // saving throw, or skill check) made before the end of your next turn". The creature picks the roll, so it waits until armed.
-  { label: "Luck channel", bonus: (b) => b.flags[MODULE_ID].channelLuck.bonus, kinds: ["attack", "Save", "Skill"], match: (b) => !!b.flags[MODULE_ID]?.channelLuck?.armed },
+  // saving throw, or skill check) made before the end of your next turn"
+  { label: "Luck channel", bonus: (b) => b.flags[MODULE_ID].channelLuck.bonus, kinds: ["attack", "Save", "Skill"], match: (b) => !!b.flags[MODULE_ID]?.channelLuck },
 ];
+// These bonuses are "on a single roll" of the creature's choosing: every roll window gets a ticked box per
+// bonus, and unticking it saves the bonus for a later roll. Rolls made without a window use it.
+const SKIPPED = "pf1eRevampNextRollSkipped";
+
+function nextRollToggle(def, buff, onChange) {
+  const label = document.createElement("label");
+  label.className = `checkbox ${MODULE_ID}-next-roll`;
+  label.dataset.tooltip = `${buff.name}: unticked, this roll goes without it and the bonus stays for a later roll`;
+  label.innerHTML = `<input type="checkbox" checked> ${esc(def.label)} +${bonusOf(def, buff)} (one roll)`;
+  label.querySelector("input").addEventListener("change", (event) => onChange(event.currentTarget.checked));
+  return label;
+}
 const bonusOf = (def, buff) => (typeof def.bonus === "function" ? def.bonus(buff) : def.bonus);
 
 const activeBuffs = (actor) => (actor?.itemTypes?.buff ?? []).filter((b) => b.isActive);
@@ -76,9 +88,26 @@ Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
   }
 
   for (const { def, buff } of nextRollBonuses(actor, "attack")) {
-    if (used.includes(buff.id)) continue;
+    if (used.includes(buff.id) || rollData[SKIPPED]?.includes(buff.id)) continue;
     parts.push(`${bonusOf(def, buff)}[${def.label}]`);
     used.push(buff.id);
+  }
+});
+
+// The attack window: one ticked box per one-roll bonus
+Hooks.on("renderAttackDialog", (app, html) => {
+  const root = html[0] ?? html;
+  const actor = app.action?.actor;
+  if (!actor || !ATTACK_ACTIONS.includes(app.action.actionType) || root.querySelector(`.${MODULE_ID}-next-roll`)) return;
+  const flags = root.querySelector(".form-group.flags");
+  const rollData = app.rollData;
+  if (!flags || !rollData) return;
+  for (const { def, buff } of nextRollBonuses(actor, "attack")) {
+    flags.append(nextRollToggle(def, buff, (on) => {
+      const skipped = new Set(rollData[SKIPPED] ?? []);
+      on ? skipped.delete(buff.id) : skipped.add(buff.id);
+      rollData[SKIPPED] = [...skipped];
+    }));
   }
 });
 
@@ -93,11 +122,17 @@ Hooks.on("pf1PostActionUse", async (actionUse) => {
 /*  concentration checks                        */
 /* -------------------------------------------- */
 
-const pending = new Map(); // actor id → buff ids to use up once the roll is made
+const pending = new Map(); // actor id → { ids: always used up once rolled, toggles: one-roll bonuses, name }
+
+// With a roll window, one-roll bonuses go in its Situational Bonus field, where a ticked box can take them
+// out again; without one (shift-click), they're added to the roll directly. Either way a bonus is used up
+// only if it ended up in the roll.
+const splitBonus = (text) => (text ?? "").split(/\s*\+\s*/).map((t) => t.trim()).filter(Boolean);
 
 function preActorRoll(kind) {
   return (actor, rollOptions) => {
     const ids = [];
+    const toggles = [];
     const prescience = armedPrescience(actor);
     if (prescience && rollOptions.staticRoll == null) {
       rollOptions.staticRoll = prescience.flags[MODULE_ID].prescience.value;
@@ -106,20 +141,46 @@ function preActorRoll(kind) {
     } else if (hasFortune(actor) && (rollOptions.dice ?? "1d20") === "1d20") {
       rollOptions.dice = KEEP_HIGHEST;
     }
+    const windowed = !(rollOptions.skipDialog ?? pf1.documents.settings.getSkipActionPrompt());
     for (const { def, buff } of nextRollBonuses(actor, kind)) {
-      rollOptions.parts ??= [];
-      rollOptions.parts.push(`${bonusOf(def, buff)}[${def.label}]`);
-      ids.push(buff.id);
+      const part = `${bonusOf(def, buff)}[${def.label}]`;
+      if (!windowed) (rollOptions.parts ??= []).push(part); // with a window, the field gets it when it opens
+      toggles.push({ def, buff, part });
     }
-    if (ids.length) pending.set(actor.id, ids);
+    if (ids.length || toggles.length) pending.set(actor.id, { ids, toggles, name: actor.name });
   };
 }
 
+// The roll window (skill, save, ability check...): one ticked box per bonus, kept in step with the field
+Hooks.on("renderDialogV2", (app, element) => {
+  const input = element.querySelector('input[name="bonus"]');
+  if (!input || element.querySelector(`.${MODULE_ID}-next-roll`)) return;
+  const entry = [...pending.values()].find((e) => e.toggles.length && !e.shown && (app.title ?? "").startsWith(`${e.name}:`));
+  if (!entry) return;
+  entry.shown = true;
+  // In the field rather than PF1's bonus option: PF1 ignores an emptied field and would keep the option
+  input.value = [...splitBonus(input.value), ...entry.toggles.map((t) => t.part)].join(" + ");
+  const row = document.createElement("div");
+  row.className = "form-group";
+  for (const t of entry.toggles) {
+    row.append(nextRollToggle(t.def, t.buff, (on) => {
+      const parts = splitBonus(input.value).filter((p) => p !== t.part);
+      input.value = (on ? [...parts, t.part] : parts).join(" + ");
+    }));
+  }
+  input.closest(".form-group").before(row);
+  app.setPosition?.({ height: "auto" });
+});
+
 function postActorRoll(actor, result) {
-  const ids = pending.get(actor.id);
-  if (!ids) return;
+  const entry = pending.get(actor.id);
+  if (!entry) return;
   pending.delete(actor.id);
-  if (result) consume(actor, ids); // no result: the roll dialog was cancelled, keep them
+  if (!result) return; // the roll window was cancelled: keep everything
+  // A one-roll bonus is used up only if it was in the roll (it may have been unticked or deleted)
+  const formula = result.rolls?.[0]?.formula ?? "";
+  const used = entry.toggles.filter((t) => formula.includes(`[${t.def.label}]`)).map((t) => t.buff.id);
+  if (entry.ids.length || used.length) consume(actor, [...entry.ids, ...used]);
 }
 
 for (const kind of ["Save", "Skill", "Ability", "Cl", "Concentration"]) {
@@ -165,13 +226,6 @@ async function arm(actor) {
   refreshFootnotes(buff);
 }
 
-/** Luck variant channeling: arm (or disarm) the bonus for the creature's next roll. */
-export async function armLuck(buff, armed = true) {
-  const { bonus } = buff.flags[MODULE_ID].channelLuck;
-  await buff.update({ [`flags.${MODULE_ID}.channelLuck.armed`]: armed, name: `Luck Channel (+${bonus})${armed ? " (armed)" : ""}` });
-  refreshFootnotes(buff);
-}
-
 // At the start of the wizard's turn the old result is lost and a new one can be rolled. The
 // previous turn's offer is removed so the chat log doesn't fill with them.
 Hooks.on("combatTurnChange", async (combat, prior, current) => {
@@ -193,17 +247,6 @@ Hooks.on("combatTurnChange", async (combat, prior, current) => {
 
 Hooks.on("renderChatMessagePF", (message, html) => {
   const flags = message.flags[MODULE_ID];
-  // Luck variant channeling: each healed creature's owner can arm their bonus from the channel summary
-  if (flags?.channel?.results && flags.channel.variant?.name === "Luck" && flags.channel.heal) {
-    const content = html.querySelector(".message-content");
-    for (const uuid of flags.channel.targets) {
-      const actor = fromUuidSync(uuid)?.actor;
-      if (!actor?.isOwner || (game.user.isGM && actor.hasPlayerOwner)) continue; // the GM arms only creatures without a player
-      const buff = actor.itemTypes.buff.find((b) => b.isActive && b.flags[MODULE_ID]?.channelLuck && !b.flags[MODULE_ID].channelLuck.armed);
-      if (buff) content?.append(footnoteButton(`${actor.name}: use +${buff.flags[MODULE_ID].channelLuck.bonus} on my next roll`, "Arm the Luck channel bonus for the next attack, CMB check, save or skill check", () => armLuck(buff)));
-    }
-    return;
-  }
   if (!flags?.prescienceOffer && !flags?.prescienceRoll) return;
   const content = html.querySelector(".message-content");
   if (flags.prescienceOffer) {
@@ -232,9 +275,8 @@ registerFootnote((item) => {
   if (item.flags?.[MODULE_ID]?.fortune === "best") return ["Automated: every d20 you roll (attacks, saves, skill and ability checks) is rolled twice, keeping the better result."];
   const luck = item.flags[MODULE_ID]?.channelLuck;
   if (luck) {
-    const content = [luck.armed ? `Armed: +${luck.bonus} on your next attack roll, CMB check, saving throw or skill check.` : `+${luck.bonus} on one attack roll, CMB check, saving throw or skill check of your choice, before the end of the channeler's next turn. Arm it before the roll you want it on.`];
+    const content = [`Automated: +${luck.bonus} on one attack roll, CMB check, saving throw or skill check before the end of the channeler's next turn. Each roll window has a ticked box for it: untick it to save the bonus for a later roll. Rolls made without a window use it.`];
     if (item.isOwner) {
-      content.push(footnoteButton(luck.armed ? "Don't use it yet" : "Use it on my next roll", "Arm or disarm the bonus", () => armLuck(item, !luck.armed)));
       // "a channel bonus or a luck bonus (creature's choice)": only matters for stacking with other bonuses
       content.push(footnoteButton(`Make it a ${luck.type === "sacred" ? "luck" : "sacred"} bonus`, `It counts as a ${luck.type} bonus now; your choice only matters for stacking`, () => item.setFlag(MODULE_ID, "channelLuck.type", luck.type === "sacred" ? "luck" : "sacred").then(() => refreshFootnotes(item))));
     }
@@ -242,7 +284,7 @@ registerFootnote((item) => {
   }
   const next = NEXT_ROLL.find((def) => def.match(item));
   if (!next) return null;
-  const content = [`Automated: +${bonusOf(next, item)} on your next ${next.kinds.map((k) => ({ attack: "attack roll or CMB check", Save: "saving throw", Skill: "skill check" })[k]).join(", ")}, then this buff switches off.`];
+  const content = [`Automated: +${bonusOf(next, item)} on your next ${next.kinds.map((k) => ({ attack: "attack roll or CMB check", Save: "saving throw", Skill: "skill check" })[k]).join(", ")}, then this buff switches off. The roll window has a ticked box for it: untick it to save it for a later roll.`];
   return content;
   return null;
 });

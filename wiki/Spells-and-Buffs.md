@@ -45,6 +45,8 @@ The rules details are handled for you:
 
 ## One-roll buffs
 
+These are "on a single roll" bonuses, so the roll window shows a ticked box for each one (for example **☑ Guidance +1 (one roll)**, with `1[Guidance]` in the Situational Bonus field). Leave it ticked to use the bonus on this roll, or untick it to save it for a later one. Rolls made without a window (shift-click) use it automatically.
+
 | Buff | What happens |
 |---|---|
 | **True Strike** | +20 on your next attack roll (the first attack only, if you make several), then the buff switches off. |

@@ -83,6 +83,22 @@ export function registerFortuneTests(quench) {
             assert.notMatch((await save(ally)).rolls[0].formula, /Guidance/);
           });
 
+          it("the roll window has a ticked box: unticked, that roll goes without it and the bonus waits", async () => {
+            const guide = ally.items.getName("Guidance");
+            await guide.update({ "system.active": true });
+            const rolling = ally.rollSavingThrow("will");
+            const box = await waitFor(() => document.querySelector(".pf1e-revamp-next-roll input"), { what: "the one-roll checkbox" });
+            assert.isTrue(box.checked, "ticked by default");
+            box.checked = false;
+            box.dispatchEvent(new Event("change"));
+            box.closest(".application").querySelector('button[data-action="normal"]').click();
+            const result = await rolling;
+            assert.notMatch(result.rolls[0].formula, /Guidance/);
+            assert.isTrue(guide.isActive, "kept for a later roll");
+            assert.match((await save(ally)).rolls[0].formula, /1\[Guidance\]/, "a roll without a window uses it");
+            await waitFor(() => !guide.isActive);
+          });
+
           it("on a full attack, only the first attack", async () => {
             const guide = ally.items.getName("Guidance");
             await guide.update({ "system.active": true });
