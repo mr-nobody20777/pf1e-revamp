@@ -439,10 +439,12 @@ async function applyArchetype(plan, choices, archetypeItem) {
     toCreate.push({ data, level: add.level });
   }
   // Track them like PF1 does ({itemId: level} on the class), so leveling down removes them
+  // (created documents don't always come back in request order, so pair them up by source)
   const created = toCreate.length ? await actor.createEmbeddedDocuments("Item", toCreate.map((c) => c.data)) : [];
+  const levelOf = new Map(toCreate.map((c) => [c.data._stats?.compendiumSource, c.level]));
   const flagUpdate = classFlagUpdate(
     toDelete.map((i) => i.id),
-    created.map((item, i) => [item.id, toCreate[i].level])
+    created.map((item) => [item.id, levelOf.get(item._stats?.compendiumSource)])
   );
   if (Object.keys(flagUpdate).length) await classItem.update(flagUpdate);
 

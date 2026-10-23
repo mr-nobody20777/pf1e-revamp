@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Slayer talent picker.** It appears in PF1's level-up window at every even slayer level, and on the Slayer Talents feature for catching up.
+  - It has a search box, and marks each talent with requirements met / not met / check manually. Advanced talents show from 10th level.
+  - Follow-up choices are asked right away:
+    - **Ranger Combat Style**: the style, then a feat with prerequisites ignored; the 6th- and 10th-level lists open when it's taken again.
+    - **Rogue Talent**, plus the advanced and catfolk variants. Shared rogue talents are only offered through it.
+    - **Combat Trick** and **Feat**: feat picker with prerequisite marks, plus a "Browse all feats" button that opens PF1's Feat Browser.
+    - Grit, Toxin Training, Focusing Attack and Terrain Mastery ask their own question.
+  - Talents that grant a specific feat add it. Deleting a talent removes the feats it brought.
+- **Ranger combat style feats** at 2nd/6th/10th/14th/18th level: choose the style once, then feats from the lists unlocked at your level, prerequisites ignored.
+
+### Fixed
+- Archetype features and bloodline/domain/school powers added together could occasionally be recorded at each other's levels, because Foundry doesn't always return new items in the order they were requested. Leveling down then removed the wrong ones.
+
 ## 0.17.0: first public test release
 
 The first release for testing at a real table. Built and tested on Foundry VTT v13 (build 351) with the Pathfinder 1e system 11.11.

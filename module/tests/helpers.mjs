@@ -36,7 +36,9 @@ export async function addItems(actor, items) {
     if (overrides) foundry.utils.mergeObject(item, overrides);
     data.push(item);
   }
-  return actor.createEmbeddedDocuments("Item", data);
+  // created documents don't always come back in request order, so match them up by name
+  const created = await actor.createEmbeddedDocuments("Item", data);
+  return data.map((d) => created.splice(created.findIndex((c) => c.name === d.name), 1)[0]);
 }
 
 export async function removeItems(actor, names) {
@@ -44,14 +46,14 @@ export async function removeItems(actor, names) {
   if (ids.length) await actor.deleteEmbeddedDocuments("Item", ids);
 }
 
-export async function waitFor(check, { timeout = 8000, interval = 100 } = {}) {
+export async function waitFor(check, { timeout = 8000, interval = 100, what = "condition" } = {}) {
   const start = Date.now();
   while (Date.now() - start < timeout) {
     const result = await check();
     if (result) return result;
     await new Promise((r) => setTimeout(r, interval));
   }
-  throw new Error("Timed out waiting for condition");
+  throw new Error(`Timed out waiting for ${what}`);
 }
 
 /**

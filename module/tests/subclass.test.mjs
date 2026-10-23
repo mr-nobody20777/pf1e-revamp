@@ -55,6 +55,8 @@ export function registerSubclassTests(quench) {
           it("opposition schools: their spells cost two slots, including ones added later", async () => {
             const school = wizard.items.getName("Foresight Subschool");
             assert.equal(specialtyOf(school), "div");
+            // PF1 sets up a new wizard's spellbook a moment after the class is added
+            await waitFor(() => Object.values(wizard.system.attributes.spells.spellbooks).some((b) => b.inUse && b.class === "wizard"));
             const book = { system: { spellbook: "primary", level: 1 } };
             const [missile, armor] = await addItems(wizard, [["pf1.spells", "Magic Missile", book], ["pf1.spells", "Mage Armor", book]]);
             await setOpposition(wizard, school, ["evo", "nec"]);

@@ -14,7 +14,7 @@ PF1e Revamp makes the **class features, archetypes, racial traits, character tra
 
 ## ✨ Highlights
 
-- **Classes.** Cleric channel energy that targets the burst and rolls the saves; spontaneous cure casting in one click; skald raging songs with per-round costs; slayer studied target and quarry; sorcerer bloodline powers; chronomancer temporal pool. → [Classes](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Classes)
+- **Classes.** Cleric channel energy that targets the burst and rolls the saves; spontaneous cure casting in one click; skald raging songs with per-round costs; slayer studied target, quarry and a **searchable slayer-talent picker** (including Ranger Combat Style and Rogue Talent choices); ranger combat style feats; sorcerer bloodline powers; chronomancer temporal pool. → [Classes](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Classes)
 - **Archetypes.** Add an archetype and it actually changes the class: replaced features go, new ones arrive at the right levels, and altered features are renamed and changed. Removing it puts everything back. → [Archetypes](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Archetypes)
 - **Races.** Pick standard or alternate racial traits from a checklist; the "+2 to any ability" gets a picker; racial fire resistance actually reduces fire damage. → [Races](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Races)
 - **Traits.** Traits with a choice ask for it, and traits whose PF1 version was wrong (like Magical Knack) follow the rules. → [Traits](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Traits)
@@ -53,7 +53,7 @@ Updates appear through Foundry's normal module update check.
 
 ## 🧪 Quality
 
-Every feature ships with automated tests (113 and counting, run before every release), has been played through as a non-GM player, and goes through a performance review every ten features. The module's share of a busy session's processing is about 0.2%. Details: [Testing and Reviews](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Testing-and-Reviews).
+Every feature ships with automated tests (122 and counting, run before every release), has been played through as a non-GM player, and goes through a performance review every ten features. The module's share of a busy session's processing is about 0.2%. Details: [Testing and Reviews](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Testing-and-Reviews).
 
 ## 🐞 Issues and suggestions
 

@@ -2,6 +2,7 @@
 
 - [Bloodlines, domains and arcane schools](#bloodlines-domains-and-arcane-schools)
 - [Cleric](#cleric)
+- [Ranger](#ranger)
 - [Skald](#skald)
 - [Slayer](#slayer)
 - [Sorcerer](#sorcerer)
@@ -64,6 +65,19 @@ Good clerics get **cure** spells and evil clerics get **inflict** spells. A neut
 
 ---
 
+## Ranger
+
+### Combat style feats
+**Before:** the ranger's combat style and its bonus feats were picked by hand from the style's text.
+
+**Now:** at each combat style feat level (2nd, 6th, 10th, 14th, 18th), PF1's level-up window has a **Combat style feat** section with a **Choose…** button:
+1. The first time, pick your **combat style** (Archery, Two-Weapon Combat, Weapon and Shield and the rest). It's fixed after that, as the rules say.
+2. Pick a feat from the style's lists **unlocked at your level**: the first list, plus the 6th-level list from 6th, plus the 10th-level list from 10th. **Prerequisites are ignored**, as the class feature allows, and feats you already have aren't offered.
+
+The **Combat Style Feat** feature's note shows your style and how many style feats you've chosen, with a **Choose feat…** button to catch up. It also reminds you that the feats only work in light, medium or no armor.
+
+---
+
 ## Skald
 
 ### Raging Song
@@ -82,6 +96,36 @@ Songs can also be started from the song item's own Use button or its note's *Sta
 ---
 
 ## Slayer
+
+### Slayer talents
+**Before:** talents were picked by hand from the compendium, with no check of their requirements. Talents that lead to another choice (Ranger Combat Style, Rogue Talent, Combat Trick) were also done by hand.
+
+**Now:** at every even slayer level, PF1's level-up window has a **Slayer talent** section with a **Choose…** button. The talent is added when you click Finish. The **Slayer Talents** feature's note shows how many talents you've chosen ("3 of 4") and has a **Choose talent…** button for catching up.
+
+The talent picker:
+- has a **search box**;
+- marks each talent **✓** (you meet its requirements), **✗** (you don't, with why, e.g. *needs slayer level 4* or *needs jaguar's grace*) or **?** (the module can't tell, e.g. *needs dimension door as a spell-like ability*);
+- shows **advanced talents** from 10th level;
+- hides talents you already have, unless the talent can be taken more than once (Deadly Range, Terrain Mastery, Toxin Training and others).
+
+**Talents that lead to another choice** ask right away:
+
+| Talent | What it asks |
+|---|---|
+| **Rogue Talent** | Which rogue talent, from its list (Bleeding Attack, Combat Trick, Fast Stealth, Weapon Training…), with requirement marks. Shared rogue talents are only offered this way, as the rules say. *Rogue and Ninja Advanced Talents* and *Catfolk Rogue Talent* work the same way. |
+| **Ranger Combat Style** | Your combat style (the first time only), then a feat from its first list, **ignoring prerequisites**. Taken again at 6th level, the style's 6th-level feats are added to the list; again at 10th, its 10th-level feats. |
+| **Combat Trick** | Any combat feat, with ✓/✗ prerequisite marks. |
+| **Feat** (advanced) | Any feat, with ✓/✗ prerequisite marks. |
+| **Grit** | A grit feat; Amateur Gunslinger is added too. |
+| **Toxin Training** | An ability score (a different one each time). |
+| **Focusing Attack** | A condition: confused, shaken or sickened (a different one each time). |
+| **Terrain Mastery** | A favored terrain. |
+
+**Talents that hand you a specific feat** add it for you: Weapon Training (Weapon Focus), Finesse Rogue (Weapon Finesse), Firearm Training, Sticks and Stones (Catch Off-Guard), Unbalancing Trick (Improved Trip), Underhanded Trick (Improved Dirty Trick), Blinding Strike (Blinding Critical).
+
+**Long feat lists** (Combat Trick, Feat) also have a **Browse all feats…** button that opens PF1's Feat Browser, for its filters. Drag the feat you want onto your sheet and it's linked to the talent. **The Feat Browser can't check prerequisites**, so make sure you qualify.
+
+**Undoing:** deleting a talent also removes the feats it brought.
 
 ### Studied Target
 **Before:** PF1 lists the bonuses as reminders; you add them by hand.

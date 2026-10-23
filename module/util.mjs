@@ -146,8 +146,10 @@ export async function createClassFeatures(classItem, entries) {
     levels.push(level);
   }
   if (!data.length) return [];
+  // created documents don't always come back in request order, so pair them up by source
   const created = await classItem.actor.createEmbeddedDocuments("Item", data);
-  await classItem.update(classFlagUpdate([], created.map((item, i) => [item.id, levels[i]])));
+  const levelOf = new Map(data.map((d, i) => [d._stats?.compendiumSource, levels[i]]));
+  await classItem.update(classFlagUpdate([], created.map((item) => [item.id, levelOf.get(item._stats?.compendiumSource)])));
   return created;
 }
 

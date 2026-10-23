@@ -46,15 +46,17 @@ export function registerTemporalPoolTests(quench) {
         it("Forewarned: offered when initiative is rolled; +1d4 to an ally for 1 point", async () => {
           const combat = await Combat.create({ scene: canvas.scene.id, active: true, flags: { [MODULE_ID]: { quench: true } } });
           try {
-            const [cw, ca] = await combat.createEmbeddedDocuments("Combatant", [
+            // created documents don't always come back in request order
+            const created = await combat.createEmbeddedDocuments("Combatant", [
               { tokenId: tokens[0].id, sceneId: canvas.scene.id, actorId: wizard.id },
               { tokenId: tokens[1].id, sceneId: canvas.scene.id, actorId: ally.id, initiative: 10 },
             ]);
+            const [cw, ca] = [wizard, ally].map((a) => created.find((c) => c.actorId === a.id));
             await cw.update({ initiative: 15 });
-            const offer = await waitFor(() => game.messages.contents.find((m) => m.getFlag(MODULE_ID, "forewarnedOffer")?.combat === combat.id));
+            const offer = await waitFor(() => game.messages.contents.find((m) => m.getFlag(MODULE_ID, "forewarnedOffer")?.combat === combat.id), { what: "the Forewarned offer" });
             assert.includeMembers(offer.getFlag(MODULE_ID, "forewarnedOffer").combatants, [cw.id, ca.id], "self and the adjacent ally");
             await forewarn(pool, combat, ca.id);
-            await waitFor(() => ca.initiative > 10);
+            await waitFor(() => ca.initiative > 10, { what: "the ally's initiative to rise" });
             assert.isAtMost(ca.initiative, 14);
             assert.equal(pool.system.uses.value, 1);
           } finally {

@@ -19,6 +19,7 @@ import { registerTemporalPoolTests } from "./temporal-pool.test.mjs";
 import { registerRaceTests } from "./races.test.mjs";
 import { registerSaveBonusTests } from "./save-bonuses.test.mjs";
 import { registerTraitTests } from "./traits.test.mjs";
+import { registerTalentTests } from "./talents.test.mjs";
 
 export function registerTests(quench) {
   registerTwoWeaponTests(quench);
@@ -40,4 +41,5 @@ export function registerTests(quench) {
   registerRaceTests(quench);
   registerSaveBonusTests(quench);
   registerTraitTests(quench);
+  registerTalentTests(quench);
 }
