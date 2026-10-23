@@ -81,8 +81,12 @@ export function registerChannelEnergyTests(quench) {
           try {
             await ally.update({ "system.attributes.hp.value": 1 });
             const msg = await use("Positive - Heal living", [tokens.ally.object]);
-            const { variant, amount } = msg.getFlag(MODULE_ID, "channel");
-            assert.equal(amount, Math.floor(variant.rolled / 2), "halved");
+            const { variant, amount, card } = msg.getFlag(MODULE_ID, "channel");
+            assert.isTrue(variant.halved);
+            // PF1's own card shows the halved roll, so there's one number in chat
+            const roll = (await fromUuid(card)).systemRolls.attacks[0].damage[0];
+            assert.match(roll.formula, /^floor\(/);
+            assert.equal(roll.total, amount);
             assert.equal(ally.system.attributes.hp.value, 1 + amount);
             const buff = await waitFor(() => ally.itemTypes.buff.find((b) => b.flags[MODULE_ID]?.channelLuck?.bonus === 1 && b.isActive));
             const save = await ally.rollSavingThrow("will", { skipDialog: true });

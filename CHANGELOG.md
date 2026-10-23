@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### New
-- **Variant channeling** (optional rule from *Ultimate Magic*, off by default under Settings). New clerics choose standard channel energy or one of 45 portfolio variants in the level-up window; existing channelers choose once from Channel Energy's note, and the choice locks (the GM can reset it). Healing with positive energy or harming with negative energy is halved per the rules, and the summary shows the portfolio's effect. **Luck** is fully automated: healed creatures get a one-roll bonus, and the negative-energy version applies a d20 penalty unless the save succeeds.
+- **Variant channeling** (optional rule from *Ultimate Magic*, off by default under Settings). New clerics choose standard channel energy or one of 45 portfolio variants in the level-up window; existing channelers choose once from Channel Energy's note, and the choice locks (the GM can reset it). Healing with positive energy or harming with negative energy is halved per the rules (on PF1's own card, so chat shows one number), and the summary shows the portfolio's effect. The choice appears on the sheet as a "Variant Channeling (portfolio)" class feature with its rules text. **Luck** is fully automated: healed creatures get a one-roll bonus, and the negative-energy version applies a d20 penalty unless the save succeeds.
 - **Searchable dropdowns everywhere.** Any list the module adds with more than 10 options has a search box: bloodlines, domains, arcane schools, the new channeling choice, and long trait choices (like Gifted Adept's spell list).
 
 ### Fixed

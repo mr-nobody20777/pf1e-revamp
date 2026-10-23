@@ -68,12 +68,10 @@ Hooks.on("pf1CreateActionUse", (actionUse) => {
  */
 export async function channel(actionUse, { targets = null } = {}) {
   const { actor, item, action } = actionUse;
-  const rolled = actionUse.shared.chatAttacks?.[0]?.damage?.total ?? 0;
+  const amount = actionUse.shared.chatAttacks?.[0]?.damage?.total ?? 0; // already halved for a variant (pf1PreDamageRoll)
   const dc = actionUse.shared.saveDC;
   const mode = modeOf(action);
-  // Variant channeling: half healing (or damage) for the portfolio's effect
   const variant = variantEffect(item, mode);
-  const amount = variant?.halved ? Math.floor(rolled / 2) : rolled;
   const refund = () => item.update({ "system.uses.value": (item.system.uses.value ?? 0) + 1 });
 
   const clericToken = actor.getActiveTokens()[0];
@@ -100,7 +98,7 @@ export async function channel(actionUse, { targets = null } = {}) {
     const who = mode.undead ? "undead" : "living creatures";
     chosen = await foundry.applications.api.DialogV2.wait({
       window: { title: `${action.name}` },
-      content: `<p><strong>${esc(action.name)}</strong>: ${mode.heal ? "heals" : "deals"} <strong>${amount}</strong>${variant?.halved ? ` (half of ${rolled}: ${esc(variant.name)} variant)` : ""}${mode.heal ? "" : variant ? `, Will DC ${dc} negates the variant effect` : `, Will DC ${dc} for half`}.</p>
+      content: `<p><strong>${esc(action.name)}</strong>: ${mode.heal ? "heals" : "deals"} <strong>${amount}</strong>${variant?.halved ? ` (halved: ${esc(variant.name)} variant)` : ""}${mode.heal ? "" : variant ? `, Will DC ${dc} negates the variant effect` : `, Will DC ${dc} for half`}.</p>
         ${variant ? `<p style="font-size:11px"><strong>${esc(variant.name)}:</strong> ${esc(variant.text)}</p>` : ""}
         <p style="font-size:11px; opacity:0.8">Affects all ${who} within ${RADIUS} ft. You can leave yourself out.
         ${selective ? `Selective Channeling: you may also exclude up to ${maxExcluded} other target(s).` : "Others can only be excluded with Selective Channeling."}
@@ -141,12 +139,21 @@ export async function channel(actionUse, { targets = null } = {}) {
       [MODULE_ID]: {
         channel: {
           heal: mode.heal, amount, dc, card: actionUse.shared.message?.uuid ?? null, targets: chosen.map((t) => t.document.uuid), label: action.name,
-          variant: variant && { ...variant, rolled, bonus: channelBonus(classLevel(item, "cleric")), source: actor.name },
+          variant: variant && { ...variant, bonus: channelBonus(classLevel(item, "cleric")), source: actor.name },
         },
       },
     },
   });
 }
+
+// Variant channeling halves the roll itself, so PF1's card shows the amount that's actually applied
+Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
+  if (!isChannel(action.item) || !variantEffect(action.item, modeOf(action))?.halved) return;
+  for (const part of parts) {
+    part.base = `floor((${[part.base, ...part.extra].join(" + ")}) / 2)`;
+    part.extra = [];
+  }
+});
 
 // item.use({ options: { channelTargets: [tokens] } }) skips the checklist (macros, tests)
 Hooks.on("pf1PostActionUse", (actionUse) => {
@@ -180,7 +187,7 @@ onGmRequest("channel", async (message, data) => {
     results.push({ name: actor.name, text: extra ? `${text}, ${extra}` : text });
   }
   const list = results.map((r) => `${esc(r.name)} ${esc(r.text)}`).join(" · ");
-  const amountText = variant?.halved ? `${data.amount}, half of ${variant.rolled}` : `${data.amount}`;
+  const amountText = variant?.halved ? `${data.amount}, halved by ${esc(variant.name)} variant` : `${data.amount}`;
   const saveText = data.heal ? "" : variant ? `, Will DC ${data.dc} negates ${esc(variant.name)} effect` : `, Will DC ${data.dc} half`;
   await message.update({
     content: `<p><strong>${esc(data.label)}</strong> (${amountText}${saveText}): ${list || "no creatures affected."}</p>${variant ? `<p style="font-size:11px"><strong>${esc(variant.name)} variant:</strong> ${esc(variant.text)}</p>` : ""}`,
