@@ -15,6 +15,18 @@
 - **Ranger combat style feats** at 2nd/6th/10th/14th/18th level: choose the style once, then feats from the lists unlocked at your level, prerequisites ignored.
 
 ### Fixed
+- Found by sweeping every compendium entry through the module's parsers:
+  - Feat prerequisites: skill ranks, races, size, base saves, Hit Dice, "ability to cast … spells", class features and "X or Y" are now checked. Things that aren't feats are no longer marked ✗ "feat not found" (1,302 wrong marks across 3,564 feats). Feat names containing "and" (Craft Magic Arms and Armor) are no longer split in two.
+  - Rogue and Ninja Advanced Talents now offers Evasion (Trick) and, as the rules allow, any rogue advanced talent. The talent lists are read from the entries' links instead of matching names.
+  - Underhanded and Underwater combat styles were missing their first feat list.
+  - Racial trait review: alternates that replace several traits separated by semicolons now replace all of them. "Language" matches "Languages". Replaced items that aren't trait items ("Base Statistics", or a trait pf-content lacks) are marked "adjust by hand".
+  - Bloodline/domain/school review: power names no longer pick up headings ("Solitude Domain Powers Resistant Touch"); powers found under a slightly different name aren't reported missing; Fey Bloodline's Woodland Stride arrives at 3rd level, not 1st.
+  - Bloodlines whose PF1 entry doesn't list its powers (Orc, Shadow and 34 others) now say so, instead of opening an empty review.
+- Feat prerequisite marks:
+  - Shield, armor, simple and martial weapon proficiency now count however you got them, not only as a feat (a slayer's class shield proficiency qualifies for Shield Focus).
+  - "8th-level fighter" checks fighter levels, not character level.
+  - "Light Armor Proficiency, Medium Armor Proficiency" is read correctly.
+  - Requirements that depend on your choice ("Weapon Focus with selected weapon") say "check manually" instead of ✗.
 - Level-up choices (slayer talent, ranger style feat, sorcerer bonus feat, a new class's bloodline/domain/school) could be lost when leveling the same class twice within about 10 seconds: closing the previous level-up window cleared the next one's choice.
 - Racial trait review: Adoptive Parentage (Weapon Focus) and 14 Changeling and Dhampir heritage traits showed as standard traits instead of alternates, because their "Replaced Trait(s)" label is formatted differently in pf-content.
 - Archetype features and bloodline/domain/school powers added together could occasionally be recorded at each other's levels, because Foundry doesn't always return new items in the order they were requested. Leveling down then removed the wrong ones.

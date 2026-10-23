@@ -67,25 +67,20 @@ async function data() {
     .map(entry)
     .map((t) => ({ ...t, advanced: t.tags.includes("Slayer Talent, Advanced"), shared: t.tags.some((x) => SHARED.includes(x)) }));
 
-  // Talents reachable only through a list ("Rogue Talent", "Rogue and Ninja Advanced Talents", "Catfolk Rogue Talent")
-  const sharedPool = index.filter((e) => tagged(e, SHARED)).map(entry);
-  const catfolkPool = index.filter((e) => /^(Deadly Scratch|Graceful Faller|Nimble Climber|Vicious Claws)/i.test(e.name)).map(entry);
+  // Talents reachable only through a list ("Rogue Talent", "Rogue and Ninja Advanced Talents", "Catfolk Rogue
+  // Talent"). The lists are compendium links, some without a label, so read the links themselves.
+  const byId = new Map(index.map((e) => [e._id, e]));
   const lists = {};
-  for (const t of talents.filter((t) => /in place of a slayer (?:advanced )?talent:/i.test(t.text))) {
-    const segment = t.text.split(/in place of a slayer (?:advanced )?talent:/i)[1].split(/\s(?:or any|Any talent|A slayer can)\b/)[0];
-    const pool = /catfolk/i.test(t.name) ? catfolkPool : sharedPool;
-    // Names run together in the text ("Bleeding Attack Camouflage Combat Trick ..."): match known names, longest first
-    const names = [...new Set(pool.map((d) => stem(d.name)))].sort((a, b) => b.length - a.length);
-    const found = [];
-    let rest = ` ${segment} `;
-    for (const n of names) {
-      const re = new RegExp(`\\s${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?=\\s)`, "i");
-      if (re.test(rest)) {
-        found.push(pool.find((d) => stem(d.name) === n));
-        rest = rest.replace(re, " ");
-      }
-    }
-    lists[t.name] = found.map((x) => ({ ...x, advanced: x.tags.some((tag) => /Advanced|Master/.test(tag)) }));
+  for (const e of index.filter((e) => tagged(e, ["Slayer Talent", "Slayer Talent, Advanced"]))) {
+    const html = e.system?.description?.value ?? "";
+    if (!/in place of a slayer (?:advanced )?talent/i.test(html)) continue;
+    const found = [...html.matchAll(/@UUID\[Compendium\.[\w-]+\.[\w-]+\.(?:Item\.)?(\w+)\]/g)].map((m) => byId.get(m[1])).filter(Boolean);
+    // "... or any rogue advanced talent"
+    if (/or any rogue advanced talent/i.test(html)) found.push(...index.filter((x) => tagged(x, ["Rogue Talent, Advanced"])));
+    lists[e.name] = [...new Map(found.map((x) => [x._id, x])).values()]
+      .map(entry)
+      .map((x) => ({ ...x, advanced: x.tags.some((tag) => /Advanced|Master/.test(tag)) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   // Ranger combat styles: feat lists by level
@@ -99,7 +94,7 @@ async function data() {
         name: doc.name,
         uuid: doc.uuid,
         tiers: {
-          2: split(t.match(/whenever he gains a combat style feat:\s*([^.]+)\./i)?.[1]),
+          2: split(t.match(/whenever he gains a combat style feat[^:]*:\s*([^.]+)\./i)?.[1]),
           6: split(t.match(/At 6th level, he adds ([^.]+?) to the list/i)?.[1]),
           10: split(t.match(/At 10th level, he adds ([^.]+?) to the list/i)?.[1]),
         },

@@ -55,11 +55,18 @@ function powerLevel(doc) {
   return m ? { level: Number(m[1]), guessed: false } : { level: 1, guessed: true };
 }
 
-async function findPowers(subclass, kind) {
+export async function findPowers(subclass, kind = kindOf(subclass)) {
+  const text = plainText(subclass.system.description.value);
   const found = new Map();
   const add = (doc, how) => {
-    if (!doc || found.has(doc.uuid) || doc.uuid === subclass._stats?.compendiumSource) return;
-    const { level, guessed } = powerLevel(doc);
+    if (!doc || found.has(doc.uuid) || doc.uuid === subclass._stats?.compendiumSource || doc.name === subclass.name) return;
+    let { level, guessed } = powerLevel(doc);
+    if (guessed) {
+      // The subclass text may give it: "Woodland Stride (Ex): At 3rd level, ..."
+      const name = doc.name.replace(/\s*\([^()]*\)\s*$/, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const m = text.match(new RegExp(`${name}\\s*\\((?:Ex|Su|Sp)\\)\\s*:?\\s*(?:At|Starting at|Beginning at) (\\d+)(?:st|nd|rd|th) level`, "i"));
+      if (m) [level, guessed] = [Number(m[1]), false];
+    }
     found.set(doc.uuid, { uuid: doc.uuid, name: doc.name, level, how, flags: guessed ? ["level guessed"] : [] });
   };
 
@@ -87,15 +94,17 @@ async function findPowers(subclass, kind) {
   }
 
   // 3. Power names in the subclass text ("Name (Su)"), matched by name among this class's features
-  const text = plainText(subclass.system.description.value);
-  const names = [...new Set([...text.matchAll(/([A-Z][\w' -]{2,40}?)\s*\((?:Ex|Su|Sp)\)/g)].map((m) => m[1].trim()))];
+  // (a heading can run into the name: "Realization Domain Powers Strength Surge (Su)")
+  const names = [...new Set([...text.matchAll(/([A-Z][\w' -]{2,40}?)\s*\((?:Ex|Su|Sp)\)/g)].map((m) => m[1].replace(/^.*\bPowers\s+/, "").trim()))];
+  // "Strength Surge" is the item "Strength Surge (Domain Power)"
+  const base = (s) => norm(s.replace(/\s*\([^()]*\)\s*$/, ""));
   const textOnly = [];
   for (const name of names) {
-    if ([...found.values()].some((p) => norm(p.name) === norm(name))) continue;
+    if ([...found.values()].some((p) => base(p.name) === base(name))) continue;
     let hit = null;
     for (const { pack, index } of indexes) {
       const entry = index.find(
-        (e) => norm(e.name) === norm(name) && (e.system?.associations?.classes ?? []).some((c) => norm(c) === norm(kind.className))
+        (e) => base(e.name) === base(name) && (e.system?.associations?.classes ?? []).some((c) => norm(c) === norm(kind.className))
       );
       if (entry) { hit = await pack.getDocument(entry._id); break; }
     }
@@ -139,6 +148,10 @@ export async function promptApply(actor, subclass, { grantAll = false } = {}) {
   if (!classItem) return ui.notifications.warn(`${subclass.name}: ${actor.name} has no ${kind.className} class.`);
 
   const { powers, textOnly } = await findPowers(subclass, kind);
+  // Many of PF1's bloodline entries stop at the bloodline arcana and never name their powers
+  if (!powers.length && !textOnly.length) {
+    return ui.notifications.warn(`${subclass.name}: PF1's entry doesn't list its powers, so they can't be added automatically. Add them from the Class Abilities compendium by hand.`, { permanent: true });
+  }
   for (const p of powers) p.existing = existingFor(actor, p)?.id ?? null;
 
   const rows = powers

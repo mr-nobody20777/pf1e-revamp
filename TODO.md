@@ -44,6 +44,9 @@ Status: ⬜ not started · 🟨 designed / in progress · ✅ done (move to CHAN
 - ⬜ Battle Scion Battle Prowess (3rd+): combat/teamwork feat instead of a rage power, grantable to allies under inspired rage at 2 rounds of song per round.
 - ⬜ Studied Ally (slayer talent): study an ally; +bonus on aid another. Counts against studied targets.
 - ⬜ Quarry: auto-confirm crits against the quarry. Now possible with the ChatAttack wrapper that Swordlord's Page uses (it was a reminder note before).
+- ⬜ **Missing bloodline power lists** (data sweep 2026-10-23): 36 PF1 bloodline entries (Orc, Shadow, Phoenix, Djinni…) and 4 domains never name their powers; the power items exist but are untagged. Needs a hand-written bloodline → powers map (like `EXTRA_POWERS`). Also domain powers PF1 lacks as items (Frog, Aquatic, Swamp, Cave…).
+- ⬜ Underwater combat style: Dolphin Dart/Circle and Shark Tear/Leap still need their style feat; the picker currently ignores all prerequisites.
+- ⬜ Heritages that replace "Base Statistics" (Sunsoul Ifrit, Angelkin Aasimar…) should swap the race's ability modifiers; now flagged "adjust by hand".
 - ⬜ Other bloodlines/domains/schools: powers are granted, but their special rules are mostly reminders. Prioritize what players actually use.
 - ⬜ Other archetypes: the structural changes work; write bonuses into `archetype-rules.mjs` as players pick them.
 

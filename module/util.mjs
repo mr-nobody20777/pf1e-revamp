@@ -29,7 +29,7 @@ document.addEventListener(
 /** HTML description → plain text, with enricher links reduced to their labels. */
 export function plainText(html) {
   const div = document.createElement("div");
-  div.innerHTML = (html ?? "").replace(/@UUID\[[^\]]+\](?:\{([^}]+)\})?/g, "$1").replace(/<br\s*\/?>|<\/p>|<\/li>/g, " ");
+  div.innerHTML = (html ?? "").replace(/@UUID\[[^\]]+\](?:\{([^}]+)\})?/g, "$1").replace(/<br\s*\/?>|<\/(?:p|li|h\d|div)>/g, " ");
   return div.textContent.replace(/[’‘]/g, "'").replace(/\s+/g, " ").trim();
 }
 

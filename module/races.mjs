@@ -26,12 +26,15 @@ const ENERGY = ["acid", "cold", "electric", "electricity", "fire", "sonic"];
 const stem = (name) => name.replace(/\s*\([^()]*\)\s*$/, "").trim();
 const sameChange = (a, b) => a.target === b.target && String(a.formula).trim() === String(b.formula).trim();
 
+// Trait names compared loosely: "Language" replaces "Languages"
+const traitKey = (name) => norm(name).replace(/s\b/g, "");
+
 /** "Replaced Trait(s): Skilled, Bonus Feat" → ["Skilled", "Bonus Feat"] */
 function replacedBy(doc) {
   // Tags become line breaks: some entries bold each word ("<strong>Replaced</strong> <strong>Trait(s)</strong>")
   const text = (doc.system.description?.value ?? "").replace(/<[^>]+>/g, "\n");
   const m = text.match(/Replaced\s+Trait\(s\)\s*:\s*([^\n]+)/i);
-  return m ? m[1].split(/\s*,\s*/).map((s) => s.trim()).filter(Boolean) : [];
+  return m ? m[1].split(/\s*[,;]\s*/).map((s) => s.trim()).filter(Boolean) : []; // some lists use semicolons
 }
 
 /**
@@ -73,13 +76,16 @@ export async function promptRacialTraits(actor, race, { choose = null } = {}) {
   if (choose) {
     picked = { alternates: alternates.filter((t) => choose.alternates?.includes(t.doc.name)), abilities: choose.abilities ?? {}, standard };
   } else {
+    // Replaced names with no trait item to drop ("Base Statistics", or a trait pf-content lacks) are left to the player
+    const standardKeys = new Set(standard.map((t) => traitKey(stem(t.doc.name))));
+    const replacedText = (t) => t.replaces.map((r) => (standardKeys.has(traitKey(r)) ? esc(r) : `${esc(r)} <em data-tooltip="Not a trait item on this list, so it isn't removed automatically">(adjust by hand)</em>`)).join(", ");
     const row = (t, i, kind) => {
       const existing = onSheet(actor, t.doc);
       const selects = Array.from({ length: t.choices }, (_, n) => abilitySelect(`${kind}${i}ab${n}`, kind === "alt")).join("");
       return `<label style="display:block; margin:2px 0">
         <input type="checkbox" name="${kind}" value="${i}" ${kind === "std" ? "checked" : ""} data-replaces="${esc(t.replaces.join("|"))}" data-stem="${esc(stem(t.doc.name))}">
         ${esc(t.doc.name)}${openLink(t.doc.uuid)}${selects}${existing ? ' <em style="opacity:0.7">(already on sheet)</em>' : ""}
-        ${t.replaces.length ? `<span style="font-size:11px; opacity:0.75"> — replaces ${esc(t.replaces.join(", "))}</span>` : ""}</label>`;
+        ${t.replaces.length ? `<span style="font-size:11px; opacity:0.75"> — replaces ${replacedText(t)}</span>` : ""}</label>`;
     };
     picked = await foundry.applications.api.DialogV2.wait({
       window: { title: `${race.name}: racial traits`, resizable: true },
@@ -94,8 +100,8 @@ export async function promptRacialTraits(actor, race, { choose = null } = {}) {
           box.addEventListener("change", () => {
             for (const sel of box.parentElement.querySelectorAll("select")) sel.disabled = !box.checked;
             if (!box.checked) return;
-            const replaced = box.dataset.replaces.split("|").map(norm);
-            for (const std of form.querySelectorAll('input[name="std"]')) if (replaced.includes(norm(std.dataset.stem))) std.checked = false;
+            const replaced = box.dataset.replaces.split("|").map(traitKey);
+            for (const std of form.querySelectorAll('input[name="std"]')) if (replaced.includes(traitKey(std.dataset.stem))) std.checked = false;
           });
         }
       },
@@ -138,14 +144,14 @@ function resistanceGrants(doc) {
 }
 
 async function applyRacialTraits(actor, race, { standard, alternates, abilities }) {
-  const replaced = new Set(alternates.flatMap((t) => t.replaces.map(norm)));
-  const keep = standard.filter((t) => !replaced.has(norm(stem(t.doc.name))));
-  const dropped = standard.filter((t) => replaced.has(norm(stem(t.doc.name))));
+  const replaced = new Set(alternates.flatMap((t) => t.replaces.map(traitKey)));
+  const keep = standard.filter((t) => !replaced.has(traitKey(stem(t.doc.name))));
+  const dropped = standard.filter((t) => replaced.has(traitKey(stem(t.doc.name))));
   const raceChanges = foundry.utils.deepClone(race._source.system.changes ?? []);
 
   // A replaced trait's bonuses may live on the race item itself (Skilled → its extra skill ranks)
   const allStandard = (await traitsFor(race.name)).filter((t) => !t.replaces.length);
-  const droppedChanges = allStandard.filter((t) => replaced.has(norm(stem(t.doc.name)))).flatMap((t) => t.doc.system.changes ?? []);
+  const droppedChanges = allStandard.filter((t) => replaced.has(traitKey(stem(t.doc.name)))).flatMap((t) => t.doc.system.changes ?? []);
   const newRaceChanges = raceChanges.filter((c) => !droppedChanges.some((d) => d.target && sameChange(c, d)));
 
   const data = [];

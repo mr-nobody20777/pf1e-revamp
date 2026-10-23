@@ -2,7 +2,8 @@
 // Rogue Talent talent, follow-up choices (combat style, rogue talent, bonus feats), undo, slots, the
 // ranger's style feats, and the picker's search box.
 
-import { createTestActor, addItems, waitFor, waitForItem, cleanup } from "./helpers.mjs";
+import { createTestActor, fromPack, addItems, waitFor, waitForItem, cleanup } from "./helpers.mjs";
+import { checkPrerequisites } from "../prereqs.mjs";
 import { talentOptions, chooseSlayerTalent, chooseRangerStyleFeat, applyPlan, slayerSlots, rangerSlots, requirementsOf } from "../talents.mjs";
 
 const MODULE_ID = "pf1e-revamp";
@@ -53,6 +54,14 @@ export function registerTalentTests(quench) {
           assert.deepEqual(requirementsOf("The slayer must be at least 6th level and have the poison use talent to select this talent.").talents, ["poison use"]);
           assert.deepEqual(requirementsOf("A slayer must have the armored marauder slayer talent to select this talent.").talents, ["armored marauder"]);
           assert.deepEqual(requirementsOf("The character must have cold resistance from a racial trait and the shadow's chill talent before choosing this talent.").talents, ["shadow's chill"]);
+        });
+
+        it("feat prerequisites: proficiency from the class counts; '8th-level fighter' means fighter levels", async () => {
+          const feat = async (name) => fromPack("pf1.feats", name);
+          const focus = checkPrerequisites(await feat("Shield Focus"), slayer);
+          assert.equal(focus.status, "met", focus.summary); // slayers are proficient with shields, no feat needed
+          const greater = checkPrerequisites(await feat("Greater Shield Focus"), slayer);
+          assert.match(greater.summary, /✗ 8th-level fighter \(you have 0 fighter levels\)/);
         });
 
         it("Ranger Combat Style: choose the style, then a feat with prerequisites ignored", async () => {
