@@ -58,6 +58,11 @@ Status: ⬜ not started · 🟨 designed / in progress · ✅ done (move to CHAN
 ## Traits
 - ⬜ Oppressive Expectations / Dependent: only if the table enters DCs on checks (both trigger on failure).
 
+## From manual QA (2026-10-23, QA/2026-10-23/MANUAL-QA.md)
+- ⬜ Channel Energy refunded (no token / cancelled checklist): PF1's chat card still shows the pre-refund uses (e.g. 2/3).
+- ⬜ Pickers: clicking Choose with nothing selected silently does nothing; say "Pick one first".
+- ⬜ QA coverage still pending: other races, trait choices, two-weapon variants, channel harm/saves/Selective Channeling, studied target cleanup, archetype removal, player permissions, multi-client.
+
 ## Quality and release
 - ⬜ **Performance review #3** at 10 features since review #2 (count: opposition schools, Blossoming Light L3, racial traits, save bonuses, character traits, slayer talents/ranger styles = 6/10).
 - ⬜ Test Two-Weapon Rend's click-to-roll button (never covered by a test).
