@@ -65,6 +65,10 @@ Status: ⬜ not started · 🟨 designed / in progress · ✅ done (move to CHAN
 - ⬜ Pickers: clicking Choose with nothing selected silently does nothing; say "Pick one first".
 - ⬜ QA coverage still pending: other races, trait choices, two-weapon variants, channel harm/saves/Selective Channeling, studied target cleanup, archetype removal, player permissions, multi-client.
 
+## Architecture and UX research
+- ⬜ **One data-driven rules layer, PF2e "rule element" style** (user: "very, very good point", 2026-10-23). We keep five separate rule tables (ARCHETYPE_RULES, fortune NEXT_ROLL, buff-grants GRANTS, traits RULES, save-bonus KEYWORDS). Merge them into one format ("this item gives X when Y", with conditions as data) so new features become data entries instead of code. Look at it during performance review #3.
+- ⬜ **Compare PF1e vs PF2e in Foundry: UI design and automation** (user's focus). How PF2e presents things to players: the roll/modifier dialog with toggles, chat cards (degree of success, apply-damage buttons), effect/condition panel, character builder (ABC), targeting, item sheets' rule displays. List what we can borrow for PF1e Revamp's UI.
+
 ## Quality and release
 - ⬜ **Performance review #3** at 10 features since review #2 (count: opposition schools, Blossoming Light L3, racial traits, save bonuses, character traits, slayer talents/ranger styles, variant channeling = 7/10).
 - ⬜ Test Two-Weapon Rend's click-to-roll button (never covered by a test).
