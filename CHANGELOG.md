@@ -11,9 +11,12 @@
     - **Combat Trick** and **Feat**: feat picker with prerequisite marks, plus a "Browse all feats" button that opens PF1's Feat Browser.
     - Grit, Toxin Training, Focusing Attack and Terrain Mastery ask their own question.
   - Talents that grant a specific feat add it. Deleting a talent removes the feats it brought.
+- **Read before you choose.** Every option in the module's pickers has a 📖 icon that opens the full entry: talents, feats, combat styles, racial traits, archetype features, bloodline/domain/school powers. Level-up dropdowns get one icon for the selected entry.
 - **Ranger combat style feats** at 2nd/6th/10th/14th/18th level: choose the style once, then feats from the lists unlocked at your level, prerequisites ignored.
 
 ### Fixed
+- Level-up choices (slayer talent, ranger style feat, sorcerer bonus feat, a new class's bloodline/domain/school) could be lost when leveling the same class twice within about 10 seconds: closing the previous level-up window cleared the next one's choice.
+- Racial trait review: Adoptive Parentage (Weapon Focus) and 14 Changeling and Dhampir heritage traits showed as standard traits instead of alternates, because their "Replaced Trait(s)" label is formatted differently in pf-content.
 - Archetype features and bloodline/domain/school powers added together could occasionally be recorded at each other's levels, because Foundry doesn't always return new items in the order they were requested. Leveling down then removed the wrong ones.
 
 ## 0.17.0: first public test release

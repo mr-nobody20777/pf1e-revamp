@@ -40,6 +40,8 @@ export function registerRaceTests(quench) {
           assert.ok(skilled, "trait on the sheet");
           assert.isEmpty(skilled.system.changes, "its skill ranks stay on the race only");
           assert.isEmpty(actor.items.getName("Bonus Feat (Human)").system.changes);
+          // its "Replaced Trait(s)" label is split across two bold tags in pf-content
+          assert.isUndefined(actor.items.getName("Adoptive Parentage (Weapon Focus)"), "an alternate trait, not standard");
           void ranksBefore;
         });
 

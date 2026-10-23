@@ -16,7 +16,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { esc, norm, plainText, onSceneCatchUp } from "./util.mjs";
+import { esc, norm, plainText, onSceneCatchUp, openLink } from "./util.mjs";
 
 const TRAIT_PACK = "pf-content.pf-racial-traits";
 const FLAG = "racialTraits";
@@ -28,7 +28,9 @@ const sameChange = (a, b) => a.target === b.target && String(a.formula).trim() =
 
 /** "Replaced Trait(s): Skilled, Bonus Feat" → ["Skilled", "Bonus Feat"] */
 function replacedBy(doc) {
-  const m = (doc.system.description?.value ?? "").match(/Replaced Trait\(s\)<\/strong>\s*:\s*([^<]+)/i);
+  // Tags become line breaks: some entries bold each word ("<strong>Replaced</strong> <strong>Trait(s)</strong>")
+  const text = (doc.system.description?.value ?? "").replace(/<[^>]+>/g, "\n");
+  const m = text.match(/Replaced\s+Trait\(s\)\s*:\s*([^\n]+)/i);
   return m ? m[1].split(/\s*,\s*/).map((s) => s.trim()).filter(Boolean) : [];
 }
 
@@ -76,7 +78,7 @@ export async function promptRacialTraits(actor, race, { choose = null } = {}) {
       const selects = Array.from({ length: t.choices }, (_, n) => abilitySelect(`${kind}${i}ab${n}`, kind === "alt")).join("");
       return `<label style="display:block; margin:2px 0">
         <input type="checkbox" name="${kind}" value="${i}" ${kind === "std" ? "checked" : ""} data-replaces="${esc(t.replaces.join("|"))}" data-stem="${esc(stem(t.doc.name))}">
-        ${esc(t.doc.name)}${selects}${existing ? ' <em style="opacity:0.7">(already on sheet)</em>' : ""}
+        ${esc(t.doc.name)}${openLink(t.doc.uuid)}${selects}${existing ? ' <em style="opacity:0.7">(already on sheet)</em>' : ""}
         ${t.replaces.length ? `<span style="font-size:11px; opacity:0.75"> — replaces ${esc(t.replaces.join(", "))}</span>` : ""}</label>`;
     };
     picked = await foundry.applications.api.DialogV2.wait({

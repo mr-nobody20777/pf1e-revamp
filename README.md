@@ -22,7 +22,7 @@ PF1e Revamp makes the **class features, archetypes, racial traits, character tra
 - **Spells and buffs.** Blur and Displacement roll their miss chance; Protection from Evil only works against evil; Remove Fear applies against fear; True Strike and Guidance are used up by the roll they help. → [Spells and Buffs](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Spells-and-Buffs)
 - **Combat rules.** Save bonuses against fear, poison, charm and other effects apply automatically; energy resistances never stack; resistance applies even to quick-applied damage. → [Combat Rules](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Combat-Rules)
 
-Every automated item gets a small **PF1e Revamp** note on its sheet and chat card explaining what's automated, often with buttons for the choices it offers.
+Every automated item gets a small **PF1e Revamp** note on its sheet and chat card explaining what's automated, often with buttons for the choices it offers. Every option in a picker has a 📖 icon that opens its full text, so you can read it before choosing.
 
 ---
 

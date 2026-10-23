@@ -25,7 +25,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { checkPrerequisites } from "./prereqs.mjs";
-import { esc, norm, plainText } from "./util.mjs";
+import { esc, norm, plainText, openLink } from "./util.mjs";
 
 const CLASS_PACK = "pf1.class-abilities";
 const FEAT_PACKS = ["pf1.feats", "pf-content.pf-feats"];
@@ -205,7 +205,8 @@ export async function talentOptions(actor, level) {
 /* -------------------------------------------- */
 
 /**
- * One choice from a list, with a search box. rows: { id, label, status, detail, group }.
+ * One choice from a list, with a search box. rows: { id, label, status, detail, group, uuid }
+ * (uuid adds a book icon that opens the entry).
  * Returns the chosen id, "browse" (open PF1's Feat Browser), or null.
  */
 async function pickOne({ title, intro, rows, browse = false }) {
@@ -213,7 +214,7 @@ async function pickOne({ title, intro, rows, browse = false }) {
     .map(
       (r, i) => `<label class="pfr-row" data-search="${esc(r.label.toLowerCase())}" style="display:flex; gap:0.4em; align-items:flex-start; padding:2px 0; ${r.status === "unmet" ? "opacity:0.6" : ""}">
         <input type="radio" name="choice" value="${i}" style="flex:none; margin-top:3px">
-        <span><strong>${MARK[r.status] ?? ""}</strong> ${esc(r.label)}${r.group ? ` <em style="font-size:11px; opacity:0.7">${esc(r.group)}</em>` : ""}
+        <span><strong>${MARK[r.status] ?? ""}</strong> ${esc(r.label)}${openLink(r.uuid)}${r.group ? ` <em style="font-size:11px; opacity:0.7">${esc(r.group)}</em>` : ""}
         ${r.detail ? `<br><span style="font-size:11px; opacity:0.75">${esc(r.detail)}</span>` : ""}</span></label>`
     )
     .join("");
@@ -259,7 +260,7 @@ export async function chooseSlayerTalent(actor, { level, pick = pickOne } = {}) 
   const id = await pick({
     title: `${actor.name}: slayer talent (level ${level})`,
     intro: level >= 10 ? "Advanced talents can be taken in place of a slayer talent from 10th level." : "",
-    rows: options.map((t) => ({ id: t.name, label: t.name, status: t.check.status, detail: t.check.why.join("; "), group: t.advanced ? "advanced" : "" })),
+    rows: options.map((t) => ({ id: t.name, label: t.name, uuid: t.uuid, status: t.check.status, detail: t.check.why.join("; "), group: t.advanced ? "advanced" : "" })),
   });
   if (!id) return null;
   const talent = options.find((t) => t.name === id);
@@ -282,7 +283,7 @@ async function followUp(actor, d, talent, level, pick, via) {
       intro: `Taken in place of a slayer talent. Effects based on rogue level use your slayer level.`,
       rows: list.map((t) => {
         const c = checkTalent(actor, t, level);
-        return { id: t.name, label: t.name, status: c.status, detail: c.why.join("; ") };
+        return { id: t.name, label: t.name, uuid: t.uuid, status: c.status, detail: c.why.join("; ") };
       }),
     });
     if (!chosen) return null;
@@ -294,7 +295,7 @@ async function followUp(actor, d, talent, level, pick, via) {
     const previous = owned(actor, "Ranger Combat Style")[0];
     let style = previous?.getFlag(MODULE_ID, SLOT_FLAG)?.style ?? null;
     if (!style) {
-      style = await pick({ title: "Ranger Combat Style: choose a style", intro: "The style can't be changed later.", rows: d.styles.map((s) => ({ id: s.name, label: s.name, status: "met", detail: s.tiers[2].join(", ") })) });
+      style = await pick({ title: "Ranger Combat Style: choose a style", intro: "The style can't be changed later.", rows: d.styles.map((s) => ({ id: s.name, label: s.name, uuid: s.uuid, status: "met", detail: s.tiers[2].join(", ") })) });
       if (!style) return null;
     }
     const takes = owned(actor, "Ranger Combat Style").length + 1;
@@ -338,7 +339,7 @@ async function pickFeat(actor, d, filter, what, pick, browse = true) {
     .filter((f) => filter(f) && !have.has(norm(f.name)))
     .map((f) => {
       const c = checkPrerequisites(f, actor); // reads only the description, which the index carries
-      return { id: f.uuid, label: f.name, status: c.status, detail: c.status === "met" ? "" : c.summary };
+      return { id: f.uuid, label: f.name, uuid: f.uuid, status: c.status, detail: c.status === "met" ? "" : c.summary };
     });
   rows.sort((a, b) => ({ met: 0, unknown: 1, unmet: 2 })[a.status] - ({ met: 0, unknown: 1, unmet: 2 })[b.status] || a.label.localeCompare(b.label));
   const id = await pick({ title: `Choose a ${what}`, intro: `Prerequisites are checked against your current character.`, rows, browse });
@@ -354,7 +355,7 @@ async function pickStyleFeat(actor, d, styleName, tiers, pick) {
     for (const name of style?.tiers[tier] ?? []) {
       const f = featNamed(d, name);
       if (have.has(norm(name))) continue;
-      rows.push({ id: f?.uuid ?? `missing:${name}`, label: name, status: f ? "ignored" : "unknown", detail: f ? `${tier === 2 ? "" : `${tier}th-level list · `}prerequisites ignored` : "not found in the feat compendiums", group: tier === 2 ? "" : `${tier}th`, rename: f?.rename });
+      rows.push({ id: f?.uuid ?? `missing:${name}`, label: name, uuid: f?.uuid, status: f ? "ignored" : "unknown", detail: f ? `${tier === 2 ? "" : `${tier}th-level list · `}prerequisites ignored` : "not found in the feat compendiums", group: tier === 2 ? "" : `${tier}th`, rename: f?.rename });
     }
   }
   const id = await pick({ title: `${styleName}: combat style feat`, intro: "Combat style feats ignore their normal prerequisites. Their benefits only apply in light, medium or no armor.", rows });
@@ -368,7 +369,7 @@ export async function chooseRangerStyleFeat(actor, { level, pick = pickOne } = {
   const feature = actor.itemTypes.feat.find((f) => f.name === "Combat Style Feat");
   let style = feature?.getFlag(MODULE_ID, STYLE_FLAG) ?? null;
   if (!style) {
-    style = await pick({ title: "Ranger: choose a combat style", intro: "Once chosen, the style can't be changed.", rows: d.styles.map((s) => ({ id: s.name, label: s.name, status: "met", detail: s.tiers[2].join(", ") })) });
+    style = await pick({ title: "Ranger: choose a combat style", intro: "Once chosen, the style can't be changed.", rows: d.styles.map((s) => ({ id: s.name, label: s.name, uuid: s.uuid, status: "met", detail: s.tiers[2].join(", ") })) });
     if (!style) return null;
   }
   const feat = await pickStyleFeat(actor, d, style, [2, 6, 10].filter((t) => level >= t), pick);
@@ -466,7 +467,9 @@ export function rangerSlots(actor) {
 /*  Level-up window                             */
 /* -------------------------------------------- */
 
-const pending = new Map(); // level-up app id → { actorUuid, cls, level, plan }
+// Keyed by the window itself: PF1 gives every level-up window for a class the same id, so a
+// closed window's delayed cleanup would otherwise wipe the next level's choice.
+const pending = new Map(); // level-up window → { actorUuid, cls, level, plan }
 
 function levelUpSection(app) {
   const cls = norm(app.item.name);
@@ -474,8 +477,8 @@ function levelUpSection(app) {
   const isSlayer = cls === "slayer" && newLevel >= 2 && newLevel % 2 === 0;
   const isRanger = cls === "ranger" && RANGER_STYLE_LEVELS.includes(newLevel);
   if (!isSlayer && !isRanger) return null;
-  const state = pending.get(app.id) ?? { actorUuid: app.actor.uuid, cls: isSlayer ? "slayer" : "ranger", level: newLevel, plan: null };
-  pending.set(app.id, state);
+  const state = pending.get(app) ?? { actorUuid: app.actor.uuid, cls: isSlayer ? "slayer" : "ranger", level: newLevel, plan: null };
+  pending.set(app, state);
 
   const section = document.createElement("section");
   section.className = `${MODULE_ID}-levelup-talent`;
@@ -504,13 +507,13 @@ Hooks.on("renderLevelUpForm", (app, html) => {
   app.setPosition({ height: "auto" });
 });
 
-Hooks.on("closeLevelUpForm", (app) => setTimeout(() => pending.delete(app.id), 10000));
+Hooks.on("closeLevelUpForm", (app) => setTimeout(() => pending.delete(app), 10000));
 
 Hooks.on("pf1ClassLevelChange", (actor, classItem, curLevel, newLevel) => {
   if (newLevel <= curLevel) return;
-  for (const [appId, state] of pending) {
+  for (const [app, state] of pending) {
     if (state.actorUuid !== actor.uuid || state.level !== newLevel || norm(classItem.name) !== state.cls) continue;
-    pending.delete(appId);
+    pending.delete(app);
     if (state.plan) applyPlan(actor, state.plan, newLevel);
   }
 });

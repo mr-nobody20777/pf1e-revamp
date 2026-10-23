@@ -11,7 +11,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { itemsFromSource, classFlagUpdate, esc, plainText, spellbookKey } from "./util.mjs";
+import { itemsFromSource, classFlagUpdate, esc, plainText, spellbookKey, openLink } from "./util.mjs";
 import { ARCHETYPE_RULES } from "./archetype-rules.mjs";
 
 const ARCH_PACK = "pf1e-archetypes.pf-archetypes";
@@ -249,7 +249,7 @@ function dialogContent(plan) {
       (a, i) => `<tr>
         <td><input type="checkbox" name="add" value="${i}" ${a.uuid && !a.merge ? "checked" : "disabled"}></td>
         <td><input type="number" name="lvl${i}" value="${a.level}" min="1" max="20" style="width:3.5em"></td>
-        <td>${esc(a.name)}${warn(a.flags)}${a.existing ? ' <em style="opacity:0.7">(already on sheet)</em>' : ""}
+        <td>${esc(a.name)}${openLink(a.uuid)}${warn(a.flags)}${a.existing ? ' <em style="opacity:0.7">(already on sheet)</em>' : ""}
           <div style="font-size:11px; opacity:0.8">${a.replaces.length ? `replaces ${esc(a.replaces.join(", "))}` : ""}${a.replaces.length && a.alters.length ? "; " : ""}${a.alters.length ? `alters ${esc(a.alters.join(", "))}` : ""}</div></td>
       </tr>`
     )
@@ -258,7 +258,7 @@ function dialogContent(plan) {
   const removeRows = baseFeatures
     .map(
       (b) => `<label style="display:block"><input type="checkbox" name="remove" value="${esc(b.uuid)}" ${removes.has(b.uuid) ? "checked" : ""}>
-        ${esc(b.name)} <span style="opacity:0.7">(lvl ${b.level})</span>${removes.has(b.uuid) ? ` <em style="font-size:11px; opacity:0.8">→ ${esc(removes.get(b.uuid).by)}</em>` : ""}</label>`
+        ${esc(b.name)}${openLink(b.uuid)} <span style="opacity:0.7">(lvl ${b.level})</span>${removes.has(b.uuid) ? ` <em style="font-size:11px; opacity:0.8">→ ${esc(removes.get(b.uuid).by)}</em>` : ""}</label>`
     )
     .join("");
 

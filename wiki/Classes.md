@@ -103,7 +103,7 @@ Songs can also be started from the song item's own Use button or its note's *Sta
 **Now:** at every even slayer level, PF1's level-up window has a **Slayer talent** section with a **Choose…** button. The talent is added when you click Finish. The **Slayer Talents** feature's note shows how many talents you've chosen ("3 of 4") and has a **Choose talent…** button for catching up.
 
 The talent picker:
-- has a **search box**;
+- has a **search box**, and a 📖 icon on every option that opens its full text;
 - marks each talent **✓** (you meet its requirements), **✗** (you don't, with why, e.g. *needs slayer level 4* or *needs jaguar's grace*) or **?** (the module can't tell, e.g. *needs dimension door as a spell-like ability*);
 - shows **advanced talents** from 10th level;
 - hides talents you already have, unless the talent can be taken more than once (Deadly Range, Terrain Mastery, Toxin Training and others).

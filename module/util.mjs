@@ -8,6 +8,24 @@ export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt
 /** Lowercase, punctuation-free form of a name for loose matching. */
 export const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
+/** A book icon that opens an entry's sheet, so picker options can be read before choosing. */
+export const openLink = (uuid) =>
+  uuid ? ` <a class="${MODULE_ID}-open" data-uuid="${esc(uuid)}" data-tooltip="Read the full entry" style="margin-left: 0.2em; opacity: 0.8"><i class="fa-solid fa-book-open"></i></a>` : "";
+
+// One listener for every picker. Capture phase, so clicking the icon inside an option's <label>
+// opens the entry without also selecting the option.
+document.addEventListener(
+  "click",
+  async (event) => {
+    const link = event.target.closest?.(`.${MODULE_ID}-open`);
+    if (!link?.dataset.uuid) return;
+    event.preventDefault();
+    event.stopPropagation();
+    (await fromUuid(link.dataset.uuid))?.sheet?.render(true);
+  },
+  true
+);
+
 /** HTML description → plain text, with enricher links reduced to their labels. */
 export function plainText(html) {
   const div = document.createElement("div");

@@ -12,7 +12,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { evaluate, classLevel, itemsFromSource, classFlagUpdate, createClassFeatures, esc, norm, plainText } from "./util.mjs";
+import { evaluate, classLevel, itemsFromSource, classFlagUpdate, createClassFeatures, esc, norm, plainText, openLink } from "./util.mjs";
 import { checkPrerequisites } from "./prereqs.mjs";
 import { promptOpposition, specialtyOf } from "./opposition-schools.mjs";
 
@@ -146,7 +146,7 @@ export async function promptApply(actor, subclass, { grantAll = false } = {}) {
       (p, i) => `<tr>
         <td><input type="checkbox" name="power" value="${i}" checked></td>
         <td><input type="number" name="lvl${i}" value="${p.level}" min="1" max="20" style="width:3.5em"></td>
-        <td>${esc(p.name)}${p.flags.length ? ` <i class="fa-solid fa-triangle-exclamation" style="color:#c80" data-tooltip="${esc(p.flags.join("; "))}"></i>` : ""}
+        <td>${esc(p.name)}${openLink(p.uuid)}${p.flags.length ? ` <i class="fa-solid fa-triangle-exclamation" style="color:#c80" data-tooltip="${esc(p.flags.join("; "))}"></i>` : ""}
           ${p.existing ? '<em style="opacity:0.7">(already on sheet)</em>' : ""}
           <div style="font-size:11px; opacity:0.7">${esc(p.how)} · ${esc(p.uuid.startsWith(`Compendium.${MODULE_ID}`) ? "PF1e Revamp" : "PF1")}</div></td>
       </tr>`
@@ -225,7 +225,8 @@ Hooks.on("createItem", (item, options, userId) => {
 
 const PICKS = { Sorcerer: 1, Cleric: 2, Wizard: 1 }; // how many to choose (clerics pick two domains)
 
-/** Picks made in an open level-up dialog, keyed by the dialog's app id, applied when the class levels. */
+/** Picks made in an open level-up dialog, applied when the class levels. Keyed by the dialog itself, not
+ *  its id: PF1 reuses one id per class, so a closed dialog's delayed cleanup would wipe the next one's picks. */
 const pending = new Map();
 
 /** Subclass choices per class, loaded once at startup so the picker renders with the dialog. */
@@ -256,26 +257,36 @@ function pickerSection(title, hint) {
   return section;
 }
 
+/** A dropdown of compendium entries (values are uuids), with a book icon that opens the selected one. */
 function pickerSelect(placeholder, options, selected, onChange) {
-  const select = document.createElement("select");
-  select.style.cssText = "width: 100%; margin-bottom: 0.25em;";
-  select.innerHTML = `<option value="">— ${esc(placeholder)} —</option>${options
-    .map((o) => `<option value="${esc(o.value)}" ${o.value === selected ? "selected" : ""}>${esc(o.label)}</option>`)
-    .join("")}`;
+  const row = document.createElement("div");
+  row.style.cssText = "display: flex; align-items: center; gap: 0.4em; margin-bottom: 0.25em;";
+  row.innerHTML = `<select style="flex: 1">
+      <option value="">— ${esc(placeholder)} —</option>${options
+        .map((o) => `<option value="${esc(o.value)}" ${o.value === selected ? "selected" : ""} ${o.title ? `title="${esc(o.title)}"` : ""}>${esc(o.label)}</option>`)
+        .join("")}
+    </select>${openLink("pending")}`;
   // No name attribute: this isn't part of PF1's form data
-  select.addEventListener("change", () => onChange(select.value));
-  return select;
+  const select = row.querySelector("select");
+  const link = row.querySelector(`.${MODULE_ID}-open`);
+  const sync = () => {
+    link.dataset.uuid = select.value;
+    link.style.visibility = select.value ? "visible" : "hidden";
+  };
+  select.addEventListener("change", () => (sync(), onChange(select.value)));
+  sync();
+  return row;
 }
 
 function pendingState(app) {
-  let state = pending.get(app.id);
-  if (!state) pending.set(app.id, (state = { actorUuid: app.actor.uuid, className: app.item.name, picks: [], feat: "", at: Date.now() }));
+  let state = pending.get(app);
+  if (!state) pending.set(app, (state = { actorUuid: app.actor.uuid, className: app.item.name, picks: [], feat: "", at: Date.now() }));
   return state;
 }
 
 // A cancelled level-up never fires pf1ClassLevelChange; drop its picks once the dialog is closed
 // (after a short delay, so a Finish that closes the dialog is still applied).
-Hooks.on("closeLevelUpForm", (app) => setTimeout(() => pending.delete(app.id), 10000));
+Hooks.on("closeLevelUpForm", (app) => setTimeout(() => pending.delete(app), 10000));
 
 /** New class: choose a bloodline / domains / arcane school. */
 async function subclassPicker(app) {
@@ -344,9 +355,7 @@ async function bloodlineFeatPicker(app) {
     `${bloodline.name}: bonus feat`,
     `Level ${newLevel} bloodline feat. ✓ prerequisites met · ✗ not met · ? check manually (hover for details). Prerequisites are checked against your current stats.`
   );
-  const select = pickerSelect("choose a bloodline feat", options, state.feat, (v) => (state.feat = v));
-  options.forEach((o, i) => (select.options[i + 1].title = o.title));
-  section.append(select);
+  section.append(pickerSelect("choose a bloodline feat", options, state.feat, (v) => (state.feat = v)));
   return section;
 }
 
@@ -363,9 +372,9 @@ Hooks.on("renderLevelUpForm", async (app, html) => {
 // After Finish, PF1 creates or levels the class; then add what was picked.
 Hooks.on("pf1ClassLevelChange", (actor, classItem, curLevel, newLevel) => {
   if (newLevel <= curLevel) return;
-  for (const [appId, state] of pending) {
+  for (const [app, state] of pending) {
     if (state.actorUuid !== actor.uuid || norm(state.className) !== norm(classItem.name)) continue;
-    pending.delete(appId);
+    pending.delete(app);
     if (Date.now() - state.at > 30 * 60 * 1000) return;
     (async () => {
       // New class: the subclass(es), reviewed one at a time so their class edits can't collide
