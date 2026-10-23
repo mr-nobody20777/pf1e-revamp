@@ -1,0 +1,38 @@
+{
+  "_id": "cKzvOhbnHWrJtpxk",
+  "name": "True Strike",
+  "type": "buff",
+  "img": "icons/magic/control/buff-strength-muscle-damage-orange.webp",
+  "system": {
+    "description": {
+      "value": "<p>Applies the mechanical bonuses of <em>True Strike</em>.</p><p>Automated: +20 insight on your next single attack roll, then the buff turns itself off. You also ignore the miss chance for a concealed target on that attack.</p><p>See @UUID[Compendium.pf1.spells.Item.xco22162bwgxn7pj]{True Strike} for full details.</p>",
+      "instructions": ""
+    },
+    "changes": [],
+    "contextNotes": [],
+    "subType": "spell",
+    "active": false,
+    "level": 1,
+    "duration": {
+      "value": "1",
+      "units": "round",
+      "end": "turnEnd"
+    },
+    "sources": [
+      {
+        "id": "PZO1110",
+        "pages": "363"
+      }
+    ]
+  },
+  "effects": [],
+  "flags": {
+    "pf1e-revamp": {
+      "trueStrike": true
+    }
+  },
+  "ownership": {
+    "default": 0
+  },
+  "_key": "!items!cKzvOhbnHWrJtpxk"
+}

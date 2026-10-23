@@ -1,0 +1,50 @@
+{
+  "_id": "VMgGglutostpYqVy",
+  "_key": "!items!VMgGglutostpYqVy",
+  "name": "Friend of Fire",
+  "type": "feat",
+  "img": "systems/pf1/icons/skills/light_01.jpg",
+  "system": {
+    "description": {
+      "value": "<p>At 3rd level, you gain fire resistance 10. At 5th level, when in contact with flame or a burning object (including a flaming weapon, lantern, or torch), add 1 per die to any healing effect of which you are the target. At 9th level, your fire resistance increases to 20.</p><p>At 20th level, you gain immunity to fire.</p>",
+      "instructions": ""
+    },
+    "subType": "classFeat",
+    "abilityType": "su",
+    "associations": {
+      "classes": [
+        "Sorcerer"
+      ]
+    },
+    "tags": [
+      "Bloodline Power",
+      "Solar Bloodline"
+    ],
+    "changeFlags": {},
+    "contextNotes": [],
+    "actions": []
+  },
+  "flags": {
+    "pf1e-revamp": {
+      "level": 3,
+      "levelFormula": "max(@class.level, @classes.sorcerer.level)",
+      "grants": [
+        {
+          "trait": "eres",
+          "type": "fire",
+          "amount": "ifelse(gte(max(@class.level, @classes.sorcerer.level), 9), 20, 10)",
+          "maxLevel": 19
+        },
+        {
+          "trait": "di",
+          "type": "fire",
+          "minLevel": 20
+        }
+      ]
+    }
+  },
+  "effects": [],
+  "ownership": {
+    "default": 0
+  }
+}

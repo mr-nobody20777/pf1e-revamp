@@ -1,0 +1,106 @@
+{
+  "id": "pf1e-revamp",
+  "title": "PF1e Revamp",
+  "description": "Makes Pathfinder 1e class features, archetypes, racial traits, character traits and spells do what their text says. Bonuses apply on the right rolls, miss chances are rolled for you, channel energy heals the right creatures, archetypes really change the features they alter, and two-weapon fighting, raging songs, studied targets and more are handled automatically. It works with the items you already have, and steps aside where other modules already do the job.",
+  "version": "0.17.0",
+  "compatibility": {
+    "minimum": "13",
+    "verified": "13.351"
+  },
+  "authors": [
+    {
+      "name": "mr-nobody20777",
+      "url": "https://github.com/mr-nobody20777",
+      "flags": { "role": "Project lead and design" }
+    },
+    {
+      "name": "Claude (Anthropic)",
+      "url": "https://claude.com/claude-code",
+      "flags": { "role": "Code, tests and documentation" }
+    }
+  ],
+  "url": "https://github.com/mr-nobody20777/pf1e-revamp",
+  "manifest": "https://github.com/mr-nobody20777/pf1e-revamp/releases/latest/download/module.json",
+  "download": "https://github.com/mr-nobody20777/pf1e-revamp/releases/download/v0.17.0/module.zip",
+  "readme": "https://github.com/mr-nobody20777/pf1e-revamp/blob/main/README.md",
+  "changelog": "https://github.com/mr-nobody20777/pf1e-revamp/blob/main/CHANGELOG.md",
+  "bugs": "https://github.com/mr-nobody20777/pf1e-revamp/issues",
+  "relationships": {
+    "systems": [
+      {
+        "id": "pf1",
+        "type": "system",
+        "compatibility": {
+          "minimum": "11.0",
+          "verified": "11.11"
+        }
+      }
+    ],
+    "recommends": [
+      {
+        "id": "lib-wrapper",
+        "type": "module",
+        "reason": "Safe hooking into PF1's attack and proficiency code (two-weapon fighting, shield bashes, Gifted Adept, Swordlord's Page). Works without it, but with a higher chance of conflicts."
+      },
+      {
+        "id": "pf-content",
+        "type": "module",
+        "reason": "Racial traits for the racial-trait review, and the spell buffs that miss chances, wards and next-roll effects recognize."
+      },
+      {
+        "id": "pf1e-archetypes",
+        "type": "module",
+        "reason": "The archetypes and archetype features that archetype application reads."
+      }
+    ]
+  },
+  "esmodules": [
+    "module/const.mjs",
+    "module/util.mjs",
+    "module/footnote.mjs",
+    "module/ward.mjs",
+    "module/miss-chance.mjs",
+    "module/fortune.mjs",
+    "module/buff-grants.mjs",
+    "module/channel-energy.mjs",
+    "module/spontaneous-casting.mjs",
+    "module/temporal-pool.mjs",
+    "module/opposition-schools.mjs",
+    "module/races.mjs",
+    "module/save-bonuses.mjs",
+    "module/traits.mjs",
+    "module/studied-target.mjs",
+    "module/raging-song.mjs",
+    "module/quarry.mjs",
+    "module/shield-trained.mjs",
+    "module/two-weapon.mjs",
+    "module/archetypes.mjs",
+    "module/prereqs.mjs",
+    "module/resistance.mjs",
+    "module/subclass.mjs"
+  ],
+  "packs": [
+    {
+      "name": "buffs",
+      "label": "Buff Library",
+      "path": "packs/buffs",
+      "type": "Item",
+      "system": "pf1",
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    },
+    {
+      "name": "features",
+      "label": "Class Features",
+      "path": "packs/features",
+      "type": "Item",
+      "system": "pf1",
+      "ownership": {
+        "PLAYER": "OBSERVER",
+        "ASSISTANT": "OWNER"
+      }
+    }
+  ]
+}

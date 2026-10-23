@@ -1,0 +1,163 @@
+{
+  "_id": "wEIoqvyTOtnWwv23",
+  "_key": "!items!wEIoqvyTOtnWwv23",
+  "name": "Healing Fire",
+  "type": "feat",
+  "img": "systems/pf1/icons/skills/light_01.jpg",
+  "system": {
+    "description": {
+      "value": "<p>At 15th level, you can channel energy twice per day as a cleric of half your level. Instead of using this ability to damage undead, you can convert the positive energy to flame and deal an equivalent amount of fire damage instead.</p><p><strong>See also:</strong> @UUID[Compendium.pf1.class-abilities.Item.kXXz1lO4i7CibHJ9]{Channel Energy}. <em>Healing Fire channels as a cleric of half your sorcerer level.</em></p>",
+      "instructions": ""
+    },
+    "subType": "classFeat",
+    "abilityType": "su",
+    "associations": {
+      "classes": [
+        "Sorcerer"
+      ]
+    },
+    "tags": [
+      "Bloodline Power",
+      "Solar Bloodline"
+    ],
+    "changeFlags": {},
+    "contextNotes": [],
+    "uses": {
+      "value": null,
+      "autoDeductChargesCost": "",
+      "rechargeFormula": "",
+      "per": "day",
+      "maxFormula": "2"
+    },
+    "actions": [
+      {
+        "_id": "S5NT82OLSpkHwxyg",
+        "activation": {
+          "type": "standard",
+          "unchained": {
+            "type": "action",
+            "cost": 2
+          }
+        },
+        "measureTemplate": {
+          "type": "circle",
+          "size": "30"
+        },
+        "range": {
+          "units": "ft",
+          "value": "30"
+        },
+        "duration": {
+          "units": "inst"
+        },
+        "name": "Heal living",
+        "actionType": "heal",
+        "target": {
+          "value": "living creatures"
+        },
+        "damage": {
+          "parts": [
+            {
+              "formula": "(ceil(floor(max(@class.level, @classes.sorcerer.level) / 2) / 2))d6",
+              "types": [
+                "positive"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "_id": "SSJguQGvLC2ghs7v",
+        "activation": {
+          "type": "standard",
+          "unchained": {
+            "type": "action",
+            "cost": 2
+          }
+        },
+        "measureTemplate": {
+          "type": "circle",
+          "size": "30"
+        },
+        "range": {
+          "units": "ft",
+          "value": "30"
+        },
+        "duration": {
+          "units": "inst"
+        },
+        "name": "Harm undead",
+        "actionType": "save",
+        "target": {
+          "value": "undead"
+        },
+        "damage": {
+          "parts": [
+            {
+              "formula": "(ceil(floor(max(@class.level, @classes.sorcerer.level) / 2) / 2))d6",
+              "types": [
+                "positive"
+              ]
+            }
+          ]
+        },
+        "save": {
+          "type": "will",
+          "dc": "10 + floor(floor(max(@class.level, @classes.sorcerer.level) / 2) / 2) + @abilities.cha.mod",
+          "description": "Will halves"
+        }
+      },
+      {
+        "_id": "3WOtQ4JuBaovcmN2",
+        "activation": {
+          "type": "standard",
+          "unchained": {
+            "type": "action",
+            "cost": 2
+          }
+        },
+        "measureTemplate": {
+          "type": "circle",
+          "size": "30"
+        },
+        "range": {
+          "units": "ft",
+          "value": "30"
+        },
+        "duration": {
+          "units": "inst"
+        },
+        "name": "Fire damage",
+        "actionType": "save",
+        "target": {
+          "value": "creatures in area"
+        },
+        "damage": {
+          "parts": [
+            {
+              "formula": "(ceil(floor(max(@class.level, @classes.sorcerer.level) / 2) / 2))d6",
+              "types": [
+                "fire"
+              ]
+            }
+          ]
+        },
+        "save": {
+          "type": "will",
+          "dc": "10 + floor(floor(max(@class.level, @classes.sorcerer.level) / 2) / 2) + @abilities.cha.mod",
+          "description": "Will halves"
+        }
+      }
+    ]
+  },
+  "flags": {
+    "pf1e-revamp": {
+      "level": 15,
+      "levelFormula": "max(@class.level, @classes.sorcerer.level)"
+    }
+  },
+  "effects": [],
+  "ownership": {
+    "default": 0
+  }
+}

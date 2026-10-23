@@ -1,0 +1,36 @@
+# Publishes a Foundry release when a version tag (v0.17.0, v0.18.0, ...) is pushed:
+# builds module.zip and attaches it, with module.json, to a GitHub release. Foundry's manifest URL
+# (releases/latest/download/module.json) then points at the newest release.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag matches module.json
+        run: |
+          VERSION=$(jq -r .version module.json)
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match module.json version $VERSION" >&2
+            exit 1
+          fi
+
+      - name: Build module.zip
+        run: zip -r module.zip module.json README.md CHANGELOG.md LICENSE module packs
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            module.json
+            module.zip
+          body: "See [CHANGELOG.md](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md) for what's in this release."

@@ -1,0 +1,4 @@
+# Text files are stored with LF line endings
+* text=auto eol=lf
+# Compendiums are LevelDB databases: never touch their bytes (000003.log holds the data)
+packs/** binary

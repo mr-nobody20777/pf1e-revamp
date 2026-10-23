@@ -1,0 +1,50 @@
+{
+  "_id": "fmWLnK1oMMalbHt9",
+  "_key": "!items!fmWLnK1oMMalbHt9",
+  "name": "Sunsight",
+  "type": "feat",
+  "img": "systems/pf1/icons/skills/light_01.jpg",
+  "system": {
+    "description": {
+      "value": "<p>At 1st level, you gain low-light vision and cannot be dazzled. If you already have low-light vision, you instead gain a +4 bonus on saving throws against blindness effects.</p>",
+      "instructions": ""
+    },
+    "subType": "classFeat",
+    "abilityType": "su",
+    "associations": {
+      "classes": [
+        "Sorcerer"
+      ]
+    },
+    "tags": [
+      "Bloodline Power",
+      "Solar Bloodline"
+    ],
+    "changeFlags": {
+      "lowLightVision": true
+    },
+    "contextNotes": [
+      {
+        "target": "allSavingThrows",
+        "text": "+[[4]] on saves vs. blindness effects (Sunsight; only if you already had low-light vision)"
+      }
+    ],
+    "actions": []
+  },
+  "flags": {
+    "pf1e-revamp": {
+      "level": 1,
+      "levelFormula": "max(@class.level, @classes.sorcerer.level)",
+      "grants": [
+        {
+          "trait": "ci",
+          "type": "dazzle"
+        }
+      ]
+    }
+  },
+  "effects": [],
+  "ownership": {
+    "default": 0
+  }
+}

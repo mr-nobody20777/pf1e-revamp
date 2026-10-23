@@ -1,0 +1,39 @@
+{
+  "_id": "1aDJJpZ3LPUYjvxZ",
+  "name": "Protection from Spells",
+  "type": "buff",
+  "img": "icons/magic/defensive/shield-barrier-flaming-diamond-blue.webp",
+  "system": {
+    "description": {
+      "value": "<p>Applies the mechanical bonuses of <em>Protection from Spells</em>.</p><p>See @UUID[Compendium.pf1.spells.Item.0kppkhsencd6tzvh]{Protection from Spells} for full details.</p>",
+      "instructions": ""
+    },
+    "changes": [],
+    "contextNotes": [
+      {
+        "target": "allSavingThrows",
+        "text": "+[[8]] Resistance vs spells and spell-like abilities."
+      }
+    ],
+    "subType": "spell",
+    "active": false,
+    "level": 13,
+    "duration": {
+      "value": "@item.level * 10",
+      "units": "minute",
+      "end": "turnStart"
+    },
+    "sources": [
+      {
+        "id": "PZO1110",
+        "pages": "328"
+      }
+    ]
+  },
+  "effects": [],
+  "flags": {},
+  "ownership": {
+    "default": 0
+  },
+  "_key": "!items!1aDJJpZ3LPUYjvxZ"
+}

@@ -1,0 +1,41 @@
+{
+  "_id": "ezlbR9iK38slHLQg",
+  "name": "Spider Climb",
+  "type": "buff",
+  "img": "icons/skills/movement/feet-winged-boots-brown.webp",
+  "system": {
+    "description": {
+      "value": "<p>Applies the mechanical bonuses of <em>Spider Climb</em>.</p><p>See @UUID[Compendium.pf1.spells.Item.3mfmhx8avu7h3iom]{Spider Climb} for full details.</p>",
+      "instructions": ""
+    },
+    "changes": [
+      {
+        "_id": "kCxqFxt0",
+        "target": "climbSpeed",
+        "type": "untyped",
+        "formula": "20"
+      }
+    ],
+    "contextNotes": [],
+    "subType": "spell",
+    "active": false,
+    "level": 3,
+    "duration": {
+      "value": "@item.level * 10",
+      "units": "minute",
+      "end": "turnStart"
+    },
+    "sources": [
+      {
+        "id": "PZO1110",
+        "pages": "347"
+      }
+    ]
+  },
+  "effects": [],
+  "flags": {},
+  "ownership": {
+    "default": 0
+  },
+  "_key": "!items!ezlbR9iK38slHLQg"
+}
