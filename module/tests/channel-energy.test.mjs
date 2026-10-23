@@ -118,7 +118,7 @@ export function registerChannelEnergyTests(quench) {
           const max = zombie.system.attributes.hp.max;
           await zombie.update({ "system.attributes.hp.value": max });
           const { results: [result], amount } = await use("Positive - Harm", [tokens.zombie.object]);
-          const expected = /saved/.test(result.text) ? Math.floor(amount / 2) : amount;
+          const expected = /saved/.test(result.text) ? Math.max(1, Math.floor(amount / 2)) : amount;
           assert.equal(zombie.system.attributes.hp.value, max - expected);
         });
       });

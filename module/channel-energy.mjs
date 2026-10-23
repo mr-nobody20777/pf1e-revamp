@@ -183,7 +183,7 @@ onGmRequest("channel", async (message, data) => {
       const total = save?.rolls?.[0]?.total;
       saved = Number.isFinite(total) && total >= data.dc;
       // A variant's damage is already halved: the save negates the extra effect, not more damage
-      const damage = saved && !variant ? Math.floor(data.amount / 2) : data.amount;
+      const damage = saved && !variant ? Math.max(1, Math.floor(data.amount / 2)) : data.amount; // half, minimum 1
       await actor.applyDamage(damage, { forceDialog: false });
       text = `${damage} (Will ${total ?? "?"}: ${saved ? "saved" : "failed"})`;
     }

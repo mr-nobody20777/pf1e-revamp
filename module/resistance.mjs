@@ -77,3 +77,16 @@ Hooks.on("pf1ApplyDamage", (actor, options) => {
     content: `<p><strong>${actor.name.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}</strong> resists ${reduced} damage: ${notes.join(", ")}. Took ${options.value}.</p>`,
   });
 });
+
+// Halved damage or healing never drops below 1: "if you wind up with a fraction, round down ...
+// Exception: Certain rolls, such as damage and hit points, have a minimum of 1." PF1 applies its ratio
+// (the ½ buttons, or a ratio typed in the dialog) as floor(value × ratio), which turns 1 into 0; this
+// runs after the resistance hook above, so resistance can still reduce damage to nothing.
+Hooks.on("pf1ApplyDamage", (actor, options) => {
+  const ratio = options.ratio ?? 1;
+  if (!(ratio > 0 && ratio < 1) || !options.value) return;
+  if (Math.abs(options.value) * ratio < 1) {
+    options.value = Math.sign(options.value);
+    options.ratio = 1;
+  }
+});

@@ -51,6 +51,9 @@ Several resistances against the same energy don't add up. Only the highest count
 ### Where resistance comes from
 Racial traits (*"you have fire resistance 5"*), bloodline powers (Solar), and anything PF1 already tracks. With **Nevela's Automation Suite**, its *Resist Energy* and *Protection from Energy* buffs are handled by Nevela and work alongside this.
 
+## Halving: minimum 1
+The core rules: *"if you wind up with a fraction, round down… Exception: Certain rolls, such as damage and hit points, have a minimum of 1."* Whenever damage or healing is halved (PF1's **½** buttons, a ratio in the Apply Damage dialog, a save for half, or variant channeling), the result is rounded down but never below 1. Energy resistance can still reduce damage to nothing.
+
 ## Miss chances
 
 Miss chances from Blur, Displacement, Blink, Entropic Shield, invisibility and blindness are rolled on attack cards. See [Spells and Buffs](Spells-and-Buffs#miss-chances).

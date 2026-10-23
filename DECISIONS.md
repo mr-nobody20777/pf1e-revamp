@@ -11,6 +11,7 @@ feature before changing it. Newest first within each section. Format: **decision
 - **Don't rewrite players' item descriptions**: they may hold flavor text; show automation in footnotes or separate items instead (2026-10-23).
 
 ## Rolls and buffs
+- **Halved damage and healing never go below 1, everywhere** (PF1's ½ buttons and dialog ratio, saves for half, variant channeling): core rule "damage and hit points have a minimum of 1". Bonuses like ½ level are not damage and can be 0; resistance can still reduce damage to 0 (2026-10-23).
 - **One-roll bonuses (Guidance, True Strike, Luck channel) show as a ticked box in every roll window**; unticked, the roll goes without it and the buff waits. No "arm" buttons (judged clunky). Rolls without a window use it automatically. A bonus is used up only if it ended up in the roll (2026-10-23).
 - **Bit of Luck: always take the better of two d20s automatically**: taking the better roll is never worse (2026-10-22).
 
@@ -29,4 +30,4 @@ feature before changing it. Newest first within each section. Format: **decision
 ## Process
 - **Testing budget**: targeted test batches while building, one full suite run before each commit, time-boxed flake hunting (2026-10-23).
 - **Performance review every 10 features** (2026-10-22).
-- **Read the full rules text and propose a design before building** a new automation (standing).
+- **Read the full rules text and propose a design before building** a new automation (standing). The design must include a rules check: who, when, whose choice, duration, stacking/bonus type, rounding and minimums, and the general rules that apply (2026-10-23).

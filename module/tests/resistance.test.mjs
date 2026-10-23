@@ -54,6 +54,16 @@ export function registerResistanceTests(quench) {
           assert.equal(hp(), start - 15);
         });
 
+        it("halved damage and healing never drop below 1 (½ button on 1 point)", async () => {
+          const start = hp();
+          await actor.applyDamage(1, { ratio: 0.5 });
+          assert.equal(hp(), start - 1, "1 damage halved is still 1");
+          await actor.applyDamage(-1, { ratio: 0.5 });
+          assert.equal(hp(), start, "1 healing halved is still 1");
+          await actor.applyDamage(5, { ratio: 0.5 });
+          assert.equal(hp(), start - 2, "larger amounts still round down");
+        });
+
         it("damage through PF1's dialog is left to the dialog", async () => {
           const start = hp();
           await hit(15, ["fire"], { [`${MODULE_ID}FromDialog`]: true });

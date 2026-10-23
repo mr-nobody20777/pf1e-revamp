@@ -9,6 +9,7 @@
 - **One-roll bonuses are the player's choice.** Guidance, True Strike and the Luck channel bonus show as a ticked box in every roll window (attack, save, skill, ability check); untick it to roll without it and keep the bonus for later.
 
 ### Changed
+- **Halved damage and healing never go below 1.** PF1's ½ buttons (and any ratio in its Apply Damage dialog) used to turn 1 point into nothing; a save for half on channel energy too. Per the core rule, damage and hit points have a minimum of 1.
 - Channel energy no longer posts its own summary message; PF1's card shows the amount and saves have their own cards. The request to the GM is whispered and removed once applied.
 
 ### Fixed
