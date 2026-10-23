@@ -53,7 +53,7 @@ Updates appear through Foundry's normal module update check.
 
 ## 🧪 Quality
 
-Every feature ships with automated tests (122 and counting, run before every release), has been played through as a non-GM player, and goes through a performance review every ten features. The module's share of a busy session's processing is about 0.2%. Details: [Testing and Reviews](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Testing-and-Reviews).
+Every feature ships with automated tests (124 and counting, run before every release), has been played through as a non-GM player, and goes through a performance review every ten features. The module's share of a busy session's processing is about 0.2%. Details: [Testing and Reviews](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Testing-and-Reviews).
 
 ## 🐞 Issues and suggestions
 

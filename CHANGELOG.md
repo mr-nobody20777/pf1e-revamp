@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.18.0: slayer talents, ranger styles, read-before-you-choose, and a round of fixes
 
 ### New
 - **Slayer talent picker.** It appears in PF1's level-up window at every even slayer level, and on the Slayer Talents feature for catching up.
