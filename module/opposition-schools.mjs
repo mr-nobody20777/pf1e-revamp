@@ -32,7 +32,7 @@ const oppositionOf = (actor) => schoolItem(actor)?.getFlag(MODULE_ID, FLAG) ?? [
 export async function promptOpposition(actor, school) {
   const specialty = specialtyOf(school);
   const current = school.getFlag(MODULE_ID, FLAG) ?? [];
-  const options = Object.entries(pf1.config.spellSchools).filter(([key]) => key !== specialty && key !== "uni");
+  const options = Object.entries(pf1.config.spellSchools).filter(([key]) => key !== specialty && key !== "uni" && key !== "misc"); // not real schools
   const chosen = await foundry.applications.api.DialogV2.wait({
     window: { title: `${school.name}: opposition schools` },
     content: `<p>Choose <strong>two</strong> opposition schools. Preparing their spells takes two slots, and crafting items that need them takes a −4 penalty.</p>

@@ -31,7 +31,10 @@ const MARK = "pf1eRevampFortune";
 const NEXT_ROLL = [
   { label: "True Strike", bonus: 20, kinds: ["attack"], match: (b) => b.flags[MODULE_ID]?.trueStrike },
   { label: "Guidance", bonus: 1, kinds: ["attack", "Save", "Skill"], match: (b) => b.name.toLowerCase() === "guidance" },
+  // Luck variant channeling: "a channel bonus or a luck bonus (creature's choice) on one roll (attack roll, CMB check, saving throw, or skill check)"
+  { label: "Luck channel", bonus: (b) => b.flags[MODULE_ID].channelLuck.bonus, kinds: ["attack", "Save", "Skill"], match: (b) => !!b.flags[MODULE_ID]?.channelLuck },
 ];
+const bonusOf = (def, buff) => (typeof def.bonus === "function" ? def.bonus(buff) : def.bonus);
 
 const activeBuffs = (actor) => (actor?.itemTypes?.buff ?? []).filter((b) => b.isActive);
 const hasFortune = (actor) => activeBuffs(actor).some((b) => b.flags[MODULE_ID]?.fortune === "best");
@@ -73,7 +76,7 @@ Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
 
   for (const { def, buff } of nextRollBonuses(actor, "attack")) {
     if (used.includes(buff.id)) continue;
-    parts.push(`${def.bonus}[${def.label}]`);
+    parts.push(`${bonusOf(def, buff)}[${def.label}]`);
     used.push(buff.id);
   }
 });
@@ -104,7 +107,7 @@ function preActorRoll(kind) {
     }
     for (const { def, buff } of nextRollBonuses(actor, kind)) {
       rollOptions.parts ??= [];
-      rollOptions.parts.push(`${def.bonus}[${def.label}]`);
+      rollOptions.parts.push(`${bonusOf(def, buff)}[${def.label}]`);
       ids.push(buff.id);
     }
     if (ids.length) pending.set(actor.id, ids);
@@ -209,6 +212,14 @@ registerFootnote((item) => {
   if (item.type !== "buff") return null;
   if (item.flags?.[MODULE_ID]?.fortune === "best") return ["Automated: every d20 you roll (attacks, saves, skill and ability checks) is rolled twice, keeping the better result."];
   const next = NEXT_ROLL.find((def) => def.match(item));
-  if (next) return [`Automated: +${next.bonus} on your next ${next.kinds.map((k) => ({ attack: "attack roll", Save: "saving throw", Skill: "skill check" })[k]).join(", ")}, then this buff switches off.`];
+  if (!next) return null;
+  const content = [`Automated: +${bonusOf(next, item)} on your next ${next.kinds.map((k) => ({ attack: "attack roll or CMB check", Save: "saving throw", Skill: "skill check" })[k]).join(", ")}, then this buff switches off.`];
+  const luck = item.flags[MODULE_ID]?.channelLuck;
+  if (luck) {
+    // "a channel bonus or a luck bonus (creature's choice)": only matters for stacking with other bonuses
+    content.push(`Counts as a ${luck.type} bonus.`);
+    if (item.isOwner) content.push(footnoteButton(`Make it a ${luck.type === "sacred" ? "luck" : "sacred"} bonus`, "Your choice; it only matters for stacking", () => item.setFlag(MODULE_ID, "channelLuck.type", luck.type === "sacred" ? "luck" : "sacred").then(() => refreshFootnotes(item))));
+  }
+  return content;
   return null;
 });

@@ -15,7 +15,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { isBashShield, bashCountsAsLight } from "./shield-trained.mjs";
-import { esc, norm, wrapMethod } from "./util.mjs";
+import { esc, norm, wrapMethod, addSearch } from "./util.mjs";
 
 const FIELD_ON = `${MODULE_ID}-twf`;
 const FIELD_OFF = `${MODULE_ID}-twf-offhand`;
@@ -111,7 +111,7 @@ Hooks.on("renderAttackDialog", (app, html) => {
   flags.append(wrap);
 
   const checkbox = wrap.querySelector("input");
-  const select = wrap.querySelector("select");
+  const select = addSearch(wrap.querySelector("select"));
   const hint = wrap.querySelector(".hint");
   const update = () => {
     state.on = checkbox.checked;

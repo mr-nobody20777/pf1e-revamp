@@ -16,7 +16,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { esc, wrapMethod } from "./util.mjs";
+import { esc, wrapMethod, searchSelects } from "./util.mjs";
 
 const FLAG = "traitChoice";
 const baseName = (name) => name.replace(/\s*\([^()]*\)\s*$/, "").trim();
@@ -89,6 +89,7 @@ export async function chooseTrait(item, { picks = null } = {}) {
     picks = await foundry.applications.api.DialogV2.wait({
       window: { title: `${item.name}: choose` },
       content: `<div>${fields}</div>`,
+      render: (event, dialog) => searchSelects(dialog.element), // e.g. Gifted Adept's spell list
       buttons: [
         { action: "ok", label: "Save", default: true, callback: (event, button) => Object.fromEntries(rule.choices.map((c) => [c.key, button.form.elements[c.key]?.value]).filter(([, v]) => v)) },
         { action: "cancel", label: "Later" },

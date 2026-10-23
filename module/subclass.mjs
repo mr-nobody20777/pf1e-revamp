@@ -12,7 +12,8 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { evaluate, classLevel, itemsFromSource, classFlagUpdate, createClassFeatures, esc, norm, plainText, openLink } from "./util.mjs";
+import { evaluate, classLevel, itemsFromSource, classFlagUpdate, createClassFeatures, esc, norm, plainText, openLink, addSearch } from "./util.mjs";
+import { variantsAllowed, variantOptions, setVariant, VARIANTS } from "./variant-channeling.mjs";
 import { checkPrerequisites } from "./prereqs.mjs";
 import { promptOpposition, specialtyOf } from "./opposition-schools.mjs";
 
@@ -248,14 +249,17 @@ const optionsCache = new Map();
 async function loadSubclassOptions() {
   const pack = game.packs.get("pf1.class-abilities");
   const index = pack ? await pack.getIndex({ fields: ["system.associations.classes"] }) : [];
+  // Schools and subschools are both wizard options, so the lists for one class are combined
+  const byClass = new Map();
   for (const kind of KINDS) {
     const options = index
       .filter((e) => e.name.endsWith(kind.suffix) && !NOT_SUBCLASSES.includes(e.name))
       .filter((e) => kind.className === "Cleric" || (e.system?.associations?.classes ?? []).some((c) => norm(c) === norm(kind.className)))
       .map((e) => ({ uuid: `Compendium.pf1.class-abilities.Item.${e._id}`, name: e.name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-    optionsCache.set(kind.className, options);
+    byClass.set(kind.className, [...(byClass.get(kind.className) ?? []), ...options]);
   }
+  for (const [className, options] of byClass) optionsCache.set(className, options);
 }
 
 Hooks.once("ready", loadSubclassOptions);
@@ -280,7 +284,7 @@ function pickerSelect(placeholder, options, selected, onChange) {
         .join("")}
     </select>${openLink("pending")}`;
   // No name attribute: this isn't part of PF1's form data
-  const select = row.querySelector("select");
+  const select = addSearch(row.querySelector("select"));
   const link = row.querySelector(`.${MODULE_ID}-open`);
   const sync = () => {
     link.dataset.uuid = select.value;
@@ -317,8 +321,22 @@ async function subclassPicker(app) {
   const section = pickerSection(count > 1 ? `${label}s` : label, `Optional. After Finish, the ${kind.label} is added and you'll review its powers.`);
   const options = optionsCache.get(kind.className).map((o) => ({ value: o.uuid, label: o.name }));
   for (let i = 0; i < count; i++) {
-    const placeholder = count > 1 ? `choose ${kind.label} ${i + 1}` : `choose a ${kind.label}`;
+    const placeholder = count > 1 ? `choose ${kind.label} ${i + 1}` : `choose ${/^[aeiou]/i.test(kind.label) ? "an" : "a"} ${kind.label}`;
     section.append(pickerSelect(placeholder, options, state.picks[i], (v) => (state.picks[i] = v)));
+  }
+  // Variant channeling (optional rule): "When you create a cleric character, decide whether she uses the
+  // standard form of channel energy or a variant ... Once this choice is made, it cannot be altered."
+  if (kind.className === "Cleric" && variantsAllowed()) {
+    const row = document.createElement("div");
+    row.style.cssText = "display: flex; align-items: center; margin-top: 0.25em;";
+    row.innerHTML = `<select style="flex: 1">${variantOptions().map((o) => `<option value="${esc(o.value)}" ${o.value === (state.variant ?? "") ? "selected" : ""}>${o.value ? `Variant channeling: ${esc(o.label)}` : esc(o.label)}</option>`).join("")}</select>`;
+    const select = addSearch(row.querySelector("select"));
+    const hint = document.createElement("p");
+    hint.style.cssText = "font-size: 11px; margin: 0.15em 0 0; opacity: 0.8;";
+    const show = () => (hint.textContent = VARIANTS[select.value] ? `Pick one of your deity's portfolios; it can't be changed later. Heal: ${VARIANTS[select.value].heal}` : "");
+    select.addEventListener("change", () => ((state.variant = select.value || null), show()));
+    show();
+    section.append(row, hint);
   }
   return section;
 }
@@ -398,6 +416,12 @@ Hooks.on("pf1ClassLevelChange", (actor, classItem, curLevel, newLevel) => {
           const data = game.items.fromCompendium(doc, { clearFolder: true });
           const [subclass] = await actor.createEmbeddedDocuments("Item", [data], { [`${MODULE_ID}NoPrompt`]: true });
           await promptApply(actor, subclass);
+        }
+        // Variant channeling, on the Channel Energy feature PF1 adds with the class
+        if (state.variant) {
+          let channelItem;
+          for (let i = 0; i < 20 && !(channelItem = actor.itemTypes.feat.find((f) => f.system.tag === "classFeat_channelEnergy")); i++) await new Promise((r) => setTimeout(r, 250));
+          if (channelItem) await setVariant(channelItem, state.variant);
         }
       }
       // Bloodline bonus feat

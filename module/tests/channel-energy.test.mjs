@@ -3,6 +3,7 @@
 
 import { createTestActor, waitFor, waitForItem, cleanup, useTestScene, placeToken, deleteTokens } from "./helpers.mjs";
 import { creaturesInBurst, isUndead } from "../channel-energy.mjs";
+import { setVariant } from "../variant-channeling.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -71,6 +72,23 @@ export function registerChannelEnergyTests(quench) {
           } finally {
             await demon.delete();
             await drow.delete();
+          }
+        });
+
+        it("Luck variant channeling: half healing, then a +1 on the creature's next roll", async () => {
+          await setVariant(channelItem, "Luck");
+          try {
+            await ally.update({ "system.attributes.hp.value": 1 });
+            const msg = await use("Positive - Heal living", [tokens.ally.object]);
+            const { variant, amount } = msg.getFlag(MODULE_ID, "channel");
+            assert.equal(amount, Math.floor(variant.rolled / 2), "halved");
+            assert.equal(ally.system.attributes.hp.value, 1 + amount);
+            const buff = await waitFor(() => ally.itemTypes.buff.find((b) => b.flags[MODULE_ID]?.channelLuck?.bonus === 1 && b.isActive));
+            const save = await ally.rollSavingThrow("will", { skipDialog: true });
+            assert.match(save.rolls[0].formula, /1\[Luck channel\]/);
+            await waitFor(() => !buff.isActive, { what: "the bonus to be used up" });
+          } finally {
+            await channelItem.unsetFlag(MODULE_ID, "variantChanneling");
           }
         });
 

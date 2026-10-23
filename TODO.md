@@ -47,6 +47,7 @@ Status: ⬜ not started · 🟨 designed / in progress · ✅ done (move to CHAN
 - ⬜ **Missing bloodline power lists** (data sweep 2026-10-23): 36 PF1 bloodline entries (Orc, Shadow, Phoenix, Djinni…) and 4 domains never name their powers; the power items exist but are untagged. Needs a hand-written bloodline → powers map (like `EXTRA_POWERS`). Also domain powers PF1 lacks as items (Frog, Aquatic, Swamp, Cave…).
 - ⬜ Underwater combat style: Dolphin Dart/Circle and Shark Tear/Leap still need their style feat; the picker currently ignores all prerequisites.
 - ⬜ Heritages that replace "Base Statistics" (Sunsoul Ifrit, Angelkin Aasimar…) should swap the race's ability modifiers; now flagged "adjust by hand".
+- ⬜ Variant channeling: automate other portfolios as players pick them (only Luck is automated; the rest show their text). The +50% "enhanced" healing/damage vs creature types is a note only.
 - ⬜ Other bloodlines/domains/schools: powers are granted, but their special rules are mostly reminders. Prioritize what players actually use.
 - ⬜ Other archetypes: the structural changes work; write bonuses into `archetype-rules.mjs` as players pick them.
 
@@ -56,6 +57,7 @@ Status: ⬜ not started · 🟨 designed / in progress · ✅ done (move to CHAN
 - ⬜ Half-Orc Ferocity (keep fighting below 0 HP, staggered). Interacts with Nevela's dying/unconscious handling.
 
 ## Traits
+- ⬜ "Historian (Human)" (a party trait) isn't in pf-content; the player needs a hand-made item. Consider shipping it in the module's compendium.
 - ⬜ Oppressive Expectations / Dependent: only if the table enters DCs on checks (both trigger on failure).
 
 ## From manual QA (2026-10-23, QA/2026-10-23/MANUAL-QA.md)
@@ -64,7 +66,7 @@ Status: ⬜ not started · 🟨 designed / in progress · ✅ done (move to CHAN
 - ⬜ QA coverage still pending: other races, trait choices, two-weapon variants, channel harm/saves/Selective Channeling, studied target cleanup, archetype removal, player permissions, multi-client.
 
 ## Quality and release
-- ⬜ **Performance review #3** at 10 features since review #2 (count: opposition schools, Blossoming Light L3, racial traits, save bonuses, character traits, slayer talents/ranger styles = 6/10).
+- ⬜ **Performance review #3** at 10 features since review #2 (count: opposition schools, Blossoming Light L3, racial traits, save bonuses, character traits, slayer talents/ranger styles, variant channeling = 7/10).
 - ⬜ Test Two-Weapon Rend's click-to-roll button (never covered by a test).
 - ⬜ Per-feature on/off settings and localizable strings (for a wider audience).
 - ⬜ If ever listing on foundryvtt.com: Foundry's AI policy requires human-written item and description text.

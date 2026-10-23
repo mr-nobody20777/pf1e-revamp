@@ -8,6 +8,38 @@ export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt
 /** Lowercase, punctuation-free form of a name for loose matching. */
 export const norm = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
 
+/**
+ * Any dropdown we add with more than 10 options gets a search box in front of it: typing hides the
+ * options that don't match (and picks the first match, so Enter-less use still works).
+ */
+export function addSearch(select) {
+  if (select.options.length <= 10 || select.dataset.searchable) return select;
+  select.dataset.searchable = "1";
+  const input = document.createElement("input");
+  input.type = "search";
+  input.placeholder = "Search…";
+  input.style.cssText = "flex: 0 0 35%; margin: 0 0.4em 0.25em 0;";
+  input.addEventListener("input", () => {
+    const q = input.value.trim().toLowerCase();
+    let first = null;
+    for (const option of select.options) {
+      const match = !option.value || !q || option.textContent.toLowerCase().includes(q);
+      option.hidden = !match;
+      if (match && option.value && !first) first = option;
+    }
+    const current = select.selectedOptions[0];
+    if (q && first && (!current?.value || current.hidden)) {
+      select.value = first.value;
+      select.dispatchEvent(new Event("change"));
+    }
+  });
+  select.before(input);
+  return select;
+}
+
+/** addSearch for every long dropdown in a dialog or section. */
+export const searchSelects = (root) => root?.querySelectorAll("select").forEach(addSearch);
+
 /** A book icon that opens an entry's sheet, so picker options can be read before choosing. */
 export const openLink = (uuid) =>
   uuid ? ` <a class="${MODULE_ID}-open" data-uuid="${esc(uuid)}" data-tooltip="Read the full entry" style="margin-left: 0.2em; opacity: 0.8"><i class="fa-solid fa-book-open"></i></a>` : "";

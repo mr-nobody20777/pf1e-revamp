@@ -47,6 +47,22 @@ Removing the bloodline, domain or school removes the powers it added. The item's
 
 The cleric's token must be on the scene. Applying the results needs a GM logged in (see [Compatibility](Compatibility#multiplayer)).
 
+### Variant channeling (optional rule)
+*Ultimate Magic* lets a cleric channel in a way that matches one aspect of their deity's portfolio, like Luck, Fire or Protection. The GM turns it on under **Settings → Variant channeling**.
+
+**Choosing.** The rules say it's decided *"when you create a cleric character … Once this choice is made, it cannot be altered."* So:
+- a **new cleric** picks it in PF1's level-up window, in a **Channeling** dropdown under the two domains (searchable, with each portfolio's effect shown);
+- a **cleric made earlier** (or a paladin or Life oracle who serves a deity) picks it once from **Channel Energy's note → Choose variant channeling…**;
+- after that it's locked. The GM gets a **Reset variant (GM)** button in case of a mistake.
+
+**Channeling with a variant.** Healing with positive energy, or harming with negative energy, is **halved**, as the rules require (roll the normal dice, halve the total). The chat summary shows both numbers and the portfolio's effect. Harming undead with positive energy, or healing undead with negative energy, is unchanged. With a variant, a successful Will save negates the extra effect but doesn't halve the damage again. A few portfolios say they work "like a standard channel (not halved)", and those aren't halved.
+
+**Luck** is fully automated:
+- **Heal:** every creature healed gets **Luck Channel (+1)**, rising to +2 at cleric level 5 and +1 per 5 levels after that (max +5). Their next attack roll, CMB check, saving throw or skill check uses it up. It counts as a sacred bonus; a button on the buff switches it to a luck bonus, since the rules let the creature choose. It lasts until the end of the cleric's next turn.
+- **Harm** (negative energy): a penalty of the same size on all d20 rolls until the end of the cleric's next turn, negated by the save.
+
+The other portfolios' effects appear in the summary for the table to apply by hand. They'll be automated as players pick them.
+
 ### Spontaneous Casting
 **Before:** losing a prepared spell to cast a cure spell meant adjusting the spellbook by hand.
 

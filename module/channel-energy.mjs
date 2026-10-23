@@ -10,8 +10,9 @@
 // healing goes straight on, harmed creatures roll their Will save and take full or half.
 
 import { MODULE_ID } from "./const.mjs";
-import { registerFootnote } from "./footnote.mjs";
-import { esc, onGmRequest } from "./util.mjs";
+import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
+import { esc, onGmRequest, classLevel } from "./util.mjs";
+import { variantEffect, variantOf, variantsAllowed, chooseVariant, clearVariant, applyVariant, channelBonus, VARIANTS } from "./variant-channeling.mjs";
 
 const RADIUS = 30;
 const isChannel = (item) => item?.type === "feat" && item.system.tag === "classFeat_channelEnergy";
@@ -67,9 +68,12 @@ Hooks.on("pf1CreateActionUse", (actionUse) => {
  */
 export async function channel(actionUse, { targets = null } = {}) {
   const { actor, item, action } = actionUse;
-  const amount = actionUse.shared.chatAttacks?.[0]?.damage?.total ?? 0;
+  const rolled = actionUse.shared.chatAttacks?.[0]?.damage?.total ?? 0;
   const dc = actionUse.shared.saveDC;
   const mode = modeOf(action);
+  // Variant channeling: half healing (or damage) for the portfolio's effect
+  const variant = variantEffect(item, mode);
+  const amount = variant?.halved ? Math.floor(rolled / 2) : rolled;
   const refund = () => item.update({ "system.uses.value": (item.system.uses.value ?? 0) + 1 });
 
   const clericToken = actor.getActiveTokens()[0];
@@ -96,7 +100,8 @@ export async function channel(actionUse, { targets = null } = {}) {
     const who = mode.undead ? "undead" : "living creatures";
     chosen = await foundry.applications.api.DialogV2.wait({
       window: { title: `${action.name}` },
-      content: `<p><strong>${esc(action.name)}</strong>: ${mode.heal ? "heals" : "deals"} <strong>${amount}</strong>${mode.heal ? "" : `, Will DC ${dc} for half`}.</p>
+      content: `<p><strong>${esc(action.name)}</strong>: ${mode.heal ? "heals" : "deals"} <strong>${amount}</strong>${variant?.halved ? ` (half of ${rolled}: ${esc(variant.name)} variant)` : ""}${mode.heal ? "" : variant ? `, Will DC ${dc} negates the variant effect` : `, Will DC ${dc} for half`}.</p>
+        ${variant ? `<p style="font-size:11px"><strong>${esc(variant.name)}:</strong> ${esc(variant.text)}</p>` : ""}
         <p style="font-size:11px; opacity:0.8">Affects all ${who} within ${RADIUS} ft. You can leave yourself out.
         ${selective ? `Selective Channeling: you may also exclude up to ${maxExcluded} other target(s).` : "Others can only be excluded with Selective Channeling."}
         ${blossoming ? "Blossoming Light: chaotic evil outsiders and evil creatures with light sensitivity or light blindness are included. Worshipers of chaotic evil deities are too; the GM applies those by hand." : ""}</p>
@@ -134,7 +139,10 @@ export async function channel(actionUse, { targets = null } = {}) {
     content: `<p><strong>${esc(action.name)}</strong>: ${chosen.length ? "applying…" : "no creatures affected."}</p>`,
     flags: {
       [MODULE_ID]: {
-        channel: { heal: mode.heal, amount, dc, card: actionUse.shared.message?.uuid ?? null, targets: chosen.map((t) => t.document.uuid), label: action.name },
+        channel: {
+          heal: mode.heal, amount, dc, card: actionUse.shared.message?.uuid ?? null, targets: chosen.map((t) => t.document.uuid), label: action.name,
+          variant: variant && { ...variant, rolled, bonus: channelBonus(classLevel(item, "cleric")), source: actor.name },
+        },
       },
     },
   });
@@ -149,33 +157,49 @@ Hooks.on("pf1PostActionUse", (actionUse) => {
 onGmRequest("channel", async (message, data) => {
   if (data.results) return;
   const results = [];
+  const variant = data.variant;
   for (const uuid of data.targets) {
     const actor = fromUuidSync(uuid)?.actor;
     if (!actor) continue;
+    let text, saved = false;
     if (data.heal) {
       const hp = actor.system.attributes.hp;
       const healed = Math.min(data.amount, Math.max(0, hp.max - hp.value));
       await actor.applyDamage(-data.amount, { forceDialog: false });
-      results.push({ name: actor.name, text: healed === 0 ? "already full" : `+${healed}${healed < data.amount ? " (to max)" : ""}` });
+      text = healed === 0 ? "already full" : `+${healed}${healed < data.amount ? " (to max)" : ""}`;
     } else {
       const save = await actor.rollSavingThrow("will", { skipDialog: true, reference: data.card ?? undefined, dc: data.dc });
       const total = save?.rolls?.[0]?.total;
-      const saved = Number.isFinite(total) && total >= data.dc;
-      const damage = saved ? Math.floor(data.amount / 2) : data.amount;
+      saved = Number.isFinite(total) && total >= data.dc;
+      // A variant's damage is already halved: the save negates the extra effect, not more damage
+      const damage = saved && !variant ? Math.floor(data.amount / 2) : data.amount;
       await actor.applyDamage(damage, { forceDialog: false });
-      results.push({ name: actor.name, text: `${damage} (Will ${total ?? "?"}: ${saved ? "saved" : "failed"})` });
+      text = `${damage} (Will ${total ?? "?"}: ${saved ? "saved" : "failed"})`;
     }
+    const extra = variant ? await applyVariant(actor, variant, { bonus: variant.bonus, saved, source: variant.source }) : null;
+    results.push({ name: actor.name, text: extra ? `${text}, ${extra}` : text });
   }
   const list = results.map((r) => `${esc(r.name)} ${esc(r.text)}`).join(" · ");
+  const amountText = variant?.halved ? `${data.amount}, half of ${variant.rolled}` : `${data.amount}`;
+  const saveText = data.heal ? "" : variant ? `, Will DC ${data.dc} negates ${esc(variant.name)} effect` : `, Will DC ${data.dc} half`;
   await message.update({
-    content: `<p><strong>${esc(data.label)}</strong> (${data.amount}${data.heal ? "" : `, Will DC ${data.dc} half`}): ${list || "no creatures affected."}</p>`,
+    content: `<p><strong>${esc(data.label)}</strong> (${amountText}${saveText}): ${list || "no creatures affected."}</p>${variant ? `<p style="font-size:11px"><strong>${esc(variant.name)} variant:</strong> ${esc(variant.text)}</p>` : ""}`,
     [`flags.${MODULE_ID}.channel.results`]: results,
   });
 });
 
 registerFootnote((item) => {
   if (!isChannel(item)) return null;
-  return [
+  const content = [
     "Automated: Use rolls the channel and lists every creature of the affected type within 30 ft (centered on you, no template). Healing is applied (up to max HP); harmed creatures roll their Will save and take full or half. You can leave yourself out; others only with Selective Channeling. The card's own Apply buttons aren't needed.",
   ];
+  const variant = variantOf(item);
+  if (variant) {
+    content.push(`Variant channeling: ${variant}. Healing with positive energy or harming with negative energy is halved (unless the portfolio says otherwise), plus: Heal: ${VARIANTS[variant]?.heal} Harm: ${VARIANTS[variant]?.harm}${variant === "Luck" ? " (automated)" : ""}`);
+    if (game.user.isGM) content.push(footnoteButton("Reset variant (GM)", "The choice is permanent for players; the GM can undo a mistake", () => clearVariant(item).then(() => refreshFootnotes(item))));
+  } else if (variantsAllowed() && item.isOwner) {
+    // "When you create a cleric character, decide ...": characters made before the module choose once here
+    content.push(footnoteButton("Choose variant channeling…", "Optional rule: a portfolio-based variant, chosen once", () => chooseVariant(item).then(() => refreshFootnotes(item))));
+  }
+  return content;
 });
