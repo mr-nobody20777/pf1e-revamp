@@ -15,6 +15,11 @@
 - **Ranger combat style feats** at 2nd/6th/10th/14th/18th level: choose the style once, then feats from the lists unlocked at your level, prerequisites ignored.
 
 ### Fixed
+- From manual QA:
+  - Racial trait review: **Not now** after "Review again…" no longer removes your existing traits and ability bonus. The old choice is undone only when a new one is applied, and the review opens with your current choices ticked.
+  - Two alternate traits that replace the same trait (Heart of the Mountains and Heart of the Streets) can't both be taken; ticking one unticks the other, and unticking an alternate gives back what it replaced.
+  - Dual Talent and other "two different ability scores" picks start on different abilities and can't be set to the same one (it gave +4 to one score).
+  - Channel Energy's use dialog no longer starts with "Measure Template" ticked.
 - Found by sweeping every compendium entry through the module's parsers:
   - Feat prerequisites: skill ranks, races, size, base saves, Hit Dice, "ability to cast … spells", class features and "X or Y" are now checked. Things that aren't feats are no longer marked ✗ "feat not found" (1,302 wrong marks across 3,564 feats). Feat names containing "and" (Craft Magic Arms and Armor) are no longer split in two.
   - Rogue and Ninja Advanced Talents now offers Evasion (Trick) and, as the rules allow, any rogue advanced talent. The talent lists are read from the entries' links instead of matching names.

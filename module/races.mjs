@@ -59,9 +59,12 @@ const onSheet = (actor, doc) => actor.items.find((i) => i._stats?.compendiumSour
 /*  Review dialog                               */
 /* -------------------------------------------- */
 
-function abilitySelect(name, disabled) {
-  return `<select name="${name}" ${disabled ? "disabled" : ""} style="width:auto; margin-left:0.5em">${ABILITIES.map((a) => `<option value="${a}">${pf1.config.abilities[a]}</option>`).join("")}</select>`;
+function abilitySelect(name, disabled, selected) {
+  return `<select name="${name}" ${disabled ? "disabled" : ""} style="width:auto; margin-left:0.5em">${ABILITIES.map((a) => `<option value="${a}" ${a === selected ? "selected" : ""}>${pf1.config.abilities[a]}</option>`).join("")}</select>`;
 }
+
+/** Two alternates that replace the same standard trait can't both be taken ("a trait can't be exchanged more than once"). */
+const conflicts = (a, b) => a !== b && a.replaces.some((r) => b.replaces.some((s) => traitKey(r) === traitKey(s)));
 
 /**
  * @param {object} [choose] Skip the dialog (macros, tests): { alternates: [names], abilities: { traitName: ["str", ...] } }
@@ -79,12 +82,18 @@ export async function promptRacialTraits(actor, race, { choose = null } = {}) {
     // Replaced names with no trait item to drop ("Base Statistics", or a trait pf-content lacks) are left to the player
     const standardKeys = new Set(standard.map((t) => traitKey(stem(t.doc.name))));
     const replacedText = (t) => t.replaces.map((r) => (standardKeys.has(traitKey(r)) ? esc(r) : `${esc(r)} <em data-tooltip="Not a trait item on this list, so it isn't removed automatically">(adjust by hand)</em>`)).join(", ");
+    // Reviewing again: start from the current choices, not the defaults
+    const record = race.getFlag(MODULE_ID, FLAG);
     const row = (t, i, kind) => {
       const existing = onSheet(actor, t.doc);
-      const selects = Array.from({ length: t.choices }, (_, n) => abilitySelect(`${kind}${i}ab${n}`, kind === "alt")).join("");
+      const ours = existing && record?.added.includes(existing.id);
+      const checked = record ? (kind === "std" ? !record.dropped.includes(t.doc.name) : !!ours) : kind === "std";
+      // Each pick defaults to a different ability (Dual Talent: two different scores), or to what was picked before
+      const previous = ours ? existing.system.changes.filter((c) => ABILITIES.includes(c.target)).map((c) => c.target) : [];
+      const selects = Array.from({ length: t.choices }, (_, n) => abilitySelect(`${kind}${i}ab${n}`, !checked, previous[n] ?? ABILITIES[n])).join("");
       return `<label style="display:block; margin:2px 0">
-        <input type="checkbox" name="${kind}" value="${i}" ${kind === "std" ? "checked" : ""} data-replaces="${esc(t.replaces.join("|"))}" data-stem="${esc(stem(t.doc.name))}">
-        ${esc(t.doc.name)}${openLink(t.doc.uuid)}${selects}${existing ? ' <em style="opacity:0.7">(already on sheet)</em>' : ""}
+        <input type="checkbox" name="${kind}" value="${i}" ${checked ? "checked" : ""} data-replaces="${esc(t.replaces.join("|"))}" data-stem="${esc(stem(t.doc.name))}">
+        ${esc(t.doc.name)}${openLink(t.doc.uuid)}${selects}${existing && !ours ? ' <em style="opacity:0.7">(already on sheet)</em>' : ""}
         ${t.replaces.length ? `<span style="font-size:11px; opacity:0.75"> — replaces ${replacedText(t)}</span>` : ""}</label>`;
     };
     picked = await foundry.applications.api.DialogV2.wait({
@@ -96,13 +105,36 @@ export async function promptRacialTraits(actor, race, { choose = null } = {}) {
         ${alternates.length ? `<h3>Alternate traits</h3>${alternates.map((t, i) => row(t, i, "alt")).join("")}` : ""}</div>`,
       render: (event, dialog) => {
         const form = dialog.element.querySelector("form") ?? dialog.element;
-        for (const box of form.querySelectorAll('input[name="alt"]')) {
+        const altBoxes = [...form.querySelectorAll('input[name="alt"]')];
+        const stdBoxes = [...form.querySelectorAll('input[name="std"]')];
+        const keysOf = (box) => box.dataset.replaces.split("|").map(traitKey);
+        for (const box of altBoxes) {
           box.addEventListener("change", () => {
             for (const sel of box.parentElement.querySelectorAll("select")) sel.disabled = !box.checked;
-            if (!box.checked) return;
-            const replaced = box.dataset.replaces.split("|").map(traitKey);
-            for (const std of form.querySelectorAll('input[name="std"]')) if (replaced.includes(traitKey(std.dataset.stem))) std.checked = false;
+            if (box.checked) {
+              // Untick other alternates exchanging the same trait, and the traits this one replaces
+              for (const other of altBoxes) if (other.checked && conflicts(alternates[box.value], alternates[other.value])) other.checked = false;
+              for (const std of stdBoxes) if (keysOf(box).includes(traitKey(std.dataset.stem))) std.checked = false;
+            } else {
+              // Give back what it replaced, unless another ticked alternate still replaces it
+              const still = altBoxes.filter((b) => b.checked).flatMap(keysOf);
+              for (const std of stdBoxes) if (keysOf(box).includes(traitKey(std.dataset.stem)) && !still.includes(traitKey(std.dataset.stem))) std.checked = true;
+            }
           });
+        }
+        // "+2 to two different ability scores": picking a score taken by the other dropdown swaps them
+        for (const label of form.querySelectorAll("label")) {
+          const selects = [...label.querySelectorAll("select")];
+          if (selects.length < 2) continue;
+          for (const sel of selects) {
+            let before = sel.value;
+            sel.addEventListener("focus", () => (before = sel.value));
+            sel.addEventListener("change", () => {
+              const clash = selects.find((s) => s !== sel && s.value === sel.value);
+              if (clash) clash.value = before;
+              before = sel.value;
+            });
+          }
         }
       },
       buttons: [
@@ -128,6 +160,14 @@ export async function promptRacialTraits(actor, race, { choose = null } = {}) {
     });
     if (!picked || typeof picked === "string") return;
   }
+  // Guards, also for choices that didn't come through the dialog (macros): one exchange per trait, distinct picks
+  picked.alternates = picked.alternates.filter((t, i) => !picked.alternates.slice(0, i).some((earlier) => conflicts(t, earlier)));
+  const chosen = new Set([...picked.standard, ...picked.alternates].map((t) => t.doc.name));
+  for (const [name, picks] of Object.entries(picked.abilities)) {
+    if (chosen.has(name) && new Set(picks).size < picks.length) return ui.notifications.warn(`${name}: choose a different ability score for each bonus.`);
+  }
+  // Only now, with a valid choice confirmed, undo the previous one (cancelling a review changes nothing)
+  if (race.getFlag(MODULE_ID, FLAG)) await revertRacialTraits(actor, race);
   return applyRacialTraits(actor, race, picked);
 }
 
@@ -212,8 +252,7 @@ registerFootnote((item) => {
   const content = [record ? `Racial traits applied (${record.added.length} added${record.dropped.length ? `; replaced ${record.dropped.map(stem).join(", ")}` : ""}).` : "Racial traits not reviewed yet."];
   if (item.isOwner) {
     content.push(footnoteButton(record ? "Review again…" : "Review racial traits…", "Choose standard and alternate racial traits", async () => {
-      if (record) await revertRacialTraits(item.actor, item);
-      await promptRacialTraits(item.actor, item);
+      await promptRacialTraits(item.actor, item); // undoes the previous choice only if a new one is applied
       refreshFootnotes(item);
     }));
   }

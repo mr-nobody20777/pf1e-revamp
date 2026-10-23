@@ -56,7 +56,10 @@ export function creaturesInBurst(centerToken, undead, { blossoming = false } = {
 
 // The burst is always centered on the cleric: no template to place
 Hooks.on("pf1CreateActionUse", (actionUse) => {
-  if (isChannel(actionUse.item)) actionUse.shared.useMeasureTemplate = false;
+  if (!isChannel(actionUse.item)) return;
+  actionUse.shared.useMeasureTemplate = false;
+  // PF1's use dialog reads its "Measure Template" box from the use options, ticked unless told otherwise
+  if (actionUse.shared.useOptions) actionUse.shared.useOptions.measureTemplate = false;
 });
 
 /**

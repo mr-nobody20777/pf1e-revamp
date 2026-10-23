@@ -45,6 +45,25 @@ export function registerRaceTests(quench) {
           void ranksBefore;
         });
 
+        it("one exchange per trait; Dual Talent needs two different abilities; reviewing again replaces the old choice", async () => {
+          const { actor, race } = await withRace("Quench Exchange Human", "Human");
+          actors.push(actor);
+          // Both Hearts replace Skilled: only one is taken (manual QA-002)
+          const hearts = () => actor.items.filter((i) => /^Heart of the (Mountains|Streets)$/.test(i.name)).length;
+          await promptRacialTraits(actor, race, { choose: { alternates: ["Heart of the Mountains", "Heart of the Streets"], abilities: { "+2 to One Ability Score (Human)": ["str"] } } });
+          assert.equal(hearts(), 1);
+          // Reviewing again with Dual Talent: Str twice is refused and the previous choice stays (QA-003, QA-001)
+          const strBefore = actor.system.abilities.str.total;
+          await promptRacialTraits(actor, race, { choose: { alternates: ["Dual Talent"], abilities: { "Dual Talent": ["str", "str"] } } });
+          assert.equal(hearts(), 1, "nothing undone by a refused choice");
+          assert.equal(actor.system.abilities.str.total, strBefore);
+          // Str and Con: +2 each, and the Heart is replaced
+          await promptRacialTraits(actor, race, { choose: { alternates: ["Dual Talent"], abilities: { "Dual Talent": ["str", "con"] } } });
+          assert.equal(hearts(), 0);
+          assert.equal(actor.system.abilities.str.total, strBefore, "+2 Str from Dual Talent instead of the standard +2");
+          assert.equal(actor.system.abilities.con.total, 12);
+        });
+
         it("Human with Heart of the Fey: Skilled is replaced, including the race's extra skill ranks", async () => {
           const { actor, race } = await withRace("Quench Fey Human", "Human");
           actors.push(actor);
