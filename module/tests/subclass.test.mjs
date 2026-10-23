@@ -69,6 +69,12 @@ export function registerSubclassTests(quench) {
             assert.equal(armor.slotCost, 2);
           });
 
+          it("Foretell, once added, lasts rounds per day equal to wizard level (PF1's data says Int mod)", async () => {
+            const [foretell] = await wizard.createEmbeddedDocuments("Item", [await fromPack("pf1.class-abilities", "Foretell")]);
+            await waitFor(() => foretell.system.uses.maxFormula === "@class.level", { what: "Foretell's uses to be corrected" });
+            await foretell.delete();
+          });
+
           it("Foretell at 8th; Diviner's Fortune and Scrying Adept replaced", () => {
             assert.equal(links["Foretell"], 8);
             assert.notProperty(links, "Diviner's Fortune");
@@ -93,6 +99,11 @@ export function registerSubclassTests(quench) {
             await waitForItem(cleric, "Resistant Touch");
             assert.equal(links["Good Fortune"], 6);
             assert.equal(links["Aura of Protection (Domain Power)"], 8);
+          });
+
+          it("the domains are tied to the Cleric class, so their formulas scale (Protection: +1, +1 per 5 levels)", () => {
+            assert.equal(cleric.items.getName("Protection Domain").system.class, "cleric");
+            assert.equal(cleric.items.getName("Luck Domain").system.class, "cleric");
           });
 
           it("no warpriest blessings", () => {

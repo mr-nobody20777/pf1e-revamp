@@ -60,6 +60,15 @@ Status: ⬜ not started · 🟨 designed / in progress · ✅ done (move to CHAN
 - ⬜ "Historian (Human)" (a party trait) isn't in pf-content; the player needs a hand-made item. Consider shipping it in the module's compendium.
 - ⬜ Oppressive Expectations / Dependent: only if the table enters DCs on checks (both trigger on failure).
 
+## From leveling the party to 10 as a player (2026-10-23)
+- ⬜ **Skald Damage Reduction (9th)**: PF1's item has no mechanics. RAW: "Subtract 1 from the damage ... from a weapon or a natural attack. At 14th and 19th levels ... increases by 1 ... the skald grants this DR to all allies affected by his inspired rage." Grant DR 1/— (scaling) on the skald and share it through Inspired Rage. Needs a design (rules check first).
+- ⬜ **Extra Channel**: "You can channel energy two additional times per day." PF1's feat has no mechanics and PF1's channel formula ignores it. Count +2 per Extra Channel in Channel Energy's uses.
+- ⬜ **Foretell aura (Foresight, 8th)**: aid (+2 luck on ability/attack/CL/save/skill for you and allies within 30 ft) or hinder (−2 for enemies), the wizard's choice, rounds/day = wizard level (uses now fixed). Could reuse the raging-song engine: checklist, 1 round per round. Needs a design.
+- ⬜ **Slayer Trapfinding talent also adds Trap Sense** (PF1 item links). Check the RAW text: the talent grants trapfinding only?
+- ⬜ **Song of Questing (Battle Scion, 10th)** is described inside the archetype's Raging Song; it's narrative (like geas/quest). Maybe list it in the song picker as a reminder (4 rounds).
+- ⬜ **Map-phase tests still pending** (players can't place tokens in this world; needs the GM to place the party): Raging Song (Inspired Rage, Marching, Strength), Studied Target scaling (+3 at 10th, more targets), Bit of Luck, Resistant Touch with the +3 domain bonus, Good Fortune, Aura of Protection, Forewarned on initiative, channel with the Luck variant on the party.
+- ⬜ Test tooling: Nevela's suite cancels targeted buff spells (e.g. Haste) without a target; cast-tests need a target or a non-buff spell.
+
 ## From manual QA (2026-10-23, QA/2026-10-23/MANUAL-QA.md)
 - ⬜ Channel Energy refunded (no token / cancelled checklist): PF1's chat card still shows the pre-refund uses (e.g. 2/3).
 - ⬜ Pickers: clicking Choose with nothing selected silently does nothing; say "Pick one first".

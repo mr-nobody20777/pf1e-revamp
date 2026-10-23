@@ -12,7 +12,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { evaluate, classLevel, itemsFromSource, classFlagUpdate, createClassFeatures, esc, norm, plainText, openLink, addSearch } from "./util.mjs";
+import { evaluate, classLevel, itemsFromSource, classFlagUpdate, createClassFeatures, esc, norm, plainText, openLink, addSearch, isActiveGM } from "./util.mjs";
 import { variantsAllowed, variantOptions, setVariant, VARIANTS } from "./variant-channeling.mjs";
 import { checkPrerequisites } from "./prereqs.mjs";
 import { promptOpposition, specialtyOf } from "./opposition-schools.mjs";
@@ -36,6 +36,16 @@ const EXTRA_POWERS = {
 const ARCANA = {
   "Solar Bloodline": { descriptor: "fire", perDie: 1 },
 };
+
+// PF1 data errors in powers, corrected when the power is added to a character
+const POWER_FIXES = {
+  // "You can use this ability for a number of rounds per day equal to your wizard level" (PF1 has Int mod)
+  Foretell: { wrong: (item) => item.system.uses?.maxFormula === "@abilities.int.mod", update: { "system.uses.maxFormula": "@class.level", "system.uses.per": "day" } },
+};
+Hooks.on("createItem", (item, options, userId) => {
+  const fix = POWER_FIXES[item.name];
+  if (userId === game.user.id && item.actor && fix?.wrong(item)) item.update(fix.update);
+});
 
 function kindOf(item) {
   if (item.type !== "feat" || NOT_SUBCLASSES.includes(item.name)) return null;
@@ -147,6 +157,9 @@ export async function promptApply(actor, subclass, { grantAll = false } = {}) {
   const kind = kindOf(subclass);
   const classItem = findClass(actor, kind.className);
   if (!classItem) return ui.notifications.warn(`${subclass.name}: ${actor.name} has no ${kind.className} class.`);
+  // Tie it to its class like PF1 does for class features, so its formulas' @class.level work
+  // (Protection Domain: "+1 resistance bonus on saving throws ... increases by 1 for every 5 levels")
+  if (subclass.system.class !== classItem.system.tag) await subclass.update({ "system.class": classItem.system.tag });
 
   const { powers, textOnly } = await findPowers(subclass, kind);
   // Many of PF1's bloodline entries stop at the bloodline arcana and never name their powers
@@ -263,6 +276,20 @@ async function loadSubclassOptions() {
 }
 
 Hooks.once("ready", loadSubclassOptions);
+
+// Bloodlines, domains and schools granted before 0.19 weren't tied to their class: fix them once (GM)
+Hooks.once("ready", async () => {
+  if (!isActiveGM()) return;
+  for (const actor of game.actors) {
+    const updates = [];
+    for (const item of actor.itemTypes.feat) {
+      const kind = kindOf(item);
+      const tag = kind && findClass(actor, kind.className)?.system.tag;
+      if (tag && item.system.class !== tag) updates.push({ _id: item.id, "system.class": tag });
+    }
+    if (updates.length) await actor.updateEmbeddedDocuments("Item", updates);
+  }
+});
 
 /** A picker section styled to sit above the level-up dialog's buttons. */
 function pickerSection(title, hint) {

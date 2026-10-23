@@ -13,6 +13,8 @@
 - Channel energy no longer posts its own summary message; PF1's card shows the amount and saves have their own cards. The request to the GM is whispered and removed once applied.
 
 ### Fixed
+- Bloodlines, domains and schools are now tied to their class, so their formulas scale: the Protection domain's resistance bonus stayed +1 instead of +1 per 5 levels (+3 at 10th). Existing characters are repaired when the GM next loads the world.
+- Foretell (Foresight subschool) lasts rounds per day equal to wizard level; PF1's data used the Int modifier.
 - The arcane school picker for a new wizard only listed subschools; the nine regular schools are back.
 - Opposition schools no longer offer "Miscellaneous", which isn't a school.
 
