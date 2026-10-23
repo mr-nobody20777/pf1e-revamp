@@ -129,7 +129,8 @@ async function luckBonus(actor, bonus, source) {
     name: `Luck Channel (+${bonus})`,
     "system.active": true,
     "system.duration": { value: "1", units: "round", end: "turnEnd" },
-    [`flags.${MODULE_ID}.${LUCK_FLAG}`]: { bonus, type: existing?.flags[MODULE_ID][LUCK_FLAG].type ?? "sacred", source },
+    // Not armed: the creature chooses which roll gets it
+    [`flags.${MODULE_ID}.${LUCK_FLAG}`]: { bonus, type: existing?.flags[MODULE_ID][LUCK_FLAG].type ?? "sacred", source, armed: false },
   };
   if (existing) return existing.update(data);
   return actor.createEmbeddedDocuments("Item", [foundry.utils.expandObject({ type: "buff", img: "icons/magic/control/buff-luck-fortune-green.webp", "system.subType": "temp", ...data })]);

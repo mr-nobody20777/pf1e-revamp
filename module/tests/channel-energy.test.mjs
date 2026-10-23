@@ -4,6 +4,7 @@
 import { createTestActor, waitFor, waitForItem, cleanup, useTestScene, placeToken, deleteTokens } from "./helpers.mjs";
 import { creaturesInBurst, isUndead } from "../channel-energy.mjs";
 import { setVariant, clearVariant } from "../variant-channeling.mjs";
+import { armLuck } from "../fortune.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -89,6 +90,11 @@ export function registerChannelEnergyTests(quench) {
             assert.equal(roll.total, amount);
             assert.equal(ally.system.attributes.hp.value, 1 + amount);
             const buff = await waitFor(() => ally.itemTypes.buff.find((b) => b.flags[MODULE_ID]?.channelLuck?.bonus === 1 && b.isActive));
+            // "on one roll ... of the creature's choice": nothing until it's armed
+            const unarmed = await ally.rollSavingThrow("fort", { skipDialog: true });
+            assert.notMatch(unarmed.rolls[0].formula, /Luck channel/);
+            assert.isTrue(buff.isActive, "still waiting");
+            await armLuck(buff);
             const save = await ally.rollSavingThrow("will", { skipDialog: true });
             assert.match(save.rolls[0].formula, /1\[Luck channel\]/);
             await waitFor(() => !buff.isActive, { what: "the bonus to be used up" });

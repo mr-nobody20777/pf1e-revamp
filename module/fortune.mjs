@@ -31,8 +31,9 @@ const MARK = "pf1eRevampFortune";
 const NEXT_ROLL = [
   { label: "True Strike", bonus: 20, kinds: ["attack"], match: (b) => b.flags[MODULE_ID]?.trueStrike },
   { label: "Guidance", bonus: 1, kinds: ["attack", "Save", "Skill"], match: (b) => b.name.toLowerCase() === "guidance" },
-  // Luck variant channeling: "a channel bonus or a luck bonus (creature's choice) on one roll (attack roll, CMB check, saving throw, or skill check)"
-  { label: "Luck channel", bonus: (b) => b.flags[MODULE_ID].channelLuck.bonus, kinds: ["attack", "Save", "Skill"], match: (b) => !!b.flags[MODULE_ID]?.channelLuck },
+  // Luck variant channeling: "a channel bonus or a luck bonus (creature's choice) on one roll (attack roll, CMB check,
+  // saving throw, or skill check) made before the end of your next turn". The creature picks the roll, so it waits until armed.
+  { label: "Luck channel", bonus: (b) => b.flags[MODULE_ID].channelLuck.bonus, kinds: ["attack", "Save", "Skill"], match: (b) => !!b.flags[MODULE_ID]?.channelLuck?.armed },
 ];
 const bonusOf = (def, buff) => (typeof def.bonus === "function" ? def.bonus(buff) : def.bonus);
 
@@ -164,6 +165,13 @@ async function arm(actor) {
   refreshFootnotes(buff);
 }
 
+/** Luck variant channeling: arm (or disarm) the bonus for the creature's next roll. */
+export async function armLuck(buff, armed = true) {
+  const { bonus } = buff.flags[MODULE_ID].channelLuck;
+  await buff.update({ [`flags.${MODULE_ID}.channelLuck.armed`]: armed, name: `Luck Channel (+${bonus})${armed ? " (armed)" : ""}` });
+  refreshFootnotes(buff);
+}
+
 // At the start of the wizard's turn the old result is lost and a new one can be rolled. The
 // previous turn's offer is removed so the chat log doesn't fill with them.
 Hooks.on("combatTurnChange", async (combat, prior, current) => {
@@ -185,6 +193,17 @@ Hooks.on("combatTurnChange", async (combat, prior, current) => {
 
 Hooks.on("renderChatMessagePF", (message, html) => {
   const flags = message.flags[MODULE_ID];
+  // Luck variant channeling: each healed creature's owner can arm their bonus from the channel summary
+  if (flags?.channel?.results && flags.channel.variant?.name === "Luck" && flags.channel.heal) {
+    const content = html.querySelector(".message-content");
+    for (const uuid of flags.channel.targets) {
+      const actor = fromUuidSync(uuid)?.actor;
+      if (!actor?.isOwner || (game.user.isGM && actor.hasPlayerOwner)) continue; // the GM arms only creatures without a player
+      const buff = actor.itemTypes.buff.find((b) => b.isActive && b.flags[MODULE_ID]?.channelLuck && !b.flags[MODULE_ID].channelLuck.armed);
+      if (buff) content?.append(footnoteButton(`${actor.name}: use +${buff.flags[MODULE_ID].channelLuck.bonus} on my next roll`, "Arm the Luck channel bonus for the next attack, CMB check, save or skill check", () => armLuck(buff)));
+    }
+    return;
+  }
   if (!flags?.prescienceOffer && !flags?.prescienceRoll) return;
   const content = html.querySelector(".message-content");
   if (flags.prescienceOffer) {
@@ -211,15 +230,19 @@ registerFootnote((item) => {
   if (isPrescience(item)) return ["Automated: using this rolls the d20 and stores it on a buff; arm it from the buff or the chat card for the roll you choose. In combat you're offered the roll at the start of your turn, and an unused result is lost then."];
   if (item.type !== "buff") return null;
   if (item.flags?.[MODULE_ID]?.fortune === "best") return ["Automated: every d20 you roll (attacks, saves, skill and ability checks) is rolled twice, keeping the better result."];
+  const luck = item.flags[MODULE_ID]?.channelLuck;
+  if (luck) {
+    const content = [luck.armed ? `Armed: +${luck.bonus} on your next attack roll, CMB check, saving throw or skill check.` : `+${luck.bonus} on one attack roll, CMB check, saving throw or skill check of your choice, before the end of the channeler's next turn. Arm it before the roll you want it on.`];
+    if (item.isOwner) {
+      content.push(footnoteButton(luck.armed ? "Don't use it yet" : "Use it on my next roll", "Arm or disarm the bonus", () => armLuck(item, !luck.armed)));
+      // "a channel bonus or a luck bonus (creature's choice)": only matters for stacking with other bonuses
+      content.push(footnoteButton(`Make it a ${luck.type === "sacred" ? "luck" : "sacred"} bonus`, `It counts as a ${luck.type} bonus now; your choice only matters for stacking`, () => item.setFlag(MODULE_ID, "channelLuck.type", luck.type === "sacred" ? "luck" : "sacred").then(() => refreshFootnotes(item))));
+    }
+    return content;
+  }
   const next = NEXT_ROLL.find((def) => def.match(item));
   if (!next) return null;
   const content = [`Automated: +${bonusOf(next, item)} on your next ${next.kinds.map((k) => ({ attack: "attack roll or CMB check", Save: "saving throw", Skill: "skill check" })[k]).join(", ")}, then this buff switches off.`];
-  const luck = item.flags[MODULE_ID]?.channelLuck;
-  if (luck) {
-    // "a channel bonus or a luck bonus (creature's choice)": only matters for stacking with other bonuses
-    content.push(`Counts as a ${luck.type} bonus.`);
-    if (item.isOwner) content.push(footnoteButton(`Make it a ${luck.type === "sacred" ? "luck" : "sacred"} bonus`, "Your choice; it only matters for stacking", () => item.setFlag(MODULE_ID, "channelLuck.type", luck.type === "sacred" ? "luck" : "sacred").then(() => refreshFootnotes(item))));
-  }
   return content;
   return null;
 });

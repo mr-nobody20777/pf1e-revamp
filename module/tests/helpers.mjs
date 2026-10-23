@@ -1,6 +1,8 @@
 // Shared helpers for PF1e Revamp's Quench tests. Tests build throwaway actors in the
 // "PF1e Revamp Tests" folder and clean up after themselves.
 
+import { settled } from "../util.mjs";
+
 export const TEST_FOLDER = "PF1e Revamp Tests";
 
 export async function fromPack(packId, name) {
@@ -129,6 +131,7 @@ export async function closeStrayWindows() {
 
 export async function cleanup(actors, messageIdsBefore) {
   await closeStrayWindows();
+  await settled(); // the module's linked-buff syncs finish before their actors are deleted
   for (const actor of actors) await actor?.delete();
   // Let Foundry's chat pop-up notifications finish before their messages disappear
   await new Promise((r) => setTimeout(r, 1500));

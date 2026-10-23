@@ -15,7 +15,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { evaluate, classLevel, isActiveGM, allActors, linkedBuffs as linkedBuffsBy, createQueue, stillExists, onSceneCatchUp } from "./util.mjs";
+import { evaluate, classLevel, isActiveGM, allActors, linkedBuffs as linkedBuffsBy, createQueue, stillExists, deleteIfExists, onSceneCatchUp } from "./util.mjs";
 
 const FLAG = "studiedTarget";
 const PF1_STUDIED_TARGET = "Compendium.pf1.class-abilities.Item.JnXrphJlr1ULx1MK";
@@ -183,8 +183,8 @@ async function reconcile(item) {
   for (const buff of linkedBuffs(actor, item.uuid)) {
     const target = buff.getFlag(MODULE_ID, LINK).target;
     if (targets.includes(target)) continue;
-    for (const other of linkedBuffs(fromUuidSync(target)?.actor, item.uuid, target)) await other.delete();
-    await buff.delete();
+    for (const other of linkedBuffs(fromUuidSync(target)?.actor, item.uuid, target)) await deleteIfExists(other);
+    await deleteIfExists(buff);
   }
 
   for (const uuid of targets) {
@@ -213,7 +213,7 @@ async function unlink(link) {
 
 // Removing a studied feature removes all of its indicator buffs.
 async function clearIndicators(item) {
-  for (const actor of allActors()) for (const buff of linkedBuffs(actor, item.uuid)) await buff.delete();
+  for (const actor of allActors()) for (const buff of linkedBuffs(actor, item.uuid)) await deleteIfExists(buff);
 }
 
 Hooks.on("updateItem", (item, changes) => {

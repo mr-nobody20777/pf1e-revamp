@@ -10,7 +10,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { classLevel, isActiveGM, allActors, linkedBuffs, createQueue, stillExists, esc, onSceneCatchUp } from "./util.mjs";
+import { classLevel, isActiveGM, allActors, linkedBuffs, createQueue, stillExists, deleteIfExists, esc, onSceneCatchUp } from "./util.mjs";
 
 const FLAG = "ragingSong";
 const LINK = "songLink";
@@ -297,7 +297,7 @@ async function reconcile(pool) {
   // Remove anything that no longer matches (other song, released target, song ended)
   for (const other of allActors()) {
     for (const buff of linkedBuffs(other, LINK, pool.uuid)) {
-      if (!wanted(buff.getFlag(MODULE_ID, LINK))) await buff.delete();
+      if (!wanted(buff.getFlag(MODULE_ID, LINK))) await deleteIfExists(buff);
     }
   }
   if (!def) return;
@@ -347,7 +347,7 @@ Hooks.on("deleteItem", (item) => {
   if (link) enqueue(() => unlink(link));
   if (isPool(item)) {
     enqueue(async () => {
-      for (const other of allActors()) for (const buff of linkedBuffs(other, LINK, item.uuid)) await buff.delete();
+      for (const other of allActors()) for (const buff of linkedBuffs(other, LINK, item.uuid)) await deleteIfExists(buff);
     });
   }
 });

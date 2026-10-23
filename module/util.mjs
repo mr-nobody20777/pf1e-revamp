@@ -208,14 +208,29 @@ export function stillExists(doc) {
   return !!doc && !!fromUuidSync(doc.uuid);
 }
 
+/** Queued cleanups run a moment later: skip anything deleted meanwhile (with its actor, say), or the server reports an error to every GM. */
+export const deleteIfExists = (doc) => (stillExists(doc) ? doc.delete() : null);
+
 // Quench test suite: only loaded when Quench is active (module/tests/)
 Hooks.on("quenchReady", (quench) => import("./tests/index.mjs").then((m) => m.registerTests(quench)));
 
 /** Run async work one task at a time, so overlapping hooks can't create duplicate buffs. */
+const queues = [];
+/** Resolves once every queue is idle (tests wait for it before deleting what the queues are syncing). */
+export async function settled() {
+  let tails;
+  do {
+    await new Promise((r) => setTimeout(r, 50)); // let hooks that are about to enqueue do so
+    tails = queues.map((q) => q.tail);
+    await Promise.all(tails);
+  } while (queues.some((q, i) => q.tail !== tails[i]));
+}
+
 export function createQueue(label) {
-  let queue = Promise.resolve();
+  const queue = { tail: Promise.resolve() };
+  queues.push(queue);
   return (fn) => {
-    queue = queue.then(fn).catch((err) => {
+    queue.tail = queue.tail.then(fn).catch((err) => {
       // A document deleted while a sync was queued (e.g. the character itself) is expected; nothing left to sync
       if (/does not exist/.test(err?.message ?? "")) return console.debug(`${MODULE_ID} | ${label} sync skipped: ${err.message}`);
       console.error(`${MODULE_ID} | ${label} sync failed`, err);

@@ -10,7 +10,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { isActiveGM, allActors, linkedBuffs, createQueue, stillExists, esc, onSceneCatchUp } from "./util.mjs";
+import { isActiveGM, allActors, linkedBuffs, createQueue, stillExists, deleteIfExists, esc, onSceneCatchUp } from "./util.mjs";
 
 const FLAG = "quarry";
 const LINK = "quarryLink";
@@ -183,7 +183,7 @@ async function reconcile(quarry) {
 
   for (const other of allActors()) {
     for (const buff of linkedBuffs(other, LINK, quarry.uuid)) {
-      if (!state || buff.getFlag(MODULE_ID, LINK).target !== state.target) await buff.delete();
+      if (!state || buff.getFlag(MODULE_ID, LINK).target !== state.target) await deleteIfExists(buff);
     }
   }
   if (!state) return;
@@ -229,7 +229,7 @@ Hooks.on("deleteItem", (item) => {
   if (link) enqueue(() => unlink(link));
   if (isQuarry(item)) {
     enqueue(async () => {
-      for (const other of allActors()) for (const buff of linkedBuffs(other, LINK, item.uuid)) await buff.delete();
+      for (const other of allActors()) for (const buff of linkedBuffs(other, LINK, item.uuid)) await deleteIfExists(buff);
     });
   }
 });
