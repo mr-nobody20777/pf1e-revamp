@@ -18,6 +18,25 @@
 12. **Compact chat cards with next steps.** Trait chips, modifier chips (Strength +3 · Expert +5), the formula, a big total, then Damage / Critical buttons. A gentle nudge instead of a block ("Please target before you attack"); with a target, the result is graded against AC.
 13. **Pickers read well.** Portrait art, name, source book, rarity badge, ✓ choose and 📄 read buttons; common entries first. Context-aware ordering: the Heritage list shows Human heritages first, then versatile ones.
 
+## Round 2: playing with the sheet (gear, conditions, combat)
+
+14. **Browse buttons know what you want.** Each inventory section's Browse opens the Compendium Browser already filtered (Weapons → weapon + shield). A bulk bar and an "Invested 0/10" counter keep the limits visible.
+15. **Carry state is one click, with context.** A hand icon on each item opens a small popover: Held in 1 / 2 hands, Worn, Stowed, Dropped. Armor gets "Worn (Armor)" (the slot that counts). Choosing it updates AC (15 → 18) and bulk right away, and a worn shield adds its own sidebar block (Hardness, HP, Broken).
+16. **Every number explains itself.** Hovering AC shows a tooltip listing each modifier with its type, plus a row to add a typed custom modifier on the spot. The tooltip doubles as the editor.
+17. **Valued conditions have steppers.** Frightened 1 appears with + / − / 🗑 on the Effects tab. The penalty lands everywhere it applies (strikes, skills, AC) and shows up by name in every roll dialog and chat card ("Frightened 1 −1", type STATUS).
+18. **Rule-blocked modifiers stay visible.** In the Athletics dialog, Armor Check Penalty −2 is listed **struck through and OFF**, because Claude's Strength meets the armor's requirement. The player sees the rule was considered and why it doesn't apply, and can override it.
+19. **Item actions sit next to the item, with action costs.** Each strike row carries its own small buttons with action glyphs: SHEATHE ◆, DROP ◇, RAISE ◆ (shield), CHANGE GRIP (2H) ◆. They are contextual: RAISE disappears once the shield is raised.
+20. **One click does the whole action.** Raise a Shield adds the effect, raises AC by 2 (17 → 19) and posts a one-line narrative card ("Claude raises their Steel Shield.").
+21. **The damage dialog mirrors the attack dialog.** Base dice, then a row to add dice (count, die, damage type), typed modifiers with ON/OFF, and a row to add a modifier with a damage type. The button shows the formula ("1d8 + 3").
+22. **Damage cards finish the job.** The card shows a red min–max bar (4 … 11) under the formula, then one-click apply buttons: **Damage, Half, Double, Block** (Block applies the shield's hardness), plus a target button. The degree of success is in the title ("Damage Roll: Longsword (Hit)").
+23. **Tabs follow play modes.** The Actions tab splits into Encounter / Exploration / Downtime, and character options appear as toggles at the top ("Student of the Canon" checkbox) instead of hidden settings.
+
+### Ideas from round 2
+- **Struck-through, explained modifiers** (#18): in our roll-window toggles, list bonuses that don't apply right now (wrong alignment for a ward, out of range for studied target) greyed out with the reason, instead of hiding them.
+- **Damage/Half/Double/Block on PF1's damage card** (#22): PF1 already has apply buttons; worth checking what's missing (a min–max hint, a "block" equivalent for DR/resistance that we already compute).
+- **Item-row action buttons** (#19, #20): Raging Song, Studied Target, Channel Energy could get a small inline "Use" button on the attack/feature row that does everything and posts one short narrative line.
+- **Typed modifier tooltips with inline add** (#16): hovering AC/saves in PF1 to see each bonus with its type would make stacking visible.
+
 ## What PF1e Revamp could borrow (ranked by value/effort)
 
 | Idea | PF2e pattern | Where it fits in PF1e Revamp |
