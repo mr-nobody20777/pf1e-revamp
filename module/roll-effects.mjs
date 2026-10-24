@@ -584,8 +584,8 @@ function preActorRoll(kind, idKey) {
     const roll = { kind, [idKey]: id, reference: rollOptions.reference ?? null };
     const windowed = !(rollOptions.skipDialog ?? pf1.documents.settings.getSkipActionPrompt());
     if (!windowed) {
-      const plan = defaultPlan(actor, roll);
-      (rollOptions.parts ??= []).push(...partsFor(plan, "roll", actor.getRollData()));
+      // The default plan has no ability-score changes, so the roll data (costly to build) isn't needed
+      (rollOptions.parts ??= []).push(...partsFor(defaultPlan(actor, roll), "roll", {}));
       return;
     }
     pending.set(actor.id, { roll, name: actor.name, actor });

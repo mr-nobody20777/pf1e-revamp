@@ -20,6 +20,7 @@
 ### Fixed
 - **One-roll bonuses follow the stacking rules.** Guidance (+1 competence) adds nothing beside a higher competence bonus such as Inspire Courage, so it's no longer offered or used up on that roll; it waits for one where it helps. True Strike and the Luck channel bonus are capped the same way.
 - Luck variant channeling: a creature harmed by two channels in a row had two penalties; the second channel now refreshes the first.
+- Saves: a bonus vs fear beaten by a higher bonus of the same type (Bless's +1 morale beside Greater Heroism) said "only vs fear" even against a fear effect; it now says a higher morale bonus already applies.
 - Racial trait review: a standard trait's ability choice is greyed out when the trait is unticked, including when an alternate unticks it for you.
 - A feature granted twice at different levels by an archetype or subclass (the same item at, say, 1st and 5th) could have both copies recorded at one level.
 - The one-time repair that ties older bloodlines, domains and schools to their class ran on every world load; it now runs once per world.

@@ -8,7 +8,7 @@ import { promptApply } from "../subclass.mjs";
 const MODULE_ID = "pf1e-revamp";
 
 // Identifiers that only appear in PF1e Revamp's hook handlers
-const OUR_CODE = /MODULE_ID|pf1eRevamp|getConfig\(|isPool\(|songKeyFor\(|studiedBonus\(|isQuarry\(|isImproved\(|quarryAgainstTargets|FIELD_ON|rendPending|MARK\]|buildFootnote|isBashShield\(|bashCategory|shieldBashRules|FROM_DIALOG|activeGrants|arcanaFor|kindOf\(|isArchetype\(|subclassPicker|bloodlineFeatPicker|wardBonus|acBonus|rebuildIndex|drawMarker|studiedIndex|registerTests|loadSubclassOptions|reconcile\(|unlink\(|enqueue\(|endSong\(|isActiveGM\(|armedPrescience\(|hasFortune\(|pending\.|grantFor\(|restoreResistance\(|isChannel\(|canConvert\(|clericBook\(|findPool\(|canRewind\(|defenderMissChance\(|missBuff\(|activeTrueStrike\(|wardFor\(|fixFlatWard\(|giveRules\(|alterItem\(|isPrescience\(|prescienceBuffs\(|nextRollBonuses\(|gmHandlers/;
+const OUR_CODE = /MODULE_ID|pf1eRevamp|getConfig\(|isPool\(|songKeyFor\(|studiedBonus\(|isQuarry\(|isImproved\(|quarryAgainstTargets|FIELD_ON|rendPending|MARK\]|buildFootnote|isBashShield\(|bashCategory|shieldBashRules|FROM_DIALOG|activeGrants|arcanaFor|kindOf\(|isArchetype\(|subclassPicker|bloodlineFeatPicker|wardBonus|acBonus|rebuildIndex|drawMarker|studiedIndex|registerTests|loadSubclassOptions|reconcile\(|unlink\(|enqueue\(|endSong\(|isActiveGM\(|armedPrescience\(|hasFortune\(|pending\.|grantFor\(|restoreResistance\(|isChannel\(|canConvert\(|clericBook\(|findPool\(|canRewind\(|defenderMissChance\(|missBuff\(|activeTrueStrike\(|wardFor\(|fixFlatWard\(|giveRules\(|alterItem\(|isPrescience\(|prescienceBuffs\(|nextRollBonuses\(|gmHandlers|partsFor\(|defaultPlan\(|attackContexts|makeContext\(|nextRollToggle\(|POWER_FIXES|variantEffect\(|browseWatch|GRANT_FLAG|SLOT_FLAG/;
 
 // Hooks PF1e Revamp listens to (Hooks.events doesn't enumerate its keys in v13, so look them up by name)
 const ROLL_KINDS = ["Save", "Skill", "Ability", "Cl", "Concentration"];
@@ -17,7 +17,7 @@ const HOOK_NAMES = [
   "pf1ClassLevelChange", "pf1CreateActionUse", "pf1PostActionUse", "pf1PreActionUse",
   ...ROLL_KINDS.flatMap((k) => [`pf1PreActorRoll${k}`, `pf1ActorRoll${k}`]),
   "pf1PreAttackRoll", "pf1PreDamageRoll", "pf1PrepareDerivedActorData", "preCreateChatMessage", "createChatMessage", "renderAttackDialog",
-  "renderChatMessagePF", "renderItemSheetPF", "renderActorSheetPF", "renderLevelUpForm", "renderTokenHUD", "updateItem", "updateCombatant",
+  "renderChatMessagePF", "renderDialogV2", "closeAttackDialog", "renderItemSheetPF", "renderActorSheetPF", "renderLevelUpForm", "renderTokenHUD", "updateItem", "updateCombatant",
 ];
 
 /** Our hook registrations, found by identifiers unique to our handlers. */

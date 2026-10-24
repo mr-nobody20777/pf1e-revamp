@@ -116,7 +116,7 @@ function matches(parts, effect) {
 }
 
 /** Bonuses this actor gets on this save against this effect (any effect, without one), after stacking. */
-export function saveBonuses(actor, saveId, effect) {
+export function saveBonuses(actor, saveId, effect, { stack = true } = {}) {
   const candidates = [];
   // The race item and its racial trait items often state the same bonus in different words
   // (halfling "+2 vs fear" on the race and on Fearless): count it once.
@@ -138,7 +138,7 @@ export function saveBonuses(actor, saveId, effect) {
       }
     }
   }
-  if (!effect) return candidates; // against different effects: they never meet in one roll
+  if (!effect || !stack) return candidates; // without an effect: against different effects, they never meet in one roll
   const stacking = new Set(pf1.config.stackingBonusTypes ?? ["untyped", "dodge", "racial", "circumstance"]);
   const out = candidates.filter((c) => stacking.has(c.type) || c.value < 0);
   const byType = new Map();
@@ -160,10 +160,12 @@ registerRollEffect({
     const applied = effect ? saveBonuses(actor, roll.saveId, effect) : [];
     const out = applied.map((b) => ({ id: id(b), label: b.label, part: b.label, type: b.type, roll: b.value, applies: true, tooltip: `vs ${b.against}` }));
     const seen = new Set(out.map((b) => b.id));
+    // Against this effect but beaten by a higher bonus of the same type (Bless's +1 morale vs fear beside +4 morale)
+    const matching = new Set(effect ? saveBonuses(actor, roll.saveId, effect, { stack: false }).map(id) : []);
     for (const b of saveBonuses(actor, roll.saveId, null)) {
       if (seen.has(id(b))) continue;
       seen.add(id(b));
-      const reason = effect ? `only vs ${b.against}` : `only vs ${b.against}; roll from the effect's card`;
+      const reason = matching.has(id(b)) ? `a higher ${b.type} bonus already applies` : effect ? `only vs ${b.against}` : `only vs ${b.against}; roll from the effect's card`;
       out.push({ id: id(b), label: b.label, part: b.label, type: b.type, roll: b.value, applies: false, reason });
     }
     return out;

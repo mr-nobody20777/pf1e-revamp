@@ -131,6 +131,11 @@ export async function closeStrayWindows() {
 
 export async function cleanup(actors, messageIdsBefore) {
   await closeStrayWindows();
+  // Dialogs a test left open for its actors (e.g. a grant prompt), which would act on deleted documents
+  const names = actors.filter(Boolean).map((a) => a.name);
+  for (const app of [...foundry.applications.instances.values()]) {
+    if (app.rendered && names.some((n) => (app.title ?? "").endsWith(`– ${n}`) || (app.title ?? "").startsWith(`${n}:`))) await app.close();
+  }
   await settled(); // the module's linked-buff syncs finish before their actors are deleted
   for (const actor of actors) await actor?.delete();
   // Let Foundry's chat pop-up notifications finish before their messages disappear

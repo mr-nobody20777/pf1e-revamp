@@ -69,6 +69,11 @@ Status: ⬜ not started · 🟨 designed / in progress · ✅ done (move to CHAN
 - ⬜ **Map-phase tests still pending** (players can't place tokens in this world; needs the GM to place the party): Raging Song (Inspired Rage, Marching, Strength), Studied Target scaling (+3 at 10th, more targets), Bit of Luck, Resistant Touch with the +3 domain bonus, Good Fortune, Aura of Protection, Forewarned on initiative, channel with the Luck variant on the party.
 - ⬜ Test tooling: Nevela's suite cancels targeted buff spells (e.g. Haste) without a target; cast-tests need a target or a non-buff spell.
 
+## From review #3 manual run-through (2026-10-24)
+- ⬜ **Save cards' reminder notes** ("+3 vs fear effects") still show after the module already added that bonus to the roll; a player could add it twice. Mark notes the module applied (✓ applied, or struck through).
+- ⬜ Disabled checkboxes in the buff manager look alike in the dark theme (a 🔒 condition, a locked Not Applied row): consider a clearer locked style.
+- ⬜ A chat card shows both "+1[Haste]" (PF1) and "−1[Buffs: Haste off]" when a buff is turned off: correct, but could read better (e.g. one line "Haste off").
+
 ## From manual QA (2026-10-23, QA/2026-10-23/MANUAL-QA.md)
 - ⬜ Channel Energy refunded (no token / cancelled checklist): PF1's chat card still shows the pre-refund uses (e.g. 2/3).
 - ⬜ QA coverage still pending: other races, trait choices, two-weapon variants, channel harm/saves/Selective Channeling, studied target cleanup, archetype removal, player permissions, multi-client.
@@ -87,7 +92,7 @@ Status: ⬜ not started · 🟨 designed / in progress · ✅ done (move to CHAN
 - ⬜ **Coverage gap check: Foundry vs. Archives of Nethys** (user asked, 2026-10-23). Compare Foundry's compendium counts per category with AoN's to find published content missing from Foundry entirely (it can't be automated until it exists as an item; e.g. 36 bloodlines' power links, "Historian (Human)", domains without power items). Foundry counts on 2026-10-23 (this world's packs, ~45,000 entries, ~32,000 items): class features 11,598 (PF1 4,651, archetype features 4,824, prestige features 1,308, pf-content 767); feats 3,644; spells 3,111; traits 2,045; racial traits 1,677; races 85; archetypes 1,268; prestige classes 119; base classes 49; equipment ~7,000; monster rules ~2,350; buffs 344; monster/NPC statblocks 10,387 (journals) plus 427 actors and 92 traps/haunts.
 
 ## Quality and release
-- ⬜ **Performance review #3** at 10 features since review #2 (count: opposition schools, Blossoming Light L3, racial traits, save bonuses, character traits, slayer talents/ranger styles, variant channeling, buffs on a roll, window names + reasons, buffs on a roll phase 2 = 10/10: due now).
+- ✅ **Performance review #3** done 2026-10-24: code review fixes (see CHANGELOG), manual run-through as GM and player, benchmark 0.22%. Next review after 10 more features (count: 0/10).
 - ⬜ Test Two-Weapon Rend's click-to-roll button (never covered by a test).
 - ⬜ Per-feature on/off settings and localizable strings (for a wider audience).
 - ⬜ If ever listing on foundryvtt.com: Foundry's AI policy requires human-written item and description text.

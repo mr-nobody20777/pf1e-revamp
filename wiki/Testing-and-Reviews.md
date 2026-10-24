@@ -34,6 +34,7 @@ Each review is measured with a benchmark (`module/tests/benchmark.mjs`). It simu
 |---|---|
 | #1 | 0.53% → **0.17%** |
 | #2 | 0.29% → **0.20%** (after ten more features) |
+| #3 | 0.23% → **0.22%** (after ten more features, including the roll windows' buff manager) |
 
 Every handler costs well under a millisecond per call, and memory showed no growth.
 
