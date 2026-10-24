@@ -31,6 +31,24 @@
 22. **Damage cards finish the job.** The card shows a red min–max bar (4 … 11) under the formula, then one-click apply buttons: **Damage, Half, Double, Block** (Block applies the shield's hardness), plus a target button. The degree of success is in the title ("Damage Roll: Longsword (Hit)").
 23. **Tabs follow play modes.** The Actions tab splits into Encounter / Exploration / Downtime, and character options appear as toggles at the top ("Student of the Canon" checkbox) instead of hidden settings.
 
+## Round 3: PF2e Level-Up Wizard (module `pf2e-level-up-wizard` 1.1.0)
+
+A wizard-hat button next to the level badge on the sheet opens one window for the next level (2 → 3 for a fighter, with the Gradual Ability Boosts variant on).
+
+24. **One page, only what this level gives.** Big heading "Claude leveled up to 3!", a link to the class, then only the sections that apply: General Feats, Skill Increases, Attribute Boosts, New Class Features (Bravery's full text, with a working @Check link to Frightened). Nothing to page through.
+25. **Each choice uses the right control.** Feat: a button that opens a feat picker and then shows the choice in place, highlighted ("Toughness | 1"). Skill: a plain dropdown. Boosts: a row of six toggle buttons that turn green and preview the new modifier (+3 → +4). Once the allowed number is picked, the other attributes fade out.
+26. **The feat picker is a focused browser.** Search by name, order by level/name, min/max level, "Hide Skill Feats", filter by skills, rarity badges (UNCOMMON), level column, a hover "View Feat" link, a send-to-chat icon and a ✓ to choose. Only feats legal at this level appear.
+27. **Submit is gated, then confirmed.** Submit stays disabled until every section is complete, then a small "Are you sure?" Yes/No.
+28. **A summary in chat and a toast.** "Claude has leveled up to level 3! Selected Feats: Toughness. Skill Increase: Athletics skill rank increased to Expert." plus a "level up complete" notification. The sheet updated in one go: HP 34 → 53, Will trained → expert (+5 → +8), Athletics expert (+6 → +10), Str and Con +4.
+
+**Where it fell short (lessons for us):**
+- **Submit was disabled with no reason given.** The boost heading said "Select one Attribute to boost", but the wizard wanted **two**: it was catching up the level-2 boost I skipped when I changed the level by hand. Nothing said what was missing; I had to read the module's code. *Lesson: a disabled button must say why ("1 boost left"), and counts must be real ("Select 2 (1 from level 2)").*
+- The skill dropdown lists all 16 skills with no current rank and no search (our over-10 rule would add one).
+- The chat summary leaves out the attribute boosts.
+- A duplicate Shield Block on the sheet wasn't flagged.
+
+**Compared with PF1e Revamp:** we inject our choices (talent, bloodline, variant channeling) into PF1's own level-up window, which is close to this one-page model. Worth borrowing: a "leveled up" summary card in chat, a gated Finish button with a visible reason, and a "New class features" section that shows each new feature's full text.
+
 ### Ideas from round 2
 - **Struck-through, explained modifiers** (#18): in our roll-window toggles, list bonuses that don't apply right now (wrong alignment for a ward, out of range for studied target) greyed out with the reason, instead of hiding them.
 - **Damage/Half/Double/Block on PF1's damage card** (#22): PF1 already has apply buttons; worth checking what's missing (a min–max hint, a "block" equivalent for DR/resistance that we already compute).
