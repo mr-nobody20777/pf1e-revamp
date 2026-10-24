@@ -10,6 +10,9 @@
 - **One-roll bonuses are the player's choice.** Guidance, True Strike and the Luck channel bonus show as a ticked box in every roll window (attack, save, skill, ability check); untick it to roll without it and keep the bonus for later.
 
 ### Changed
+- **Every window the module opens names the creature it's for** ("Slayer talent (level 4) – Kestrel", "Channel Positive Energy – Sister Aurel"), like PF1's own roll windows.
+- **Controls that can't be used say why.** The talent/feat picker's Choose button stays off until you pick something ("Pick one first"); greyed-out archetype rows, channel-energy targets, racial ability choices and the off-hand weapon list explain themselves on hover.
+- **Saving throws from a card warn when they'd roll for the wrong creature.** PF1's save button rolls for whatever token is selected; if that isn't one of the card's targets, you're told who it's rolling for (the roll still goes ahead).
 - Studied Target and Quarry bonuses appear in the roll window, and can be left out of a roll. When no studied creature or quarry is targeted, they're listed as Not Applied and can be ticked by hand (for theater-of-mind play).
 - **Halved damage and healing never go below 1.** PF1's ½ buttons (and any ratio in its Apply Damage dialog) used to turn 1 point into nothing; a save for half on channel energy too. Per the core rule, damage and hit points have a minimum of 1.
 - Channel energy no longer posts its own summary message; PF1's card shows the amount and saves have their own cards. The request to the GM is whispered and removed once applied.

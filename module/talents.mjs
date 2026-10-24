@@ -25,7 +25,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { checkPrerequisites } from "./prereqs.mjs";
-import { esc, norm, plainText, openLink } from "./util.mjs";
+import { esc, titleFor, norm, plainText, openLink } from "./util.mjs";
 
 const CLASS_PACK = "pf1.class-abilities";
 const FEAT_PACKS = ["pf1.feats", "pf-content.pf-feats"];
@@ -204,7 +204,7 @@ export async function talentOptions(actor, level) {
  * (uuid adds a book icon that opens the entry).
  * Returns the chosen id, "browse" (open PF1's Feat Browser), or null.
  */
-async function pickOne({ title, intro, rows, browse = false }) {
+async function pickOne({ title, intro, rows, browse = false, actor = null }) {
   const list = rows
     .map(
       (r, i) => `<label class="pfr-row" data-search="${esc(r.label.toLowerCase())}" style="display:flex; gap:0.4em; align-items:flex-start; padding:2px 0; ${r.status === "unmet" ? "opacity:0.6" : ""}">
@@ -214,7 +214,7 @@ async function pickOne({ title, intro, rows, browse = false }) {
     )
     .join("");
   const result = await foundry.applications.api.DialogV2.wait({
-    window: { title, resizable: true },
+    window: { title: titleFor(title, actor), resizable: true },
     position: { width: 520 },
     content: `${intro ? `<p style="margin-top:0">${intro}</p>` : ""}
       <input type="search" class="pfr-search" placeholder="Search…" style="width:100%; margin-bottom:0.4em">
@@ -223,6 +223,16 @@ async function pickOne({ title, intro, rows, browse = false }) {
       ${browse ? `<p style="font-size:11px; margin:0.4em 0 0 0"><strong>Browse all feats</strong> opens PF1's Feat Browser for its filters. Drag the feat you want onto your character sheet. <strong>The Feat Browser can't check prerequisites</strong>, so make sure you qualify.</p>` : ""}`,
     render: (event, dialog) => {
       const root = dialog.element;
+      // Choose stays off, saying why, until something is picked
+      const choose = root.querySelector('button[data-action="choose"]');
+      const ready = () => {
+        const picked = !!root.querySelector('input[name="choice"]:checked');
+        if (!choose) return;
+        choose.disabled = !picked;
+        choose.dataset.tooltip = picked ? "" : "Pick one first";
+      };
+      root.querySelectorAll('input[name="choice"]').forEach((r) => r.addEventListener("change", ready));
+      ready();
       const search = root.querySelector(".pfr-search");
       search?.focus();
       search?.addEventListener("input", () => {
@@ -249,11 +259,12 @@ async function pickOne({ title, intro, rows, browse = false }) {
  * A plan for one slot: { talent: doc, rename?, choice?, style?, feats: [{uuid, rename?}], browse?, via? }.
  * `pick` answers each question: the interactive picker by default; tests pass scripted answers.
  */
-export async function chooseSlayerTalent(actor, { level, pick = pickOne } = {}) {
+export async function chooseSlayerTalent(actor, { level, pick: ask = pickOne } = {}) {
+  const pick = (options) => ask({ ...options, actor }); // every window names the slayer
   const d = await data();
   const options = await talentOptions(actor, level);
   const id = await pick({
-    title: `${actor.name}: slayer talent (level ${level})`,
+    title: `Choose a slayer talent (level ${level})`,
     intro: level >= 10 ? "Advanced talents can be taken in place of a slayer talent from 10th level." : "",
     rows: options.map((t) => ({ id: t.name, label: t.name, uuid: t.uuid, status: t.check.status, detail: t.check.why.join("; "), group: t.advanced ? "advanced" : "" })),
   });
@@ -359,7 +370,8 @@ async function pickStyleFeat(actor, d, styleName, tiers, pick) {
 }
 
 /** Ranger: a combat style feat (choosing the style first if needed). */
-export async function chooseRangerStyleFeat(actor, { level, pick = pickOne } = {}) {
+export async function chooseRangerStyleFeat(actor, { level, pick: ask = pickOne } = {}) {
+  const pick = (options) => ask({ ...options, actor });
   const d = await data();
   const feature = actor.itemTypes.feat.find((f) => f.name === "Combat Style Feat");
   let style = feature?.getFlag(MODULE_ID, STYLE_FLAG) ?? null;

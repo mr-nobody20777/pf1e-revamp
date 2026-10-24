@@ -1,7 +1,7 @@
 // Save bonuses against kinds of effects, read from the save's chat card: racial (halfling vs fear,
 // dwarf vs poison/spells, elf vs enchantment), buffs (Remove Fear, Mind Blank), stacking.
 
-import { createTestActor, fromPack, addItems, waitFor, cleanup } from "./helpers.mjs";
+import { createTestActor, fromPack, addItems, waitFor, cleanup, useTestScene, placeToken, deleteTokens } from "./helpers.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -81,6 +81,38 @@ export function registerSaveBonusTests(quench) {
           await human.createEmbeddedDocuments("Item", [{ name: "Cloak of Resistance +1", type: "buff", system: { active: true, changes: [{ _id: foundry.utils.randomID(8), target: "allSavingThrows", type: "resist", formula: "1" }] } }]);
           assert.match(await saveFormula(human, cards["Charm Person"]), /7\[Mind Blank\]/);
           assert.notMatch(await saveFormula(human, cards["Magic Missile"], "ref"), /Mind Blank/, "not mind-affecting");
+        });
+
+        it("the card's save button warns when it would roll for a creature that isn't a target", async () => {
+          const { restore } = await useTestScene();
+          const target = await withRace("Quench Save Target");
+          const bystander = await withRace("Quench Bystander");
+          const [targetToken, bystanderToken] = [await placeToken(target, 1, 1), await placeToken(bystander, 3, 1)];
+          const card = await ChatMessage.implementation.create({ type: "action", speaker: ChatMessage.implementation.getSpeaker({ actor: caster }), system: { targets: [targetToken.uuid] } });
+          // A stand-in for the card's button, so PF1 itself doesn't roll
+          const el = document.createElement("div");
+          el.className = "chat-message";
+          el.dataset.messageId = card.id;
+          el.innerHTML = '<button data-action="save" data-save="will">Will save</button>';
+          document.body.append(el);
+          const warnings = [];
+          const warn = ui.notifications.warn;
+          ui.notifications.warn = (text, ...rest) => (warnings.push(text), warn.call(ui.notifications, text, ...rest));
+          try {
+            bystanderToken.object.control({ releaseOthers: true });
+            el.querySelector("button").click();
+            assert.match(warnings.at(-1) ?? "", /Quench Bystander, who isn't a target/);
+            warnings.length = 0;
+            targetToken.object.control({ releaseOthers: true });
+            el.querySelector("button").click();
+            assert.isEmpty(warnings, "the target itself: no warning");
+          } finally {
+            ui.notifications.warn = warn;
+            el.remove();
+            canvas.tokens.releaseAll();
+            await deleteTokens([targetToken, bystanderToken]);
+            await restore();
+          }
         });
       });
     },

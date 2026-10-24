@@ -11,7 +11,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
-import { isActiveGM, allActors, linkedBuffs, createQueue, stillExists, deleteIfExists, esc, onSceneCatchUp } from "./util.mjs";
+import { isActiveGM, allActors, linkedBuffs, createQueue, stillExists, deleteIfExists, esc, onSceneCatchUp, titleFor } from "./util.mjs";
 
 const FLAG = "quarry";
 const LINK = "quarryLink";
@@ -68,7 +68,7 @@ async function selectQuarry(actor, usedItem) {
   const remaining = cooldown ? cooldown - game.time.worldTime : 0;
   if (remaining > 0) {
     const ok = await foundry.applications.api.DialogV2.confirm({
-      window: { title: "Quarry on cooldown" },
+      window: { title: titleFor("Quarry on cooldown", actor) },
       content: `<p>${esc(actor.name)} can't select a new quarry for another <strong>${formatTime(remaining)}</strong> of game time.</p><p>Select anyway?</p>`,
       rejectClose: false,
     });
@@ -78,7 +78,7 @@ async function selectQuarry(actor, usedItem) {
   // Must be a studied target or a favored enemy type
   if (!isStudied(actor, token.uuid)) {
     const ok = await foundry.applications.api.DialogV2.confirm({
-      window: { title: "Quarry requirement" },
+      window: { title: titleFor("Quarry requirement", actor) },
       content: `<p><strong>${esc(token.name)}</strong> isn't one of ${esc(actor.name)}'s studied targets.</p><p>A quarry must be a studied target or match one of your favored enemy types. Does it match a favored enemy type?</p>`,
       rejectClose: false,
     });

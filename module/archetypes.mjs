@@ -11,7 +11,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { itemsFromSource, classFlagUpdate, esc, plainText, spellbookKey, openLink } from "./util.mjs";
+import { itemsFromSource, classFlagUpdate, esc, plainText, spellbookKey, openLink, titleFor } from "./util.mjs";
 import { ARCHETYPE_RULES } from "./archetype-rules.mjs";
 
 const ARCH_PACK = "pf1e-archetypes.pf-archetypes";
@@ -247,7 +247,7 @@ function dialogContent(plan) {
   const addRows = adds
     .map(
       (a, i) => `<tr>
-        <td><input type="checkbox" name="add" value="${i}" ${a.uuid && !a.merge ? "checked" : "disabled"}></td>
+        <td ${a.uuid && !a.merge ? "" : `data-tooltip="${a.merge ? "Restates a feature you already have: merged into it, nothing to add" : "Not found in the compendium: add it by hand"}"`}><input type="checkbox" name="add" value="${i}" ${a.uuid && !a.merge ? "checked" : "disabled"}></td>
         <td><input type="number" name="lvl${i}" value="${a.level}" min="1" max="20" style="width:3.5em"></td>
         <td>${esc(a.name)}${openLink(a.uuid)}${warn(a.flags)}${a.existing ? ' <em style="opacity:0.7">(already on sheet)</em>' : ""}
           <div style="font-size:11px; opacity:0.8">${a.replaces.length ? `replaces ${esc(a.replaces.join(", "))}` : ""}${a.replaces.length && a.alters.length ? "; " : ""}${a.alters.length ? `alters ${esc(a.alters.join(", "))}` : ""}</div></td>
@@ -312,7 +312,7 @@ export async function promptApply(actor, archetypeItem, { acceptDefaults = false
   }
 
   const choices = acceptDefaults ? defaultChoices(plan) : await foundry.applications.api.DialogV2.wait({
-    window: { title: `Apply ${archetypeItem.name}`, resizable: true },
+    window: { title: titleFor(`Apply ${archetypeItem.name}`, actor), resizable: true },
     position: { width: 560 },
     content: dialogContent(plan),
     buttons: [

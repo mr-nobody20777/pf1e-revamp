@@ -71,12 +71,11 @@ Status: ⬜ not started · 🟨 designed / in progress · ✅ done (move to CHAN
 
 ## From manual QA (2026-10-23, QA/2026-10-23/MANUAL-QA.md)
 - ⬜ Channel Energy refunded (no token / cancelled checklist): PF1's chat card still shows the pre-refund uses (e.g. 2/3).
-- ⬜ Pickers: clicking Choose with nothing selected silently does nothing; say "Pick one first". (Part of UX plan #2.)
 - ⬜ QA coverage still pending: other races, trait choices, two-weapon variants, channel harm/saves/Selective Channeling, studied target cleanup, archetype removal, player permissions, multi-client.
 
 ## UX plan from the PF2e study (approved 2026-10-23, in this order)
 1. 🟨 **Bonus breakdown in roll windows.** Phase 1 built 2026-10-23 (`module/roll-effects.mjs`, "Buffs on a roll" in CHANGELOG): PF1 buffs and conditions on attacks, saves and skills; Studied Target and Quarry as providers; chips/threshold/Manage…. **Phase 2:** wards and save bonuses vs effects as providers, TWF and shield-ACP penalties, ability checks, True Strike vs Quarry insight overlap (both insight; only the higher should count), imposed debuffs cast by others (🔒), check Roll Bonuses (ckl) overlap. Original plan: Every situational bonus the module would add to this roll is listed in the roll window with its value, bonus type and an on/off box. Bonuses that don't apply right now stay greyed out with the reason ("not your studied target", "attacker isn't evil"); same-type bonuses that don't stack are shown crossed out ("doesn't stack with True Strike, insight"). Extends the one-roll checkboxes.
-2. 🟨 **Name the roller and the reason.** Every module window names the creature it acts for; every button that can't act says why instead of silently doing nothing (e.g. picker "Choose" with nothing selected). Warn when a card's save button rolls for a token that wasn't one of the card's targets.
+2. ✅ **Name the roller and the reason.** Done 2026-10-23 (CHANGELOG "Changed"): `util.titleFor` on every module window, reasons on disabled controls, Choose off until picked, save-button target warning. Every module window names the creature it acts for; every button that can't act says why instead of silently doing nothing (e.g. picker "Choose" with nothing selected). Warn when a card's save button rolls for a token that wasn't one of the card's targets.
 3. ⬜ **Better cards:** margin on save results vs a DC ("Success by +3"), a draggable buff link in channel/spell notes, damage colored by type.
 4. ⬜ **Empty-slot rows and a pending-choice glow** instead of pop-up dialogs (talent slots, style feats, choices not made yet).
 5. ⬜ **Unified rules layer** (see below); plan it during performance review #3 so 1–4 share one data format.

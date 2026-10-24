@@ -11,7 +11,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { esc, plainText, spellbookKey } from "./util.mjs";
+import { esc, plainText, spellbookKey, titleFor } from "./util.mjs";
 
 const FLAG = "opposition";
 const COST_FLAG = "oppositionCost"; // set on spells whose slot cost we changed
@@ -34,7 +34,7 @@ export async function promptOpposition(actor, school) {
   const current = school.getFlag(MODULE_ID, FLAG) ?? [];
   const options = Object.entries(pf1.config.spellSchools).filter(([key]) => key !== specialty && key !== "uni" && key !== "misc"); // not real schools
   const chosen = await foundry.applications.api.DialogV2.wait({
-    window: { title: `${school.name}: opposition schools` },
+    window: { title: titleFor(`${school.name}: opposition schools`, actor) },
     content: `<p>Choose <strong>two</strong> opposition schools. Preparing their spells takes two slots, and crafting items that need them takes a −4 penalty.</p>
       ${options.map(([key, label]) => `<label style="display:block"><input type="checkbox" name="school" value="${key}" ${current.includes(key) ? "checked" : ""}> ${esc(label)}</label>`).join("")}`,
     buttons: [

@@ -17,7 +17,7 @@
 // healing, a penalty on all d20 rolls when harming.
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, searchSelects } from "./util.mjs";
+import { esc, searchSelects, titleFor } from "./util.mjs";
 import { VARIANTS } from "./variant-channeling-data.mjs";
 
 export { VARIANTS };
@@ -96,7 +96,7 @@ export const variantOptions = () => [{ value: "", label: "Standard channel energ
 export async function chooseVariant(channelItem) {
   const options = variantOptions().map((o) => `<option value="${esc(o.value)}">${esc(o.label)}</option>`).join("");
   const name = await foundry.applications.api.DialogV2.wait({
-    window: { title: `${channelItem.actor?.name ?? ""}: variant channeling` },
+    window: { title: titleFor("Variant channeling", channelItem.actor) },
     content: `<p>Choose one aspect of your deity's portfolio. <strong>This can't be changed later</strong> (only the GM can reset it).</p>
       <div style="display:flex; align-items:center"><select name="variant" style="flex:1">${options}</select></div>
       <p class="pfr-variant-text" style="font-size:11px; opacity:0.8; min-height:3em"></p>`,

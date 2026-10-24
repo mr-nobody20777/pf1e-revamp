@@ -16,7 +16,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { esc, wrapMethod, searchSelects } from "./util.mjs";
+import { esc, wrapMethod, searchSelects, titleFor } from "./util.mjs";
 
 const FLAG = "traitChoice";
 const baseName = (name) => name.replace(/\s*\([^()]*\)\s*$/, "").trim();
@@ -87,7 +87,7 @@ export async function chooseTrait(item, { picks = null } = {}) {
       })
       .join("");
     picks = await foundry.applications.api.DialogV2.wait({
-      window: { title: `${item.name}: choose` },
+      window: { title: titleFor(`${item.name}: choose`, actor) },
       content: `<div>${fields}</div>`,
       render: (event, dialog) => searchSelects(dialog.element), // e.g. Gifted Adept's spell list
       buttons: [

@@ -12,7 +12,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { evaluate, classLevel, itemsFromSource, classFlagUpdate, createClassFeatures, esc, norm, plainText, openLink, addSearch, isActiveGM } from "./util.mjs";
+import { evaluate, classLevel, itemsFromSource, classFlagUpdate, createClassFeatures, esc, norm, plainText, openLink, addSearch, isActiveGM, titleFor } from "./util.mjs";
 import { variantsAllowed, variantOptions, setVariant, VARIANTS } from "./variant-channeling.mjs";
 import { checkPrerequisites } from "./prereqs.mjs";
 import { promptOpposition, specialtyOf } from "./opposition-schools.mjs";
@@ -181,7 +181,7 @@ export async function promptApply(actor, subclass, { grantAll = false } = {}) {
     .join("");
 
   const choices = grantAll ? powers : await foundry.applications.api.DialogV2.wait({
-    window: { title: `Grant ${subclass.name} powers`, resizable: true },
+    window: { title: titleFor(`Grant ${subclass.name} powers`, actor), resizable: true },
     position: { width: 480 },
     content: `<p>Links these powers into <strong>${esc(classItem.name)}</strong> (level ${classItem.system.level}) at their levels, and adds the ones already reached.</p>
       <table><thead><tr><th></th><th>Lvl</th><th>Power</th></tr></thead><tbody>${rows || "<tr><td colspan=3>No power items found.</td></tr>"}</tbody></table>

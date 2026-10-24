@@ -11,7 +11,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { esc, onGmRequest, classLevel } from "./util.mjs";
+import { esc, onGmRequest, classLevel, titleFor } from "./util.mjs";
 import { variantEffect, variantOf, variantsAllowed, chooseVariant, clearVariant, applyVariant, channelBonus, isVariantFeature, VARIANTS } from "./variant-channeling.mjs";
 
 const RADIUS = 30;
@@ -91,13 +91,13 @@ export async function channel(actionUse, { targets = null } = {}) {
       .map((c, i) => {
         const self = c.token === clericToken;
         const locked = !self && !selective;
-        return `<label style="display:block"><input type="checkbox" name="target" value="${i}" checked ${locked ? "disabled" : ""} ${self ? "" : 'data-other="1"'}>
+        return `<label style="display:block" ${locked ? 'data-tooltip="Only Selective Channeling can leave out other creatures"' : ""}><input type="checkbox" name="target" value="${i}" checked ${locked ? "disabled" : ""} ${self ? "" : 'data-other="1"'}>
           ${esc(c.token.name)} <span style="opacity:0.7">(${self ? "you" : `${Math.round(c.distance)} ft`})</span></label>`;
       })
       .join("");
     const who = mode.undead ? "undead" : "living creatures";
     chosen = await foundry.applications.api.DialogV2.wait({
-      window: { title: `${action.name}` },
+      window: { title: titleFor(action.name, actor) },
       content: `<p><strong>${esc(action.name)}</strong>: ${mode.heal ? "heals" : "deals"} <strong>${amount}</strong>${variant?.halved ? ` (halved: ${esc(variant.name)} variant)` : ""}${mode.heal ? "" : variant ? `, Will DC ${dc} negates the variant effect` : `, Will DC ${dc} for half`}.</p>
         ${variant ? `<p style="font-size:11px"><strong>${esc(variant.name)}:</strong> ${esc(variant.text)}</p>` : ""}
         <p style="font-size:11px; opacity:0.8">Affects all ${who} within ${RADIUS} ft. You can leave yourself out.

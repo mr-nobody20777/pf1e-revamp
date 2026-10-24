@@ -12,7 +12,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton } from "./footnote.mjs";
-import { esc, spellbookKey } from "./util.mjs";
+import { esc, spellbookKey, titleFor } from "./util.mjs";
 
 const CHOICE_FLAG = "spontaneousKind"; // "cure" | "inflict", for clerics who are neither good nor evil
 
@@ -33,7 +33,7 @@ async function spontaneousKind(actor) {
   const chosen = actor.getFlag(MODULE_ID, CHOICE_FLAG);
   if (chosen) return chosen;
   const kind = await foundry.applications.api.DialogV2.wait({
-    window: { title: "Spontaneous casting" },
+    window: { title: titleFor("Spontaneous casting", actor) },
     content: "<p>A cleric who is neither good nor evil chooses once whether to convert prepared spells into <strong>cure</strong> or <strong>inflict</strong> spells. This can't be changed later (it also decides positive or negative channel energy).</p>",
     buttons: [
       { action: "cure", label: "Cure spells", icon: "fa-solid fa-heart" },
@@ -83,7 +83,7 @@ export async function convert(spell, { spellName = null, skipDialog } = {}) {
   let option = spellName ? options.find((o) => o.entry.name === spellName) : null;
   if (!option) {
     const picked = await foundry.applications.api.DialogV2.wait({
-      window: { title: `Spontaneous casting: lose ${spell.name}` },
+      window: { title: titleFor(`Spontaneous casting: lose ${spell.name}`, actor) },
       content: `<p>Lose one prepared <strong>${esc(spell.name)}</strong> (level ${spell.system.level}) to cast:</p>`,
       buttons: [
         ...options.map((o, i) => ({ action: `s${i}`, label: `${o.entry.name} (${o.level})`, default: i === 0, callback: () => i })),

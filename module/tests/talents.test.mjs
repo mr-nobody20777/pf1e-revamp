@@ -114,7 +114,11 @@ export function registerTalentTests(quench) {
 
         it("the picker's search box filters the list", async () => {
           const open = chooseSlayerTalent(slayer, { level: 2 });
-          const dialog = await waitFor(() => [...foundry.applications.instances.values()].find((a) => a.rendered && /slayer talent/.test(a.title ?? "")));
+          const dialog = await waitFor(() => [...foundry.applications.instances.values()].find((a) => a.rendered && /slayer talent/i.test(a.title ?? "")));
+          assert.match(dialog.title, new RegExp(`– ${slayer.name}$`), "the window names the slayer");
+          const choose = dialog.element.querySelector('button[data-action="choose"]');
+          assert.isTrue(choose.disabled, "nothing picked yet");
+          assert.equal(choose.dataset.tooltip, "Pick one first");
           const search = dialog.element.querySelector(".pfr-search");
           const visible = () => [...dialog.element.querySelectorAll(".pfr-row")].filter((r) => r.style.display !== "none").length;
           const all = visible();

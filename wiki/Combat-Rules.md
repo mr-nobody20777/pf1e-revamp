@@ -56,6 +56,9 @@ The bonuses can come from anywhere on the character: race, racial traits, charac
 - **Every other type** (morale, resistance, luck, sacred…) only uses the **highest**, and only the part above a bonus of that type the character already has. *Mind Blank*'s +8 resistance on top of a *Cloak of Resistance +1* adds 7.
 - The same racial bonus stated on both the race and one of its racial traits counts **once**.
 
+### Rolling for the right creature
+PF1's save button on a card rolls for whatever token you have selected (or your own character). If that isn't one of the card's targets, PF1e Revamp warns you who it's rolling for. The roll still goes ahead, so the GM can roll for anyone on purpose.
+
 ### When it doesn't apply
 - **Saves rolled without the effect's card** (typed in or rolled from the sheet) get no automatic bonus. The reminders still show on the roll.
 - **Bonuses against creatures** ("vs. evil creatures") are handled by the alignment wards, not here.

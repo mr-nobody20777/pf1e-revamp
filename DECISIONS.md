@@ -4,6 +4,7 @@ Rulings made with the project lead, so later changes don't quietly undo them. Re
 feature before changing it. Newest first within each section. Format: **decision**: why (date).
 
 ## General UX
+- **Every window the module opens names the creature it acts for** (`util.titleFor`: "Title – Name", PF1's style), and **every control that can't act says why** (tooltip or message), never silently doing nothing. PF1's card save button rolls for the selected token: warn (don't block) when that isn't a card target. From the PF2e study, where a save rolled for the wrong creature unnoticed (2026-10-23).
 - **Any dropdown or list the module adds with more than 10 options gets a search box** (`util.addSearch` / `searchSelects`): long lists are painful to scroll (2026-10-23).
 - **Every picker option has a 📖 icon that opens the full compendium entry**: players need to read an option before choosing it (2026-10-23).
 - **Optional rules are GM opt-in world settings, off by default** (e.g. variant channeling): tables that don't use them never see extra choices (2026-10-23).

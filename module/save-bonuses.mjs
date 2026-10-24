@@ -157,3 +157,26 @@ Hooks.on("pf1PreActorRollSave", (actor, rollOptions, saveId) => {
     rollOptions.parts.push(`${b.value}[${b.label}]`);
   }
 });
+
+/* -------------------------------------------- */
+/*  Who is rolling                              */
+/* -------------------------------------------- */
+
+// PF1's save button rolls for the selected tokens (or the player's own character), not for the card's
+// targets. Warn, without stopping the roll, when one of them isn't a target of the card: easy to miss
+// when the GM still has another token selected.
+document.addEventListener(
+  "click",
+  (event) => {
+    const button = event.target.closest?.('.chat-message button[data-action="save"]');
+    if (!button || button.dataset.as === "speaker") return;
+    const message = game.messages.get(button.closest("[data-message-id]")?.dataset.messageId);
+    const targets = (message?.system?.targets ?? []).map((uuid) => fromUuidSync(uuid)?.actor?.id).filter(Boolean);
+    if (!targets.length) return;
+    let rollers = canvas.tokens?.controlled.map((t) => t.actor).filter(Boolean) ?? [];
+    if (!rollers.length && game.user.character) rollers = [game.user.character];
+    const strays = rollers.filter((a) => !targets.includes(a.id)).map((a) => a.name);
+    if (strays.length) ui.notifications.warn(`Rolling the save for ${strays.join(", ")}, who ${strays.length > 1 ? "aren't targets" : "isn't a target"} of this card. Select the target's token to roll for it.`);
+  },
+  true
+);

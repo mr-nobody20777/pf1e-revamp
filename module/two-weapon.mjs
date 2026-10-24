@@ -118,6 +118,7 @@ Hooks.on("renderAttackDialog", (app, html) => {
     state.off = select.value;
     const pick = candidates.find((c) => c.item.id === state.off);
     select.disabled = !state.on;
+    select.dataset.tooltip = state.on ? "" : "Tick Two-Weapon Fighting first";
     hint.textContent = state.on ? `${describe(actor, pick?.light)}. Full attack only; the off-hand attacks follow automatically.` : "";
   };
   checkbox.addEventListener("change", update);

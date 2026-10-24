@@ -10,7 +10,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { classLevel, isActiveGM, allActors, linkedBuffs, createQueue, stillExists, deleteIfExists, esc, onSceneCatchUp } from "./util.mjs";
+import { classLevel, isActiveGM, allActors, linkedBuffs, createQueue, stillExists, deleteIfExists, esc, onSceneCatchUp, titleFor } from "./util.mjs";
 
 const FLAG = "ragingSong";
 const LINK = "songLink";
@@ -160,7 +160,7 @@ export async function startSong(actor, songItem, { prepaid = false, targets = nu
     .join("");
 
   const chosen = targets ?? await foundry.applications.api.DialogV2.wait({
-    window: { title: `${def.label}: choose ${def.side}` },
+    window: { title: titleFor(`${def.label}: choose ${def.side}`, actor) },
     content: `<p><strong>${esc(def.label)}</strong>: ${esc(effect.summary)}.</p>
       <p style="font-size:11px; opacity:0.8">${def.side === "allies" ? "Allies" : "Enemies"} within ${def.range} ft. Uncheck anyone who declines or can't hear. ${prepaid ? "1 round already spent" : "Costs 1 round"}${def.perRound ? ", then 1 more each of your turns in combat" : " for the hour"}. Rounds left: ${roundsLeft(pool)}.</p>
       ${isDeaf(actor) ? '<p style="color:#c00"><i class="fa-solid fa-ear-deaf"></i> Deafened: 20% chance the song fails to start (the round is still spent).</p>' : ""}
@@ -235,7 +235,7 @@ async function chooseSong(actor, pool) {
   }
 
   const picked = await foundry.applications.api.DialogV2.wait({
-    window: { title: "Raging Song: choose a song" },
+    window: { title: titleFor("Raging Song: choose a song", actor) },
     content: `<p>Which song? ${pool.getFlag(MODULE_ID, FLAG) ? "This replaces the current song." : ""}</p>`,
     buttons: [
       ...songs.map((song, i) => ({

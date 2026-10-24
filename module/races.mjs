@@ -16,7 +16,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { esc, norm, plainText, onSceneCatchUp, openLink } from "./util.mjs";
+import { esc, norm, plainText, onSceneCatchUp, openLink, titleFor } from "./util.mjs";
 
 const TRAIT_PACK = "pf-content.pf-racial-traits";
 const FLAG = "racialTraits";
@@ -60,7 +60,7 @@ const onSheet = (actor, doc) => actor.items.find((i) => i._stats?.compendiumSour
 /* -------------------------------------------- */
 
 function abilitySelect(name, disabled, selected) {
-  return `<select name="${name}" ${disabled ? "disabled" : ""} style="width:auto; margin-left:0.5em">${ABILITIES.map((a) => `<option value="${a}" ${a === selected ? "selected" : ""}>${pf1.config.abilities[a]}</option>`).join("")}</select>`;
+  return `<select name="${name}" ${disabled ? 'disabled data-tooltip="Tick the trait first"' : ""} style="width:auto; margin-left:0.5em">${ABILITIES.map((a) => `<option value="${a}" ${a === selected ? "selected" : ""}>${pf1.config.abilities[a]}</option>`).join("")}</select>`;
 }
 
 /** Two alternates that replace the same standard trait can't both be taken ("a trait can't be exchanged more than once"). */
@@ -97,7 +97,7 @@ export async function promptRacialTraits(actor, race, { choose = null } = {}) {
         ${t.replaces.length ? `<span style="font-size:11px; opacity:0.75"> — replaces ${replacedText(t)}</span>` : ""}</label>`;
     };
     picked = await foundry.applications.api.DialogV2.wait({
-      window: { title: `${race.name}: racial traits`, resizable: true },
+      window: { title: titleFor(`${race.name}: racial traits`, actor), resizable: true },
       position: { width: 560 },
       content: `<div style="max-height:65vh; overflow-y:auto">
         <p>Standard traits are checked. Checking an alternate trait unchecks what it replaces.</p>
@@ -110,7 +110,10 @@ export async function promptRacialTraits(actor, race, { choose = null } = {}) {
         const keysOf = (box) => box.dataset.replaces.split("|").map(traitKey);
         for (const box of altBoxes) {
           box.addEventListener("change", () => {
-            for (const sel of box.parentElement.querySelectorAll("select")) sel.disabled = !box.checked;
+            for (const sel of box.parentElement.querySelectorAll("select")) {
+              sel.disabled = !box.checked;
+              sel.dataset.tooltip = box.checked ? "" : "Tick the trait first";
+            }
             if (box.checked) {
               // Untick other alternates exchanging the same trait, and the traits this one replaces
               for (const other of altBoxes) if (other.checked && conflicts(alternates[box.value], alternates[other.value])) other.checked = false;

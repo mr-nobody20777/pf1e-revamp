@@ -3,6 +3,9 @@
 import { MODULE_ID } from "./const.mjs";
 
 /** Escape text for HTML. */
+/** A window title naming the creature it acts for, like PF1's own ("Attack (Longsword) – Kestrel"). */
+export const titleFor = (title, actor) => (actor?.name ? `${title} – ${actor.name}` : title);
+
 export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** Lowercase, punctuation-free form of a name for loose matching. */
