@@ -6,7 +6,6 @@ Planned work for PF1e Revamp, grouped by status. Completed work is recorded in t
 
 ### Roll windows and chat cards
 The roll-window buff manager ("Buffs on a roll") is released in the Unreleased section of the changelog. Remaining work:
-- **Mark applied reminders on save cards.** PF1 prints reminder notes such as "+3 vs fear effects" on save cards even when PF1e Revamp has already added that bonus to the roll, so a player could add it twice. Notes the module applied should be marked as applied.
 - **Debuffs cast by another creature.** Penalties from buffs cast by someone else (for example *Bane*) should be locked like conditions, so only the GM can remove them from a roll. PF1 buffs don't record their caster, so this needs a way to track the source.
 - **Compatibility with Roll Bonuses.** Confirm that bonuses added by the Roll Bonuses module are never counted twice.
 - **Clearer locked rows.** In the dark theme, a locked condition and a locked Not Applied row look alike; give locked rows a distinct style.

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.19.0: buffs on a roll, clearer windows, and rules fixes
 
 ### New
 - **Buffs on a roll.** Attack, save and skill windows show what PF1's buffs and conditions add to the roll. A few show as chips you can untick; more than that (4 by default, a per-player setting) show as totals with a **Manage…** window that groups them by attack, damage or both, combines ability-score buffs, and lists what's **Not Applied**: bonuses beaten by a higher one of the same type, and situational ones that don't apply right now. Changes apply to that roll only and show on the chat card as one labeled part. Conditions can only be turned off by the GM. Ability checks get the same line. Alignment wards and save bonuses against effects ("+2 vs fear") are listed too: when the save isn't rolled from a matching effect's card they show as Not Applied with the reason, and can be ticked by hand.
@@ -10,6 +10,7 @@
 - **One-roll bonuses are the player's choice.** Guidance, True Strike and the Luck channel bonus show as a ticked box in every roll window (attack, save, skill, ability check); untick it to roll without it and keep the bonus for later.
 
 ### Changed
+- **Save cards mark reminder notes the module already applied.** A note such as Bravery's "+2 vs fear effects" is ticked and faded, with "already added to this roll" on hover, when that bonus is in the roll, so it isn't added twice by hand. Notes for bonuses that didn't apply stay as normal reminders.
 - **Every window the module opens names the creature it's for** ("Choose a slayer talent (level 4) – Kestrel", "Channel Positive Energy – Sister Aurel"), like PF1's own roll windows.
 - **Controls that can't be used say why.** The talent/feat picker's Choose button stays off until you pick something ("Pick one first"); greyed-out archetype rows, channel-energy targets, racial ability choices and the off-hand weapon list explain themselves on hover.
 - **Saving throws from a card warn when they'd roll for the wrong creature.** PF1's save button rolls for whatever token is selected; if that isn't one of the card's targets, you're told who it's rolling for (the roll still goes ahead).
@@ -18,6 +19,7 @@
 - Channel energy no longer posts its own summary message; PF1's card shows the amount and saves have their own cards. The request to the GM is whispered and removed once applied.
 
 ### Fixed
+- **Installs and updates now get the right version.** The manifest's download link still pointed at the 0.17.0 package, so installing or updating to 0.18.0 delivered 0.17.0. The release process now refuses a release whose download link doesn't match it.
 - **Halved damage against resistance with Nevela's Automation Suite.** Its chat-card damage buttons set the ½ ratio without recomputing PF1's reductions, so immunity, DR and energy resistance were worked out on the unhalved damage and then halved again: 6 slashing + 4 fire, halved, against fire resistance 10 dealt 1 instead of 3. Such targets are now recomputed with PF1's own method; PF1's normal path is unaffected.
 - **Energy resistance on halved damage.** With the ½ button, damage is now halved before resistance is subtracted (the common reading, as the rules don't specify): 20 fire, saved for half, against fire resistance 10 is fully resisted instead of dealing 5. The private note now shows the damage actually taken. Damage of several types is split so each type gets its proportional share of the halved total (an immunity to one type no longer cancels the others); when PF1 doesn't say how much of each type there was, the amounts are read from the attack card, or the damage is left for the GM rather than guessed. Later hooks still see the ½ ratio.
 - **Conditional save bonuses and penalties are no longer applied automatically.** Notes such as "+1 vs charm and compulsion effects if a partner is within 60 feet" (Tight Bonds), "−2 vs fear effects whenever the object of your attachment is threatened" (Attached) or "vs effects created by outsiders" were applied to every matching save. They now appear under Not Applied with their condition, to be ticked when it applies. Their "only vs …" text is also tidier.

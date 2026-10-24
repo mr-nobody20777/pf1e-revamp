@@ -2,7 +2,7 @@
   "id": "pf1e-revamp",
   "title": "PF1e Revamp",
   "description": "Makes Pathfinder 1e class features, archetypes, racial traits, character traits and spells do what their text says. Bonuses apply on the right rolls, miss chances are rolled for you, channel energy heals the right creatures, archetypes really change the features they alter, and two-weapon fighting, raging songs, studied targets and more are handled automatically. It works with the items you already have, and steps aside where other modules already do the job.",
-  "version": "0.18.0",
+  "version": "0.19.0",
   "compatibility": {
     "minimum": "13",
     "verified": "13.351"
@@ -21,7 +21,7 @@
   ],
   "url": "https://github.com/mr-nobody20777/pf1e-revamp",
   "manifest": "https://github.com/mr-nobody20777/pf1e-revamp/releases/latest/download/module.json",
-  "download": "https://github.com/mr-nobody20777/pf1e-revamp/releases/download/v0.17.0/module.zip",
+  "download": "https://github.com/mr-nobody20777/pf1e-revamp/releases/download/v0.19.0/module.zip",
   "readme": "https://github.com/mr-nobody20777/pf1e-revamp/blob/main/README.md",
   "changelog": "https://github.com/mr-nobody20777/pf1e-revamp/blob/main/CHANGELOG.md",
   "bugs": "https://github.com/mr-nobody20777/pf1e-revamp/issues",

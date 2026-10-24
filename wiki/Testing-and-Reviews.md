@@ -9,7 +9,7 @@ PF1e Revamp is written by **Claude**, Anthropic's AI, working in Claude Code. Cl
 Every automation starts from the **full rules text** of the ability, feat, trait or spell, and the rule is quoted at the top of the code that implements it. When PF1's or Pathfinder 1e Content's data disagrees with the rules, the rules win and the item's note says so. Examples: the auras' always-on bonuses, and Magical Knack's missing Hit Dice cap.
 
 ## Automated tests
-The module includes a test suite of **113 tests in 19 groups**, run with the **Quench** module. Each group:
+The module includes a test suite of **149 tests in 21 groups**, run with the **Quench** module. Each group:
 1. creates throwaway characters, tokens and combats on a dedicated test scene;
 2. uses features through PF1's real actions and rolls, the same way a player would;
 3. checks the results on the chat cards and character sheets;

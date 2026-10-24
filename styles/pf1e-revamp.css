@@ -22,3 +22,6 @@
 .pf1e-revamp-effects-table tr.sub td { padding-left: 14px; font-size: 11px; }
 .pf1e-revamp-effects-table tr.sub label { display: flex; align-items: center; gap: 4px; }
 .pf1e-revamp-effects-table a[data-action="expand"] { cursor: pointer; }
+
+/* Save cards: reminder notes whose bonus the module already added to the roll (save-bonuses.mjs) */
+.general-notes .tag.pf1e-revamp-applied { opacity: 0.6; }

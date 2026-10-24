@@ -192,6 +192,37 @@ registerRollEffect({
 });
 
 /* -------------------------------------------- */
+/*  Reminder notes already added                */
+/* -------------------------------------------- */
+
+// PF1 still prints an item's save notes ("+3 vs fear effects") on the save card after this module added
+// that bonus to the roll, so a player could add it twice. The card records whose notes the module
+// handles; a note whose source's bonus is in the roll formula is marked as already added, as is a note
+// with the same wording from another item (a race and its racial trait often state the same bonus).
+Hooks.on("pf1PreActorRollSave", (actor, rollOptions, saveId) => {
+  const labels = [...new Set(saveBonuses(actor, saveId, null).map((b) => b.label))];
+  if (labels.length) rollOptions.messageData = foundry.utils.mergeObject(rollOptions.messageData ?? {}, { flags: { [MODULE_ID]: { saveBonusLabels: labels } } });
+});
+
+Hooks.on("renderChatMessagePF", (message, html) => {
+  const labels = message.flags?.[MODULE_ID]?.saveBonusLabels;
+  if (!labels?.length) return;
+  const formula = message.rolls?.[0]?.formula ?? "";
+  const applied = new Set(labels.filter((label) => formula.includes(`[${label}]`)));
+  if (!applied.size) return;
+  const tags = [...html.querySelectorAll(".general-notes .tag")];
+  const source = (tag) => (tag.dataset.tooltip ?? "").replace(/^[^:]*:\s*/, "");
+  const wording = (tag) => tag.textContent.replace(/\s+/g, " ").trim().toLowerCase();
+  const same = new Set(tags.filter((tag) => applied.has(source(tag))).map(wording));
+  for (const tag of tags) {
+    if (!applied.has(source(tag)) && !same.has(wording(tag))) continue;
+    tag.classList.add(`${MODULE_ID}-applied`);
+    tag.dataset.tooltip = `${tag.dataset.tooltip ?? ""} · already added to this roll`;
+    tag.prepend("✓ ");
+  }
+});
+
+/* -------------------------------------------- */
 /*  Who is rolling                              */
 /* -------------------------------------------- */
 

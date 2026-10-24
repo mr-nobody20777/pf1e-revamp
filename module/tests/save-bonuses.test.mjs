@@ -97,6 +97,23 @@ export function registerSaveBonusTests(quench) {
           assert.notMatch(await saveFormula(human, cards["Cause Fear"]), /Quench Attached/, "the condition can't be checked, so it isn't applied");
         });
 
+        it("a reminder note whose bonus was added to the roll is marked on the save card", async () => {
+          const fighter = await createTestActor("Quench Brave Fighter", { items: [["pf1.classes", "Fighter", { system: { level: 6 } }]] });
+          actors.push(fighter);
+          const noteOn = async (card) => {
+            const before = new Set(game.messages.keys());
+            await fighter.rollSavingThrow("will", { skipDialog: true, reference: card?.uuid });
+            const message = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id)));
+            const el = await waitFor(() => document.querySelector(`[data-message-id="${message.id}"] .general-notes`));
+            return [...el.querySelectorAll(".tag")].find((t) => /Bravery/.test(t.dataset.tooltip ?? ""));
+          };
+          const vsFear = await noteOn(cards["Cause Fear"]);
+          assert.isTrue(vsFear.classList.contains(`${MODULE_ID}-applied`), "Bravery's +2 vs fear is in the roll");
+          assert.match(vsFear.dataset.tooltip, /already added to this roll/);
+          const noCard = await noteOn(null);
+          assert.isFalse(noCard.classList.contains(`${MODULE_ID}-applied`), "no effect known: still a reminder");
+        });
+
         it("the card's save button warns when it would roll for a creature that isn't a target", async () => {
           const { restore } = await useTestScene();
           const target = await withRace("Quench Save Target");
