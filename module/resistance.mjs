@@ -31,6 +31,49 @@ Hooks.on("pf1ApplyDamageTargetOptions", (app, target, options) => {
   options[FROM_DIALOG] = true;
 });
 
+/**
+ * How much of the damage each instance carries, adding up to `value`. Uses the instances' own amounts;
+ * else, for a card's attack, its damage rolls by type (PF1's quick path drops per-instance amounts);
+ * else a lone instance carries everything. Damage not accounted for by the instances is left untyped.
+ * Null when the split can't be known.
+ */
+function amountsOf(options) {
+  const instances = options.instances;
+  let amounts = instances.map((i) => Math.max(0, i.value ?? 0));
+  if (!amounts.some((a) => a > 0)) {
+    if (instances.length === 1) return [options.value];
+    const attack = options.message?.systemRolls?.attacks?.[options.attackIndex ?? 0];
+    const rolls = attack ? [...(attack.damage ?? []), ...(options.critMult ? attack.critDamage ?? [] : [])] : [];
+    const key = (types) => [...(types ?? [])].sort().join("|");
+    amounts = instances.map((i) => rolls.filter((r) => key(r.options?.damageType) === key(i.types)).reduce((t, r) => t + (r.total ?? 0), 0));
+    if (amounts.reduce((t, a) => t + a, 0) !== options.value) return null;
+  }
+  const rest = options.value - amounts.reduce((t, a) => t + a, 0);
+  return rest > 0 ? [...amounts, rest] : amounts;
+}
+
+/** Split `total` in proportion to `amounts`, rounding so the shares add up exactly (largest remainders). */
+function proportional(amounts, total) {
+  const sum = amounts.reduce((t, a) => t + a, 0);
+  if (!sum || sum === total) return amounts;
+  const exact = amounts.map((a) => (a * total) / sum);
+  const shares = exact.map(Math.floor);
+  let left = total - shares.reduce((t, a) => t + a, 0);
+  for (const i of exact.map((x, i) => [x - Math.floor(x), i]).sort((a, b) => b[0] - a[0]).map(([, i]) => i)) {
+    if (left-- <= 0) break;
+    shares[i]++;
+  }
+  return shares;
+}
+
+/** The value PF1 must receive so that its own floor(value × ratio) comes out at `damage`. */
+function beforeRatio(damage, ratio) {
+  if (damage <= 0) return 0;
+  let value = Math.ceil(damage / ratio - 1e-9);
+  while (Math.floor(value * ratio + 1e-9) < damage) value++;
+  return value;
+}
+
 Hooks.on("pf1ApplyDamage", (actor, options) => {
   if (!game.settings.get(MODULE_ID, SETTING)) return;
   if (options[FROM_DIALOG] || !(options.value > 0) || !options.instances?.length) return;
@@ -39,55 +82,54 @@ Hooks.on("pf1ApplyDamage", (actor, options) => {
   const resistances = traits.eres?.value ?? [];
   const immunities = traits.di?.total ?? traits.di?.standard ?? new Set();
 
-  // PF1's quick path copies instances with toObject(), which keeps their types but drops the
-  // per-instance amount. A lone instance gets the whole value; with several and no amounts, each
-  // matching resistance applies once against the total.
-  const instances = options.instances;
-  const missingAmounts = instances.every((i) => !(i.value > 0));
-
-  // Halve before resistance (minimum 1, like any halved damage); PF1 then has no ratio left to apply
+  // Halve first (minimum 1, like any halved damage), then split the halved total across the instances
   const ratio = options.ratio ?? 1;
   const halving = ratio > 0 && ratio < 1;
-  const scale = (n) => (halving ? Math.max(1, Math.floor(n * ratio)) : n);
-  const total = scale(options.value);
+  const total = halving ? Math.max(1, Math.floor(options.value * ratio)) : options.value;
+  const amounts = amountsOf(options);
   console.debug(`${MODULE_ID} | quick-apply resistance`, actor.name, {
     value: options.value,
-    instances: instances.map((i) => ({ types: [...(i.types ?? [])], value: i.value })),
+    ratio,
+    total,
+    instances: options.instances.map((i) => ({ types: [...(i.types ?? [])], value: i.value })),
+    amounts,
     resistances,
     immunities: [...immunities],
   });
+  if (!amounts) return; // several damage types and no way to tell how much is which: left to the GM
 
+  const shares = proportional(amounts, total);
   let reduced = 0;
   const notes = [];
-  for (const instance of instances) {
+  options.instances.forEach((instance, i) => {
     const types = [...(instance.types ?? [])];
-    const amount = instance.value > 0 ? scale(instance.value) : missingAmounts && instances.length === 1 ? total : missingAmounts ? total - reduced : 0;
-    if (!types.length || amount <= 0) continue;
-
+    const share = shares[i] ?? 0;
+    if (!types.length || share <= 0) return;
     if (types.every((t) => immunities.has(t))) {
-      reduced += amount;
-      notes.push(`immune to ${types.join("/")} (${amount})`);
-      continue;
+      reduced += share;
+      notes.push(`immune to ${types.join("/")} (${share})`);
+      return;
     }
-
     let best = 0;
     for (const res of resistances) if (res.types?.some((t) => t && types.includes(t))) best = Math.max(best, res.amount ?? 0);
     if (best > 0) {
-      const r = Math.min(amount, best);
+      const r = Math.min(share, best);
       reduced += r;
       notes.push(`${types.join("/")} resistance ${best} (−${r})`);
     }
-  }
+  });
   if (!reduced) return;
 
-  reduced = Math.min(reduced, total);
-  options.value = total - reduced;
-  if (halving) options.ratio = 1;
+  // PF1 still applies its ratio after this hook, and later hooks may read it to see the target saved:
+  // keep the ratio, and give PF1 the value that it turns into the damage actually left
+  const left = total - reduced;
+  options.value = halving ? beforeRatio(left, ratio) : left;
+  const took = halving ? left : Math.floor(left * ratio);
 
   ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
     whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
-    content: `<p><strong>${esc(actor.name)}</strong> resists ${reduced} damage${halving ? " (after halving)" : ""}: ${esc(notes.join(", "))}. Took ${options.value * (options.ratio ?? 1)}.</p>`,
+    content: `<p><strong>${esc(actor.name)}</strong> resists ${reduced} damage${halving ? " (after halving)" : ""}: ${esc(notes.join(", "))}. Took ${took}.</p>`,
   });
 });
 

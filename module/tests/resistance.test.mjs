@@ -68,6 +68,39 @@ export function registerResistanceTests(quench) {
           assert.equal(hp(), start - 10);
         });
 
+        const part = (types, value) => Object.assign(instance(types), { value });
+
+        it("mixed damage halved: each type gets its share of the halved total before resistance", async () => {
+          const start = hp();
+          await actor.applyDamage(12, { instances: [part(["slashing"], 6), part(["fire"], 6)], ratio: 0.5 });
+          assert.equal(hp(), start - 3, "12 halved to 6 (3 slashing + 3 fire); the fire is resisted");
+          await actor.applyDamage(8, { instances: [part(["fire"], 4), part(["cold"], 4)], ratio: 0.5 });
+          assert.equal(hp(), start - 5, "8 halved to 4 (2 fire + 2 cold): the cold still lands");
+        });
+
+        it("several types without amounts and no card to read them from: left to the GM, not guessed", async () => {
+          const start = hp();
+          await actor.applyDamage(10, { instances: [instance(["slashing"]), instance(["fire"])] });
+          assert.equal(hp(), start - 10);
+        });
+
+        it("later hooks still see the ½ ratio; the note shows the whole damage taken", async () => {
+          let seen = null;
+          const spy = Hooks.on("pf1ApplyDamage", (a, options) => a === actor && (seen = options.ratio));
+          const before = new Set(game.messages.keys());
+          try {
+            await hit(30, ["fire"], { ratio: 0.5 });
+          } finally {
+            Hooks.off("pf1ApplyDamage", spy);
+          }
+          assert.equal(seen, 0.5);
+          const start = hp();
+          await hit(15, ["fire"], { ratio: 1.5 });
+          assert.equal(start - hp(), 7, "15 − 10 resisted = 5, ×1.5 = 7");
+          const note = game.messages.contents.filter((m) => !before.has(m.id)).at(-1);
+          assert.match(note.content, /Took 7\./);
+        });
+
         it("halved damage and healing never drop below 1 (½ button on 1 point)", async () => {
           const start = hp();
           await actor.applyDamage(1, { ratio: 0.5 });
