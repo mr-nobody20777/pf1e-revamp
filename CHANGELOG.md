@@ -3,12 +3,14 @@
 ## Unreleased
 
 ### New
+- **Buffs on a roll.** Attack, save and skill windows show what PF1's buffs and conditions add to the roll. A few show as chips you can untick; more than that (4 by default, a per-player setting) show as totals with a **Manage…** window that groups them by attack, damage or both, combines ability-score buffs, and lists what's **Not Applied**: bonuses beaten by a higher one of the same type, and situational ones that don't apply right now. Changes apply to that roll only and show on the chat card as one labeled part. Conditions can only be turned off by the GM.
 - **Variant channeling** (optional rule from *Ultimate Magic*, off by default under Settings). New clerics choose standard channel energy or one of 45 portfolio variants in the level-up window; existing channelers choose once from Channel Energy's note, and the choice locks (the GM can reset it). Healing with positive energy or harming with negative energy is halved per the rules (on PF1's own card, so chat shows one number, and never below 1). The choice appears on the sheet as a "Variant Channeling (portfolio)" class feature with its rules text. **Luck** is fully automated: healed creatures get a one-roll bonus, and the negative-energy version applies a d20 penalty unless the save succeeds.
 - **Searchable dropdowns everywhere.** Any list the module adds with more than 10 options has a search box: bloodlines, domains, arcane schools, the new channeling choice, and long trait choices (like Gifted Adept's spell list).
 
 - **One-roll bonuses are the player's choice.** Guidance, True Strike and the Luck channel bonus show as a ticked box in every roll window (attack, save, skill, ability check); untick it to roll without it and keep the bonus for later.
 
 ### Changed
+- Studied Target and Quarry bonuses appear in the roll window, and can be left out of a roll. When no studied creature or quarry is targeted, they're listed as Not Applied and can be ticked by hand (for theater-of-mind play).
 - **Halved damage and healing never go below 1.** PF1's ½ buttons (and any ratio in its Apply Damage dialog) used to turn 1 point into nothing; a save for half on channel energy too. Per the core rule, damage and hit points have a minimum of 1.
 - Channel energy no longer posts its own summary message; PF1's card shows the amount and saves have their own cards. The request to the GM is whispered and removed once applied.
 

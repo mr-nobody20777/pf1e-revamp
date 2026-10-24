@@ -1,10 +1,33 @@
 # Combat Rules
 
+- [Buffs on a roll](#buffs-on-a-roll)
 - [Save bonuses against effects](#save-bonuses-against-effects)
 - [Energy resistance](#energy-resistance)
 - [Miss chances](#miss-chances)
 
 ---
+
+## Buffs on a roll
+
+**Before:** PF1 adds up every buff and condition into one number. You couldn't see which ones counted, which lost to a higher bonus of the same type, or leave one out for a single roll without switching the buff off.
+
+**Now:** attack, save and skill windows have a **Buffs** line.
+
+- **A few effects** (4 or fewer by default) show right in the window as small chips. Untick one to leave it out of this roll.
+- **More than that**, the line shows the totals instead, e.g. *Attack +7 · Damage +8 from 8 effects · 4 not applied*, and a **Manage…** button opens a small window listing every effect:
+  - grouped into **Attack only**, **Damage only** and **Attack and damage** (saves and skills have one group), with each effect's value and bonus type;
+  - ability-score buffs combine into one row per ability (*Strength +8*), which expands to its sources (Rage, Bull's Strength, Enlarge Person);
+  - **Not Applied** lists bonuses that don't stack (*Bless · Heroism is higher*) and situational bonuses that don't apply right now (*Studied Target · your target isn't studied*).
+- **Changes apply to that one roll only.** The chat card shows them as one labeled part, e.g. *−2 [Buffs: Heroism, Greater off; Heroism on]*.
+
+### The rules it follows
+- Stacking is PF1's own: bonuses of the same type don't stack (the highest counts); dodge, untyped, circumstance and racial bonuses stack; penalties always stack.
+- A bonus that loses to a higher one can be ticked only after everything beating it is turned off, and it never moves up on its own.
+- **Conditions** (shaken, sickened...) are marked 🔒: only the GM can turn them off for a roll. Everything else, anyone can change.
+- Situational bonuses that don't apply right now (no studied creature targeted) can be ticked by anyone, for theater-of-mind play.
+- Rolls made without a window (shift-click) use PF1's totals plus the situational bonuses that apply.
+
+How many effects show as chips is a per-player setting: see [Settings](Settings).
 
 ## Save bonuses against effects
 

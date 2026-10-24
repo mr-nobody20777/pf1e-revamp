@@ -15,6 +15,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
+import { registerRollEffect } from "./roll-effects.mjs";
 import { evaluate, classLevel, isActiveGM, allActors, linkedBuffs as linkedBuffsBy, createQueue, stillExists, deleteIfExists, onSceneCatchUp } from "./util.mjs";
 
 const FLAG = "studiedTarget";
@@ -51,17 +52,20 @@ async function discard(item, uuid) {
   ui.notifications.info(`${item.name}: stopped studying ${tokenName(uuid)}.`);
 }
 
-/** Highest studied-target bonus the actor has against any of the user's current targets. */
-function studiedBonus(actor) {
+/**
+ * Highest studied-target bonus the actor has: against the user's current targets, or (with `any`)
+ * against anything it is studying, for listing it as not applying.
+ */
+function studiedBonus(actor, { any = false } = {}) {
   if (!actor) return null;
   const targeted = Array.from(game.user.targets, (t) => t.document.uuid);
-  if (!targeted.length) return null;
+  if (!targeted.length && !any) return null;
 
   let best = null;
   for (const item of actor.itemTypes.feat) {
     const config = getConfig(item);
-    if (!config || !item.isActive) continue;
-    if (!config.targets.some((uuid) => targeted.includes(uuid))) continue;
+    if (!config || !item.isActive || !config.targets.length) continue;
+    if (!any && !config.targets.some((uuid) => targeted.includes(uuid))) continue;
 
     // The default formula only needs the slayer level; skip building the item's full roll data per attack
     const level = classLevel(item, "slayer");
@@ -109,23 +113,25 @@ Hooks.on("pf1PostActionUse", async (actionUse) => {
 /*  Bonuses                                     */
 /* -------------------------------------------- */
 
-Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
-  if (!WEAPON_ACTIONS.includes(action.actionType)) return;
-  const bonus = studiedBonus(action.actor);
-  if (bonus) parts.push(`${bonus.value}[${bonus.label}]`);
-});
-
-Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
-  if (!WEAPON_ACTIONS.includes(action.actionType) || !parts[0]) return;
-  const bonus = studiedBonus(action.actor);
-  if (bonus) parts[0].extra.push(`${bonus.value}[${bonus.label}]`);
-});
-
-Hooks.on("pf1PreActorRollSkill", (actor, rollOptions, skillId) => {
+// Weapon attack and damage rolls, and the listed skills; shown in the roll window (roll-effects.mjs),
+// as not applying when no studied creature is targeted.
+const studiedSkill = (skillId) => {
   const skill = skillId.split(".")[0];
-  if (!STUDIED_SKILLS.includes(skill) && !/^k[a-z]{2}$/.test(skill)) return;
-  const bonus = studiedBonus(actor);
-  if (bonus) rollOptions.parts.push(`${bonus.value}[${bonus.label}]`);
+  return STUDIED_SKILLS.includes(skill) || /^k[a-z]{2}$/.test(skill);
+};
+
+registerRollEffect({
+  collect(actor, roll) {
+    if (roll.kind === "save" || (roll.kind === "attack" && !WEAPON_ACTIONS.includes(roll.action.actionType))) return [];
+    if (roll.kind === "skill" && !studiedSkill(roll.skillId)) return [];
+    const best = studiedBonus(actor, { any: true });
+    if (!best) return [];
+    const applying = studiedBonus(actor);
+    const value = (applying ?? best).value;
+    const values = roll.kind === "attack" ? { atk: value, dmg: value } : { roll: value };
+    const reason = game.user.targets.size ? "your target isn't studied" : "no target selected";
+    return [{ id: "studied-target", label: best.label, part: best.label, type: "untyped", ...values, applies: !!applying, reason }];
+  },
 });
 
 /* -------------------------------------------- */

@@ -54,10 +54,12 @@
       }
     ]
   },
+  "styles": ["styles/pf1e-revamp.css"],
   "esmodules": [
     "module/const.mjs",
     "module/util.mjs",
     "module/footnote.mjs",
+    "module/roll-effects.mjs",
     "module/ward.mjs",
     "module/miss-chance.mjs",
     "module/fortune.mjs",

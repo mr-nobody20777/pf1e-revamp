@@ -10,6 +10,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
+import { registerRollEffect } from "./roll-effects.mjs";
 import { isActiveGM, allActors, linkedBuffs, createQueue, stillExists, deleteIfExists, esc, onSceneCatchUp } from "./util.mjs";
 
 const FLAG = "quarry";
@@ -130,10 +131,15 @@ function quarryAgainstTargets(actor) {
   return [...game.user.targets].some((t) => t.document.uuid === state.target) ? state : null;
 }
 
-Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
-  if (!ATTACK_ACTIONS.includes(action.actionType)) return;
-  if (!quarryAgainstTargets(action.actor)) return;
-  parts.push(`${hasImproved(action.actor) ? 4 : 2}[Quarry (insight)]`);
+// Shown in the roll window (roll-effects.mjs), as not applying when the quarry isn't targeted
+registerRollEffect({
+  collect(actor, roll) {
+    if (roll.kind !== "attack" || !ATTACK_ACTIONS.includes(roll.action.actionType)) return [];
+    if (!findQuarry(actor)?.getFlag(MODULE_ID, FLAG)) return [];
+    const applies = !!quarryAgainstTargets(actor);
+    const reason = game.user.targets.size ? "your target isn't your quarry" : "no target selected";
+    return [{ id: "quarry", label: "Quarry", part: "Quarry (insight)", type: "insight", atk: hasImproved(actor) ? 4 : 2, applies, reason }];
+  },
 });
 
 // Note on attack cards made against the quarry

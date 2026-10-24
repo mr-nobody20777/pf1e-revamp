@@ -1,0 +1,24 @@
+/* Roll windows: buffs, conditions and situational bonuses on this roll (roll-effects.mjs) */
+.pf1e-revamp-effects { align-items: center; }
+.pf1e-revamp-effects > label { flex: 0 0 auto; }
+.pf1e-revamp-chips { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; }
+.pf1e-revamp-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; line-height: 16px; padding: 0 5px; border: 1px solid #9a8f7a; border-radius: 3px; background: #f3eee2; white-space: nowrap; cursor: pointer; }
+.pf1e-revamp-chip input { margin: 0; width: 11px; height: 11px; }
+.pf1e-revamp-chip.neg { border-color: #a33; color: #822; background: #f8ecea; }
+.pf1e-revamp-chip.abl { border-color: #7a8aa6; background: #e8eef6; }
+.pf1e-revamp-chip.na { opacity: 0.55; border-style: dashed; }
+.pf1e-revamp-summary { display: flex; align-items: center; gap: 8px; flex: 1; font-size: 12px; }
+.pf1e-revamp-manage { margin-left: auto; border: 1px solid #9a8f7a; border-radius: 3px; padding: 0 6px; background: #f3eee2; cursor: pointer; white-space: nowrap; }
+.pf1e-revamp-muted { opacity: 0.7; font-weight: normal; }
+.pf1e-revamp-effects-manager .window-content { font-size: 12px; padding: 6px 8px; }
+.pf1e-revamp-totals { margin: 0 0 4px; }
+.pf1e-revamp-effects-table { width: 100%; border-collapse: collapse; margin: 0; background: none; border: none; }
+.pf1e-revamp-effects-table td, .pf1e-revamp-effects-table th { padding: 1px 3px; border: none; text-align: left; }
+.pf1e-revamp-effects-table td:first-child { width: 18px; }
+.pf1e-revamp-effects-table input { margin: 0; width: 12px; height: 12px; }
+.pf1e-revamp-effects-table .num { text-align: right; white-space: nowrap; }
+.pf1e-revamp-effects-table tr.head th { padding-top: 6px; border-bottom: 1px solid #b5aa94; }
+.pf1e-revamp-effects-table tr.na td:not(:first-child) { opacity: 0.6; }
+.pf1e-revamp-effects-table tr.sub td { padding-left: 14px; font-size: 11px; }
+.pf1e-revamp-effects-table tr.sub label { display: flex; align-items: center; gap: 4px; }
+.pf1e-revamp-effects-table a[data-action="expand"] { cursor: pointer; }
