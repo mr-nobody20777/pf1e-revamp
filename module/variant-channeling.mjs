@@ -121,6 +121,7 @@ export async function chooseVariant(channelItem) {
 /* -------------------------------------------- */
 
 const LUCK_FLAG = "channelLuck";
+const PENALTY_FLAG = "channelLuckPenalty";
 
 /** Heal: a one-roll bonus (fortune.mjs uses it up). One buff per creature, refreshed by each channel. */
 async function luckBonus(actor, bonus, source) {
@@ -135,13 +136,20 @@ async function luckBonus(actor, bonus, source) {
   return actor.createEmbeddedDocuments("Item", [foundry.utils.expandObject({ type: "buff", img: "icons/magic/control/buff-luck-fortune-green.webp", "system.subType": "temp", ...data })]);
 }
 
-/** Harm: a penalty on all d20 rolls until the end of the channeler's next turn. */
+/**
+ * Harm: a penalty on all d20 rolls until the end of the channeler's next turn. Being channeled again
+ * refreshes it rather than adding a second penalty (the same effect doesn't stack with itself).
+ */
 async function luckPenalty(actor, bonus) {
   const changes = ["attack", "allSavingThrows", "skills", "allChecks"].map((target) => ({ _id: foundry.utils.randomID(8), target, type: "untyped", formula: `-${bonus}` }));
-  return actor.createEmbeddedDocuments("Item", [{
-    name: `Luck Channel Penalty (−${bonus})`, type: "buff", img: "icons/magic/control/hypnosis-mesmerism-swirl.webp",
-    system: { subType: "temp", active: true, changes, duration: { value: "1", units: "round", end: "turnEnd" } },
-  }]);
+  const data = {
+    name: `Luck Channel Penalty (−${bonus})`,
+    system: { active: true, changes, duration: { value: "1", units: "round", end: "turnEnd" } },
+    flags: { [MODULE_ID]: { [PENALTY_FLAG]: true } },
+  };
+  const existing = actor.itemTypes.buff.find((b) => b.flags[MODULE_ID]?.[PENALTY_FLAG]);
+  if (existing) return existing.update(data);
+  return actor.createEmbeddedDocuments("Item", [foundry.utils.mergeObject(data, { type: "buff", img: "icons/magic/control/hypnosis-mesmerism-swirl.webp", system: { subType: "temp" } })]);
 }
 
 /** Apply a variant's automated effect to one creature (on the GM's client). Returns a note for the summary. */

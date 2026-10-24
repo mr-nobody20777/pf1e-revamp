@@ -22,7 +22,7 @@
 import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { esc, isActiveGM, ownerWhisper } from "./util.mjs";
-import { TYPED } from "./roll-effects.mjs";
+import { TYPED, highestOfType } from "./roll-effects.mjs";
 
 const KEEP_HIGHEST = "2d20kh";
 const MARK = "pf1eRevampFortune";
@@ -40,11 +40,11 @@ const NEXT_ROLL = [
 // bonus, and unticking it saves the bonus for a later roll. Rolls made without a window use it.
 const SKIPPED = "pf1eRevampNextRollSkipped";
 
-function nextRollToggle(def, buff, onChange) {
+function nextRollToggle(def, buff, value, onChange) {
   const label = document.createElement("label");
   label.className = `checkbox ${MODULE_ID}-next-roll`;
   label.dataset.tooltip = `${buff.name}: unticked, this roll goes without it and the bonus stays for a later roll`;
-  label.innerHTML = `<input type="checkbox" checked> ${esc(def.label)} +${bonusOf(def, buff)} (one roll)`;
+  label.innerHTML = `<input type="checkbox" checked> ${esc(def.label)} +${value} (one roll)`;
   label.querySelector("input").addEventListener("change", (event) => onChange(event.currentTarget.checked));
   return label;
 }
@@ -55,11 +55,18 @@ const activeBuffs = (actor) => (actor?.itemTypes?.buff ?? []).filter((b) => b.is
 const hasFortune = (actor) => activeBuffs(actor).some((b) => b.flags[MODULE_ID]?.fortune === "best");
 const armedPrescience = (actor) => activeBuffs(actor).find((b) => b.flags[MODULE_ID]?.prescience?.armed) ?? null;
 
-function nextRollBonuses(actor, kind) {
+/**
+ * One-roll bonuses for this roll, worth only what's above a bonus of the same type the roll already has
+ * (Guidance's +1 competence adds nothing beside Inspire Courage's +3 competence). One that would add
+ * nothing isn't offered, so it isn't used up either.
+ */
+function nextRollBonuses(actor, kind, roll = null) {
   const active = activeBuffs(actor);
   return NEXT_ROLL.filter((def) => def.kinds.includes(kind))
     .map((def) => ({ def, buff: active.find(def.match) }))
-    .filter((b) => b.buff);
+    .filter((b) => b.buff)
+    .map((b) => ({ ...b, value: bonusOf(b.def, b.buff) - (roll ? highestOfType(actor, roll, typeOf(b.def, b.buff)) : 0) }))
+    .filter((b) => b.value > 0);
 }
 
 /** Use up one-time effects after the roll they applied to. */
@@ -89,11 +96,11 @@ Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
     rollData.d20 = KEEP_HIGHEST;
   }
 
-  for (const { def, buff } of nextRollBonuses(actor, "attack")) {
+  for (const { def, buff, value } of nextRollBonuses(actor, "attack", { kind: "attack", action })) {
     if (used.includes(buff.id) || rollData[SKIPPED]?.includes(buff.id)) continue;
-    parts.push(`${bonusOf(def, buff)}[${def.label}]`);
+    parts.push(`${value}[${def.label}]`);
     // Same-type situational bonuses (Quarry's insight) don't stack with it
-    (rollData[TYPED] ??= []).push({ type: typeOf(def, buff), value: bonusOf(def, buff) });
+    (rollData[TYPED] ??= []).push({ type: typeOf(def, buff), value });
     used.push(buff.id);
   }
 });
@@ -106,8 +113,8 @@ Hooks.on("renderAttackDialog", (app, html) => {
   const flags = root.querySelector(".form-group.flags");
   const rollData = app.rollData;
   if (!flags || !rollData) return;
-  for (const { def, buff } of nextRollBonuses(actor, "attack")) {
-    flags.append(nextRollToggle(def, buff, (on) => {
+  for (const { def, buff, value } of nextRollBonuses(actor, "attack", { kind: "attack", action: app.action })) {
+    flags.append(nextRollToggle(def, buff, value, (on) => {
       const skipped = new Set(rollData[SKIPPED] ?? []);
       on ? skipped.delete(buff.id) : skipped.add(buff.id);
       rollData[SKIPPED] = [...skipped];
@@ -133,8 +140,11 @@ const pending = new Map(); // actor id → { ids: always used up once rolled, to
 // only if it ended up in the roll.
 const splitBonus = (text) => (text ?? "").split(/\s*\+\s*/).map((t) => t.trim()).filter(Boolean);
 
+// The roll, for capping one-roll bonuses by same-type bonuses on it (saves and skills only)
+const ROLL_OF = { Save: (id) => ({ kind: "save", saveId: id }), Skill: (id) => ({ kind: "skill", skillId: id }), Ability: (id) => ({ kind: "ability", abilityId: id }) };
+
 function preActorRoll(kind) {
-  return (actor, rollOptions) => {
+  return (actor, rollOptions, id) => {
     const ids = [];
     const toggles = [];
     const prescience = armedPrescience(actor);
@@ -146,10 +156,10 @@ function preActorRoll(kind) {
       rollOptions.dice = KEEP_HIGHEST;
     }
     const windowed = !(rollOptions.skipDialog ?? pf1.documents.settings.getSkipActionPrompt());
-    for (const { def, buff } of nextRollBonuses(actor, kind)) {
-      const part = `${bonusOf(def, buff)}[${def.label}]`;
+    for (const { def, buff, value } of nextRollBonuses(actor, kind, typeof id === "string" ? ROLL_OF[kind]?.(id) : null)) {
+      const part = `${value}[${def.label}]`;
       if (!windowed) (rollOptions.parts ??= []).push(part); // with a window, the field gets it when it opens
-      toggles.push({ def, buff, part });
+      toggles.push({ def, buff, value, part });
     }
     if (ids.length || toggles.length) pending.set(actor.id, { ids, toggles, name: actor.name });
   };
@@ -167,7 +177,7 @@ Hooks.on("renderDialogV2", (app, element) => {
   const row = document.createElement("div");
   row.className = "form-group";
   for (const t of entry.toggles) {
-    row.append(nextRollToggle(t.def, t.buff, (on) => {
+    row.append(nextRollToggle(t.def, t.buff, t.value, (on) => {
       const parts = splitBonus(input.value).filter((p) => p !== t.part);
       input.value = (on ? [...parts, t.part] : parts).join(" + ");
     }));
@@ -290,5 +300,4 @@ registerFootnote((item) => {
   if (!next) return null;
   const content = [`Automated: +${bonusOf(next, item)} on your next ${next.kinds.map((k) => ({ attack: "attack roll or CMB check", Save: "saving throw", Skill: "skill check" })[k]).join(", ")}, then this buff switches off. The roll window has a ticked box for it: untick it to save it for a later roll.`];
   return content;
-  return null;
 });

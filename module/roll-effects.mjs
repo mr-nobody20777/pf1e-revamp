@@ -29,7 +29,7 @@ const PART_LABEL = { atk: "Attack", dmg: "Damage", roll: "" };
 Hooks.once("init", () => {
   game.settings.register(MODULE_ID, SETTING, {
     name: "Buffs listed in roll windows",
-    hint: "Up to this many buffs, conditions and situational bonuses are listed right in attack, save and skill windows. Above it, the window shows their totals and a Manage… button. 0 always shows the totals.",
+    hint: "Up to this many buffs, conditions and situational bonuses are listed right in attack, save, skill and ability-check windows. Above it, the window shows their totals and a Manage… button. 0 always shows the totals.",
     scope: "client",
     config: true,
     type: Number,
@@ -97,6 +97,16 @@ function rollTargets(actor, roll) {
   const skill = actor.system.skills?.[root];
   const ability = (sub ? skill?.subSkills?.[sub]?.ability : skill?.ability) ?? null;
   return { roll: { targets: ["skills", `skill.${root}`, `skill.${roll.skillId}`, ability && `${ability}Skills`].filter(Boolean), ability } };
+}
+
+/**
+ * The highest bonus of a type PF1 already counts on this roll (from gear, feats or buffs); 0 for types
+ * that stack. Features adding their own typed bonus (Guidance's competence) add only what's above it.
+ */
+export function highestOfType(actor, roll, type) {
+  if (STACKING().has(type ?? "untyped")) return 0;
+  const changes = roll.kind === "attack" ? roll.action.attackSources : actor.changes.filter((c) => rollTargets(actor, roll).roll.targets.includes(c.target));
+  return Math.max(0, ...changes.filter((c) => c.type === type && c.operator === "add").map((c) => c.value ?? 0));
 }
 
 /** Everything that affects this roll, with PF1's stacking worked out. */
@@ -449,7 +459,10 @@ class EffectsManager extends foundry.applications.api.ApplicationV2 {
 
 /** A row's current worth in one part, for section subtotals. */
 function valueOf(model, r, part) {
-  if (r.kind === "ability") return model.abilities.find((a) => `abl.${a.ability}` === r.key)?.parts.includes(part) ? model.abilities.find((a) => `abl.${a.ability}` === r.key).worth : 0;
+  if (r.kind === "ability") {
+    const a = model.abilities.find((x) => `abl.${x.ability}` === r.key);
+    return a?.parts.includes(part) ? a.worth : 0;
+  }
   if (r.kind === "provided") return model.provided.find((p) => p.id === r.key)?.[part] ?? 0;
   return model.entries.get(r.key)?.values[part] ?? 0;
 }
@@ -549,7 +562,7 @@ Hooks.once("init", () => {
     if (!ATTACK_ACTIONS.includes(action.actionType)) return;
     rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action });
     parts.push(...partsFor(rollData[KEY], "atk", rollData));
-    delete rollData[TYPED]; // per attack: a full attack's next attack starts fresh
+    delete rollData[TYPED]; // per attack roll: a full attack's next attack starts fresh (no typed damage bonuses yet)
   });
 
   Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {

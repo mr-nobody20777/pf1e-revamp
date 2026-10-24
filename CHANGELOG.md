@@ -18,6 +18,11 @@
 - Channel energy no longer posts its own summary message; PF1's card shows the amount and saves have their own cards. The request to the GM is whispered and removed once applied.
 
 ### Fixed
+- **One-roll bonuses follow the stacking rules.** Guidance (+1 competence) adds nothing beside a higher competence bonus such as Inspire Courage, so it's no longer offered or used up on that roll; it waits for one where it helps. True Strike and the Luck channel bonus are capped the same way.
+- Luck variant channeling: a creature harmed by two channels in a row had two penalties; the second channel now refreshes the first.
+- Racial trait review: a standard trait's ability choice is greyed out when the trait is unticked, including when an alternate unticks it for you.
+- A feature granted twice at different levels by an archetype or subclass (the same item at, say, 1st and 5th) could have both copies recorded at one level.
+- The one-time repair that ties older bloodlines, domains and schools to their class ran on every world load; it now runs once per world.
 - **Quarry and True Strike no longer stack.** Both are insight bonuses, so only the higher counts: an attack with True Strike gets +20, not +22 (or +24 with Improved Quarry); Quarry still applies to the rest of a full attack. Quarry also defers to any other insight bonus on attacks the slayer already has.
 - Bloodlines, domains and schools are now tied to their class, so their formulas scale: the Protection domain's resistance bonus stayed +1 instead of +1 per 5 levels (+3 at 10th). Existing characters are repaired when the GM next loads the world.
 - Foretell (Foresight subschool) lasts rounds per day equal to wizard level; PF1's data used the Int modifier.

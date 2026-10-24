@@ -277,9 +277,12 @@ async function loadSubclassOptions() {
 
 Hooks.once("ready", loadSubclassOptions);
 
-// Bloodlines, domains and schools granted before 0.19 weren't tied to their class: fix them once (GM)
+// Bloodlines, domains and schools granted before 0.19 weren't tied to their class: fix them once per
+// world (GM). New ones are tied when granted, so it never needs to run again.
+const REPAIRED = "classTieRepaired";
+Hooks.once("init", () => game.settings.register(MODULE_ID, REPAIRED, { scope: "world", config: false, type: Boolean, default: false }));
 Hooks.once("ready", async () => {
-  if (!isActiveGM()) return;
+  if (!isActiveGM() || game.settings.get(MODULE_ID, REPAIRED)) return;
   for (const actor of game.actors) {
     const updates = [];
     for (const item of actor.itemTypes.feat) {
@@ -289,6 +292,7 @@ Hooks.once("ready", async () => {
     }
     if (updates.length) await actor.updateEmbeddedDocuments("Item", updates);
   }
+  await game.settings.set(MODULE_ID, REPAIRED, true);
 });
 
 /** A picker section styled to sit above the level-up dialog's buttons. */

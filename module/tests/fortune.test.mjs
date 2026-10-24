@@ -108,6 +108,20 @@ export function registerFortuneTests(quench) {
             assert.notMatch(f[1].attack, /Guidance/);
             await waitFor(() => !guide.isActive);
           });
+
+          it("adds nothing beside a higher competence bonus (Inspire Courage), so it isn't used up", async () => {
+            const guide = ally.items.getName("Guidance");
+            await guide.update({ "system.active": true });
+            const [courage] = await addItems(ally, [["pf1.buffs", "Inspire Courage", { system: { active: true, level: 1 } }]]);
+            try {
+              const [card] = await useAndCollect(ally.items.getName("Longsword"));
+              assert.notMatch(formulas(card)[0].attack, /Guidance/, "+1 competence doesn't stack with +1 competence");
+              assert.isTrue(ally.items.getName("Guidance").isActive, "kept for a roll where it helps");
+            } finally {
+              await courage.delete();
+              await guide.update({ "system.active": false });
+            }
+          });
         });
 
         describe("Prescience", function () {

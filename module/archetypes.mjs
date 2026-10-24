@@ -11,7 +11,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { itemsFromSource, classFlagUpdate, esc, plainText, spellbookKey, openLink, titleFor } from "./util.mjs";
+import { itemsFromSource, classFlagUpdate, levelsBySource, esc, plainText, spellbookKey, openLink, titleFor } from "./util.mjs";
 import { ARCHETYPE_RULES } from "./archetype-rules.mjs";
 
 const ARCH_PACK = "pf1e-archetypes.pf-archetypes";
@@ -439,12 +439,10 @@ async function applyArchetype(plan, choices, archetypeItem) {
     toCreate.push({ data, level: add.level });
   }
   // Track them like PF1 does ({itemId: level} on the class), so leveling down removes them
-  // (created documents don't always come back in request order, so pair them up by source)
   const created = toCreate.length ? await actor.createEmbeddedDocuments("Item", toCreate.map((c) => c.data)) : [];
-  const levelOf = new Map(toCreate.map((c) => [c.data._stats?.compendiumSource, c.level]));
   const flagUpdate = classFlagUpdate(
     toDelete.map((i) => i.id),
-    created.map((item) => [item.id, levelOf.get(item._stats?.compendiumSource)])
+    levelsBySource(toCreate.map((c) => [c.data, c.level]), created)
   );
   if (Object.keys(flagUpdate).length) await classItem.update(flagUpdate);
 

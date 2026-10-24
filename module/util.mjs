@@ -2,10 +2,10 @@
 
 import { MODULE_ID } from "./const.mjs";
 
-/** Escape text for HTML. */
 /** A window title naming the creature it acts for, like PF1's own ("Attack (Longsword) – Kestrel"). */
 export const titleFor = (title, actor) => (actor?.name ? `${title} – ${actor.name}` : title);
 
+/** Escape text for HTML. */
 export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** Lowercase, punctuation-free form of a name for loose matching. */
@@ -199,11 +199,23 @@ export async function createClassFeatures(classItem, entries) {
     levels.push(level);
   }
   if (!data.length) return [];
-  // created documents don't always come back in request order, so pair them up by source
   const created = await classItem.actor.createEmbeddedDocuments("Item", data);
-  const levelOf = new Map(data.map((d, i) => [d._stats?.compendiumSource, levels[i]]));
-  await classItem.update(classFlagUpdate([], created.map((item) => [item.id, levelOf.get(item._stats?.compendiumSource)])));
+  await classItem.update(classFlagUpdate([], levelsBySource(data.map((d, i) => [d, levels[i]]), created)));
   return created;
+}
+
+/**
+ * [itemId, level] for items created from [data, level] requests. Created documents don't always come back
+ * in request order, so they're paired by compendium source; copies of one source take its levels in order.
+ */
+export function levelsBySource(requests, created) {
+  const levels = new Map();
+  for (const [data, level] of requests) {
+    const source = data._stats?.compendiumSource;
+    if (!levels.has(source)) levels.set(source, []);
+    levels.get(source).push(level);
+  }
+  return created.map((item) => [item.id, levels.get(item._stats?.compendiumSource)?.shift()]);
 }
 
 /** False once a document has been deleted (e.g. a queued sync whose character was removed meanwhile). */

@@ -108,12 +108,18 @@ export async function promptRacialTraits(actor, race, { choose = null } = {}) {
         const altBoxes = [...form.querySelectorAll('input[name="alt"]')];
         const stdBoxes = [...form.querySelectorAll('input[name="std"]')];
         const keysOf = (box) => box.dataset.replaces.split("|").map(traitKey);
+        // A trait's ability choice is only open while it's ticked, including boxes unticked for you below
+        const syncSelects = () => {
+          for (const b of [...altBoxes, ...stdBoxes]) {
+            for (const sel of b.parentElement.querySelectorAll("select")) {
+              sel.disabled = !b.checked;
+              sel.dataset.tooltip = b.checked ? "" : "Tick the trait first";
+            }
+          }
+        };
+        for (const box of stdBoxes) box.addEventListener("change", syncSelects);
         for (const box of altBoxes) {
           box.addEventListener("change", () => {
-            for (const sel of box.parentElement.querySelectorAll("select")) {
-              sel.disabled = !box.checked;
-              sel.dataset.tooltip = box.checked ? "" : "Tick the trait first";
-            }
             if (box.checked) {
               // Untick other alternates exchanging the same trait, and the traits this one replaces
               for (const other of altBoxes) if (other.checked && conflicts(alternates[box.value], alternates[other.value])) other.checked = false;
@@ -123,6 +129,7 @@ export async function promptRacialTraits(actor, race, { choose = null } = {}) {
               const still = altBoxes.filter((b) => b.checked).flatMap(keysOf);
               for (const std of stdBoxes) if (keysOf(box).includes(traitKey(std.dataset.stem)) && !still.includes(traitKey(std.dataset.stem))) std.checked = true;
             }
+            syncSelects();
           });
         }
         // "+2 to two different ability scores": picking a score taken by the other dropdown swaps them

@@ -3,7 +3,7 @@
 
 import { createTestActor, waitFor, waitForItem, cleanup, useTestScene, placeToken, deleteTokens } from "./helpers.mjs";
 import { creaturesInBurst, isUndead } from "../channel-energy.mjs";
-import { setVariant, clearVariant } from "../variant-channeling.mjs";
+import { setVariant, clearVariant, applyVariant } from "../variant-channeling.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -101,6 +101,18 @@ export function registerChannelEnergyTests(quench) {
             await clearVariant(channelItem);
           }
           assert.isUndefined(cleric.items.getName("Variant Channeling (Luck)"), "reset removes it");
+        });
+
+        it("Luck variant harming twice: the penalty is refreshed, not doubled; a successful save negates it", async () => {
+          const penalties = () => ally.itemTypes.buff.filter((b) => b.flags[MODULE_ID]?.channelLuckPenalty);
+          const luck = { name: "Luck", heal: false };
+          await applyVariant(ally, luck, { bonus: 1, saved: true });
+          assert.lengthOf(penalties(), 0, "saved: no penalty");
+          await applyVariant(ally, luck, { bonus: 1 });
+          await applyVariant(ally, luck, { bonus: 2 });
+          assert.lengthOf(penalties(), 1);
+          assert.match(penalties()[0].name, /−2/, "refreshed with the latest channel's penalty");
+          await ally.deleteEmbeddedDocuments("Item", penalties().map((b) => b.id));
         });
 
         it("heal living: applied to the targets, never above max HP, and spends a use", async () => {
