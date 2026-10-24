@@ -259,6 +259,13 @@ function planFor(model, state) {
 /** How much an ability modifier moves when the score moves by `score`. */
 const modShift = (total, score) => Math.floor((total + score - 10) / 2) - Math.floor((total - 10) / 2);
 
+/** An ability modifier on this attack, after any ability buffs turned off in its roll window. */
+export function attackAbilityMod(rollData, ability) {
+  const data = rollData.abilities?.[ability] ?? {};
+  const change = Object.values(rollData[KEY]?.abilities ?? {}).find((a) => a.ability === ability && a.score);
+  return (data.mod ?? 0) + (change ? modShift(data.total ?? 10, change.score) : 0);
+}
+
 /** Formula parts for one part of the roll ("atk", "dmg" or "roll"), given the roller's roll data. */
 function partsFor(plan, part, rollData) {
   const out = [];

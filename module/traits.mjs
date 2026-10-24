@@ -79,9 +79,11 @@ export async function chooseTrait(item, { picks = null } = {}) {
   if (!rule || !actor) return;
   if (!picks) {
     const current = item.getFlag(MODULE_ID, FLAG) ?? {};
+    const empty = []; // choices with nothing available yet: Save can't complete, and says why
     const fields = rule.choices
       .map((c) => {
         const options = c.options(actor);
+        if (!options.length) empty.push(c.label);
         if (!options.length) return `<p><strong>${esc(c.label)}:</strong> none available on this character yet.</p>`;
         return `<p><label><strong>${esc(c.label)}:</strong> <select name="${c.key}">${options.map(([v, l]) => `<option value="${esc(v)}" ${current[c.key] === v ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></label></p>`;
       })
@@ -89,7 +91,14 @@ export async function chooseTrait(item, { picks = null } = {}) {
     picks = await foundry.applications.api.DialogV2.wait({
       window: { title: titleFor(`${item.name}: choose`, actor) },
       content: `<div>${fields}</div>`,
-      render: (event, dialog) => searchSelects(dialog.element), // e.g. Gifted Adept's spell list
+      render: (event, dialog) => {
+        searchSelects(dialog.element); // e.g. Gifted Adept's spell list
+        const save = dialog.element.querySelector('button[data-action="ok"]');
+        if (save && empty.length) {
+          save.disabled = true;
+          save.dataset.tooltip = `Nothing to choose yet for ${empty.join(", ")}`;
+        }
+      },
       buttons: [
         { action: "ok", label: "Save", default: true, callback: (event, button) => Object.fromEntries(rule.choices.map((c) => [c.key, button.form.elements[c.key]?.value]).filter(([, v]) => v)) },
         { action: "cancel", label: "Later" },

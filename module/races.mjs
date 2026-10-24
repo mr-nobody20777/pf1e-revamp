@@ -99,12 +99,22 @@ export async function promptRacialTraits(actor, race, { choose = null } = {}) {
     picked = await foundry.applications.api.DialogV2.wait({
       window: { title: titleFor(`${race.name}: racial traits`, actor), resizable: true },
       position: { width: 560 },
-      content: `<div style="max-height:65vh; overflow-y:auto">
+      content: `${standard.length + alternates.length > 10 ? `<input type="search" class="pfr-trait-search" placeholder="Search traits…" style="width:100%; margin-bottom:0.4em">` : ""}
+        <div style="max-height:65vh; overflow-y:auto">
         <p>Standard traits are checked. Checking an alternate trait unchecks what it replaces.</p>
         <h3>Standard traits</h3>${standard.map((t, i) => row(t, i, "std")).join("")}
         ${alternates.length ? `<h3>Alternate traits</h3>${alternates.map((t, i) => row(t, i, "alt")).join("")}` : ""}</div>`,
       render: (event, dialog) => {
         const form = dialog.element.querySelector("form") ?? dialog.element;
+        // Long lists (humans have dozens of alternates): filter the rows by name; ticked ones stay visible
+        const search = form.querySelector(".pfr-trait-search");
+        search?.addEventListener("input", () => {
+          const q = search.value.trim().toLowerCase();
+          for (const row of form.querySelectorAll("label")) {
+            const box = row.querySelector('input[type="checkbox"]');
+            if (box) row.style.display = !q || box.checked || row.textContent.toLowerCase().includes(q) ? "block" : "none";
+          }
+        });
         const altBoxes = [...form.querySelectorAll('input[name="alt"]')];
         const stdBoxes = [...form.querySelectorAll('input[name="std"]')];
         const keysOf = (box) => box.dataset.replaces.split("|").map(traitKey);

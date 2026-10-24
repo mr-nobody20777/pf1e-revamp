@@ -16,7 +16,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
-import { evaluate, classLevel, isActiveGM, allActors, linkedBuffs as linkedBuffsBy, createQueue, stillExists, deleteIfExists, onSceneCatchUp } from "./util.mjs";
+import { esc, evaluate, classLevel, isActiveGM, allActors, linkedBuffs as linkedBuffsBy, createQueue, stillExists, deleteIfExists, onSceneCatchUp } from "./util.mjs";
 
 const FLAG = "studiedTarget";
 const PF1_STUDIED_TARGET = "Compendium.pf1.class-abilities.Item.JnXrphJlr1ULx1MK";
@@ -199,11 +199,11 @@ async function reconcile(item) {
     const link = { source: item.uuid, target: uuid };
 
     if (!linkedBuffs(actor, item.uuid, uuid).length) {
-      const description = `${actor.name} is studying ${name}. Delete or deactivate this buff to stop studying.`;
+      const description = `${esc(actor.name)} is studying ${esc(name)}. Delete or deactivate this buff to stop studying.`;
       await actor.createEmbeddedDocuments("Item", [indicatorData(item, `${item.name}: ${name}`, description, link)]);
     }
     if (token?.actor && !linkedBuffs(token.actor, item.uuid, uuid).length) {
-      const description = `${actor.name} has this creature as a studied target. Delete or deactivate this buff to end it.`;
+      const description = `${esc(actor.name)} has this creature as a studied target. Delete or deactivate this buff to end it.`;
       await token.actor.createEmbeddedDocuments("Item", [indicatorData(item, `Studied by ${actor.name}`, description, link)]);
     }
   }

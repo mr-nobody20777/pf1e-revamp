@@ -83,6 +83,20 @@ export function registerSaveBonusTests(quench) {
           assert.notMatch(await saveFormula(human, cards["Magic Missile"], "ref"), /Mind Blank/, "not mind-affecting");
         });
 
+        it("conditional notes are never applied automatically (Attached, Tight Bonds); plain ones are", async () => {
+          const parse = (await import("../save-bonuses.mjs")).parseNote;
+          assert.isTrue(parse("+[[1]] Trait bonus against charm and compulsion effects if a partner is within 60 feet.").conditional);
+          assert.isTrue(parse("+[[2]] Trait bonus vs charm, compulsion, and fear effects created by humanoids other than elves.").conditional);
+          assert.isFalse(parse("+[[2]] Racial bonus vs. fear effects").conditional);
+          assert.equal(parse("+[[4]] Racial bonus vs. diseases (incl. magical) and poisons").against, "diseases");
+
+          const human = await withRace("Quench Attached Human");
+          await human.createEmbeddedDocuments("Item", [{
+            name: "Quench Attached", type: "feat", system: { subType: "trait", contextNotes: [{ target: "allSavingThrows", text: "-[[2]] Penalty on saves against fear effects whenever the object of your attachment is threatened." }] },
+          }]);
+          assert.notMatch(await saveFormula(human, cards["Cause Fear"]), /Quench Attached/, "the condition can't be checked, so it isn't applied");
+        });
+
         it("the card's save button warns when it would roll for a creature that isn't a target", async () => {
           const { restore } = await useTestScene();
           const target = await withRace("Quench Save Target");

@@ -56,6 +56,19 @@ const FORMS = [
 // A line with these isn't a plain bonus; a part of "vs A, B" with these is dropped (the rest still counts)
 const SKIP_LINE = /\bonce per\b|\bexisting\b|\bimmun|\breroll|\broll twice\b|\bnew save\b/i;
 const SKIP_PART = /\bcreatures?\b|\bwhen\b|\bwhile\b|\bif\b|\bunless\b/i;
+// A condition anywhere in the "vs ..." clause (who created the effect, a partner nearby, something the
+// character must own) makes the whole note conditional: "+1 vs charm and compulsion effects if a partner
+// is within 60 feet" must not give +1 against every charm. Conditional notes are listed, never applied.
+const CONDITIONAL = /\bcreatures?\b|\bwhen(?:ever)?\b|\bwhile\b|\bif\b|\bunless\b|\bas long as\b|\bother than\b|\b(?:created|inflicted|employed|cast)\s+(?:by|against)\b|\bby the source\b|\b(?:of|from) (?:outsiders|undead|fey|dragons|humanoids|giants|demons|devils|daemons|swarms|vermin|plants)\b|\bthat (?:do not|rely|would)\b/i;
+
+/** The "vs ..." text, tidied for display: no roll markup, cut at a clause break or an unclosed parenthesis. */
+function tidyAgainst(text) {
+  let t = text.replace(/\[\[|\]\]/g, "").split(/[;:]/)[0].trim();
+  const open = t.lastIndexOf("(");
+  if (open > t.lastIndexOf(")")) t = t.slice(0, open).trim();
+  t = t.replace(/\s+incl$/i, "").replace(/[\s,;:]+$/, ""); // "diseases (incl. magical)" is cut at its period
+  return t.length > 60 ? `${t.slice(0, 57).replace(/\s+\S*$/, "")}…` : t;
+}
 const TYPE_WORDS = {
   racial: "racial", trait: "trait", morale: "morale", resistance: "resist", luck: "luck", sacred: "sacred", profane: "profane",
   competence: "competence", insight: "insight", circumstance: "circumstance", enhancement: "enh", dodge: "dodge", alchemical: "alchemical",
@@ -101,7 +114,7 @@ export function parseNote(line) {
     if (part.kinds.length || part.forms.length) parts.push(part);
     previous = part;
   }
-  return parts.length ? { formula, type, parts, against: m[4].trim().replace(/[\s,;:]+$/, "") } : null;
+  return parts.length ? { formula, type, parts, against: tidyAgainst(m[4]), conditional: CONDITIONAL.test(m[4]) } : null;
 }
 
 /** A note's text as separate lines (notes often hold several, e.g. "+2 vs enchantment\nImmune to magic sleep"). */
@@ -128,13 +141,13 @@ export function saveBonuses(actor, saveId, effect, { stack = true } = {}) {
       if (note.target !== "allSavingThrows" && note.target !== saveId) continue;
       for (const line of noteLines(note.text ?? "")) {
         const parsed = parseNote(line);
-        if (!parsed || (effect && !matches(parsed.parts, effect))) continue;
+        if (!parsed || (effect && (parsed.conditional || !matches(parsed.parts, effect)))) continue;
         const value = evaluate(parsed.formula, item);
         if (!value) continue;
         const key = `${value}|${parsed.type}`;
         if (racialSource && racialSeen.has(key)) continue;
         if (racialSource) racialSeen.add(key);
-        candidates.push({ value, type: parsed.type, label: item.name, against: parsed.against });
+        candidates.push({ value, type: parsed.type, label: item.name, against: parsed.against, conditional: parsed.conditional });
       }
     }
   }
@@ -165,7 +178,13 @@ registerRollEffect({
     for (const b of saveBonuses(actor, roll.saveId, null)) {
       if (seen.has(id(b))) continue;
       seen.add(id(b));
-      const reason = matching.has(id(b)) ? `a higher ${b.type} bonus already applies` : effect ? `only vs ${b.against}` : `only vs ${b.against}; roll from the effect's card`;
+      const reason = b.conditional
+        ? `only vs ${b.against}: tick it if that applies`
+        : matching.has(id(b))
+          ? `a higher ${b.type} bonus already applies`
+          : effect
+            ? `only vs ${b.against}`
+            : `only vs ${b.against}; roll from the effect's card`;
       out.push({ id: id(b), label: b.label, part: b.label, type: b.type, roll: b.value, applies: false, reason });
     }
     return out;

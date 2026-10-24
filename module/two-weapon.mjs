@@ -16,6 +16,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { isBashShield, bashCountsAsLight } from "./shield-trained.mjs";
 import { esc, norm, wrapMethod, addSearch } from "./util.mjs";
+import { attackAbilityMod } from "./roll-effects.mjs";
 
 const FIELD_ON = `${MODULE_ID}-twf`;
 const FIELD_OFF = `${MODULE_ID}-twf-offhand`;
@@ -185,10 +186,13 @@ Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
   if (twf?.penalty) parts.push(`${twf.penalty}[Two-Weapon Fighting]`);
 });
 
-// Double Slice: full Strength on off-hand damage (the off-hand held setting applies only half)
+// Double Slice: "add your Strength bonus to damage rolls made with your off-hand weapon" in full (the
+// off-hand held setting applies only half). Uses the weapon's damage ability, and the modifier after any
+// ability buff left out of this roll in the roll window.
 Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
   if (rollData[MARK]?.role !== "off" || !parts[0] || !hasFeat(action.actor, "doubleSlice")) return;
-  const str = rollData.abilities?.str?.mod ?? 0;
+  if ((action.ability?.damage ?? "str") !== "str") return;
+  const str = attackAbilityMod(rollData, "str");
   const extra = str - Math.floor(str * 0.5);
   if (str > 0 && extra > 0) parts[0].extra.push(`${extra}[Double Slice]`);
 });

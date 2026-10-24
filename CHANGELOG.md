@@ -18,6 +18,11 @@
 - Channel energy no longer posts its own summary message; PF1's card shows the amount and saves have their own cards. The request to the GM is whispered and removed once applied.
 
 ### Fixed
+- **Conditional save bonuses and penalties are no longer applied automatically.** Notes such as "+1 vs charm and compulsion effects if a partner is within 60 feet" (Tight Bonds), "−2 vs fear effects whenever the object of your attachment is threatened" (Attached) or "vs effects created by outsiders" were applied to every matching save. They now appear under Not Applied with their condition, to be ticked when it applies. Their "only vs …" text is also tidier.
+- Double Slice uses the off-hand weapon's damage ability, and the Strength modifier after any buff left out of the roll in the roll window.
+- Character trait choices: when a choice has nothing available yet, Save is greyed out and says why, instead of doing nothing.
+- Racial trait review: a search box filters long trait lists (humans have dozens of alternate traits).
+- Studied Target's indicator buffs escape creature names in their descriptions.
 - **One-roll bonuses follow the stacking rules.** Guidance (+1 competence) adds nothing beside a higher competence bonus such as Inspire Courage, so it's no longer offered or used up on that roll; it waits for one where it helps. True Strike and the Luck channel bonus are capped the same way.
 - Luck variant channeling: a creature harmed by two channels in a row had two penalties; the second channel now refreshes the first.
 - Saves: a bonus vs fear beaten by a higher bonus of the same type (Bless's +1 morale beside Greater Heroism) said "only vs fear" even against a fear effect; it now says a higher morale bonus already applies.
