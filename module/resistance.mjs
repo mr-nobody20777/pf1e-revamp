@@ -3,8 +3,14 @@
 // This reduces each damage instance by the target's best matching energy resistance, or ignores it
 // entirely if the target is immune to all of its types, and whispers what happened. The dialog path
 // is left alone, since the dialog already handles resistances.
+//
+// Order: the rules don't say whether a save for half or resistance comes first (no FAQ). Following the
+// usual table reading and the guideline of applying effects in the order most favorable to the creature,
+// halving (PF1's ½ buttons) comes first, then resistance: 20 fire, saved for half, resist 10 → 0, not 5.
+// Doubling (ratio above 1) keeps resistance first, which is also the more favorable order.
 
 import { MODULE_ID } from "./const.mjs";
+import { esc } from "./util.mjs";
 
 const SETTING = "quickApplyResistance";
 const FROM_DIALOG = `${MODULE_ID}FromDialog`;
@@ -38,6 +44,12 @@ Hooks.on("pf1ApplyDamage", (actor, options) => {
   // matching resistance applies once against the total.
   const instances = options.instances;
   const missingAmounts = instances.every((i) => !(i.value > 0));
+
+  // Halve before resistance (minimum 1, like any halved damage); PF1 then has no ratio left to apply
+  const ratio = options.ratio ?? 1;
+  const halving = ratio > 0 && ratio < 1;
+  const scale = (n) => (halving ? Math.max(1, Math.floor(n * ratio)) : n);
+  const total = scale(options.value);
   console.debug(`${MODULE_ID} | quick-apply resistance`, actor.name, {
     value: options.value,
     instances: instances.map((i) => ({ types: [...(i.types ?? [])], value: i.value })),
@@ -49,7 +61,7 @@ Hooks.on("pf1ApplyDamage", (actor, options) => {
   const notes = [];
   for (const instance of instances) {
     const types = [...(instance.types ?? [])];
-    const amount = instance.value > 0 ? instance.value : missingAmounts && instances.length === 1 ? options.value : missingAmounts ? options.value - reduced : 0;
+    const amount = instance.value > 0 ? scale(instance.value) : missingAmounts && instances.length === 1 ? total : missingAmounts ? total - reduced : 0;
     if (!types.length || amount <= 0) continue;
 
     if (types.every((t) => immunities.has(t))) {
@@ -68,13 +80,14 @@ Hooks.on("pf1ApplyDamage", (actor, options) => {
   }
   if (!reduced) return;
 
-  reduced = Math.min(reduced, options.value);
-  options.value -= reduced;
+  reduced = Math.min(reduced, total);
+  options.value = total - reduced;
+  if (halving) options.ratio = 1;
 
   ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
     whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
-    content: `<p><strong>${actor.name.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)}</strong> resists ${reduced} damage: ${notes.join(", ")}. Took ${options.value}.</p>`,
+    content: `<p><strong>${esc(actor.name)}</strong> resists ${reduced} damage${halving ? " (after halving)" : ""}: ${esc(notes.join(", "))}. Took ${options.value * (options.ratio ?? 1)}.</p>`,
   });
 });
 

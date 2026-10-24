@@ -76,6 +76,9 @@ Several resistances against the same energy don't add up. Only the highest count
 
 **Now:** damage applied straight from a card is also reduced by the target's best matching energy resistance, or ignored if they're immune. A private message tells the target's owner and the GM what was resisted. This is a world setting, on by default; see [Settings](Settings). Damage through PF1's dialog is left to PF1, so it's never reduced twice.
 
+### Halving and resistance
+The rules don't say whether a saving throw for half damage or energy resistance applies first, and there's no official ruling. PF1e Revamp halves first, then applies resistance, which is the most common reading and the order most favorable to the creature. For example, 20 fire damage, saved for half, against fire resistance 10 is fully resisted (20 → 10 → 0), rather than leaving 5. Doubled damage (the ×2 button) keeps resistance first, for the same reason.
+
 ### Where resistance comes from
 Racial traits (*"you have fire resistance 5"*), bloodline powers (Solar), and anything PF1 already tracks. With **Nevela's Automation Suite**, its *Resist Energy* and *Protection from Energy* buffs are handled by Nevela and work alongside this.
 

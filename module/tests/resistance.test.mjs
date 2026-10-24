@@ -54,6 +54,20 @@ export function registerResistanceTests(quench) {
           assert.equal(hp(), start - 15);
         });
 
+        it("halving comes before resistance: 20 fire saved for half against resist 10 is fully resisted", async () => {
+          const start = hp();
+          await hit(20, ["fire"], { ratio: 0.5 });
+          assert.equal(hp(), start, "20 halved to 10, then resist 10: nothing");
+          await hit(30, ["fire"], { ratio: 0.5 });
+          assert.equal(hp(), start - 5, "30 halved to 15, then resist 10: 5");
+        });
+
+        it("doubling keeps resistance first (the more favorable order): 15 fire ×2 against resist 10 is 10", async () => {
+          const start = hp();
+          await hit(15, ["fire"], { ratio: 2 });
+          assert.equal(hp(), start - 10);
+        });
+
         it("halved damage and healing never drop below 1 (½ button on 1 point)", async () => {
           const start = hp();
           await actor.applyDamage(1, { ratio: 0.5 });
