@@ -10,7 +10,7 @@
 - **One-roll bonuses are the player's choice.** Guidance, True Strike and the Luck channel bonus show as a ticked box in every roll window (attack, save, skill, ability check); untick it to roll without it and keep the bonus for later.
 
 ### Changed
-- **Every window the module opens names the creature it's for** ("Slayer talent (level 4) – Kestrel", "Channel Positive Energy – Sister Aurel"), like PF1's own roll windows.
+- **Every window the module opens names the creature it's for** ("Choose a slayer talent (level 4) – Kestrel", "Channel Positive Energy – Sister Aurel"), like PF1's own roll windows.
 - **Controls that can't be used say why.** The talent/feat picker's Choose button stays off until you pick something ("Pick one first"); greyed-out archetype rows, channel-energy targets, racial ability choices and the off-hand weapon list explain themselves on hover.
 - **Saving throws from a card warn when they'd roll for the wrong creature.** PF1's save button rolls for whatever token is selected; if that isn't one of the card's targets, you're told who it's rolling for (the roll still goes ahead).
 - Studied Target and Quarry bonuses appear in the roll window, and can be left out of a roll. When no studied creature or quarry is targeted, they're listed as Not Applied and can be ticked by hand (for theater-of-mind play).
