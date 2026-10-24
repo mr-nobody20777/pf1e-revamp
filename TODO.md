@@ -87,7 +87,7 @@ Status: ⬜ not started · 🟨 designed / in progress · ✅ done (move to CHAN
 - ⬜ **Coverage gap check: Foundry vs. Archives of Nethys** (user asked, 2026-10-23). Compare Foundry's compendium counts per category with AoN's to find published content missing from Foundry entirely (it can't be automated until it exists as an item; e.g. 36 bloodlines' power links, "Historian (Human)", domains without power items). Foundry counts on 2026-10-23 (this world's packs, ~45,000 entries, ~32,000 items): class features 11,598 (PF1 4,651, archetype features 4,824, prestige features 1,308, pf-content 767); feats 3,644; spells 3,111; traits 2,045; racial traits 1,677; races 85; archetypes 1,268; prestige classes 119; base classes 49; equipment ~7,000; monster rules ~2,350; buffs 344; monster/NPC statblocks 10,387 (journals) plus 427 actors and 92 traps/haunts.
 
 ## Quality and release
-- ⬜ **Performance review #3** at 10 features since review #2 (count: opposition schools, Blossoming Light L3, racial traits, save bonuses, character traits, slayer talents/ranger styles, variant channeling, buffs on a roll = 8/10).
+- ⬜ **Performance review #3** at 10 features since review #2 (count: opposition schools, Blossoming Light L3, racial traits, save bonuses, character traits, slayer talents/ranger styles, variant channeling, buffs on a roll, window names + reasons, buffs on a roll phase 2 = 10/10: due now).
 - ⬜ Test Two-Weapon Rend's click-to-roll button (never covered by a test).
 - ⬜ Per-feature on/off settings and localizable strings (for a wider audience).
 - ⬜ If ever listing on foundryvtt.com: Foundry's AI policy requires human-written item and description text.
