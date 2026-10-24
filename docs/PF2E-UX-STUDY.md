@@ -49,6 +49,20 @@ A wizard-hat button next to the level badge on the sheet opens one window for th
 
 **Compared with PF1e Revamp:** we inject our choices (talent, bloodline, variant channeling) into PF1's own level-up window, which is close to this one-page model. Worth borrowing: a "leveled up" summary card in chat, a gated Finish button with a visible reason, and a "New class features" section that shows each new feature's full text.
 
+## Round 4: spell cards in chat (Guidance and Daze, posted by the project lead)
+
+29. **Spell cards carry their effects as draggable links.** Guidance's card ends with "Spell Effect: Guidance" and "Effect: Guidance Immunity". Dragging the first onto Claude's sheet added the effect: no targeting step, no dialog. Daze's card links "Stunned 1" the same way, inline in the rules text.
+30. **One-roll bonuses use the same idea as our Guidance, but opt-in.** The effect is a +1 status modifier tied to a "guidance" roll option, marked "remove after roll if enabled". In the Athletics dialog it appeared as a Guidance row, **OFF by default**. Switching it on changed the button to "Roll (+11)", the chat card listed "Guidance +1", and the effect deleted itself after the roll. (PF1e Revamp ticks it automatically, per the project lead's ruling; PF2e leaves it to the player.)
+31. **Save buttons carry the DC and the save type.** "Save DC 17 basic Will" rolls the save for the **selected token** and the result card reads "DC 17 · Result: Success by +3": degree of success **and margin**.
+32. **Spell damage looks like weapon damage.** Roll Damage opens the same damage dialog (add dice, typed modifiers). The card shows a range bar colored by damage type (orange for mental, red for slashing), a damage-type icon in the formula, and the same Damage / Half / Double / Block buttons.
+
+**Pitfall seen:** with no token for Claude, the save button opened a Will save for the GM's **selected token (Ruby Star)**, with her modifiers and no hint whose roll it was beyond the numbers. *Lesson for our channel energy / save cards: always name the creature in the roll window title, and warn when the roller isn't the expected target.*
+
+**Compared with PF1e Revamp:** PF1's spell cards already have save buttons and buff links, and our next-roll bonuses work like PF2e's removeAfterRoll. Worth borrowing:
+- Show the margin on save results ("Success by +3").
+- Put the buff link right in our channel/spell footnotes, so a player can drag the effect onto a sheet when targeting wasn't used.
+- Color damage by type on our cards.
+
 ### Ideas from round 2
 - **Struck-through, explained modifiers** (#18): in our roll-window toggles, list bonuses that don't apply right now (wrong alignment for a ward, out of range for studied target) greyed out with the reason, instead of hiding them.
 - **Damage/Half/Double/Block on PF1's damage card** (#22): PF1 already has apply buttons; worth checking what's missing (a min–max hint, a "block" equivalent for DR/resistance that we already compute).
