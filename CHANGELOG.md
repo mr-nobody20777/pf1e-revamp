@@ -1,10 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Changed
-- Raging Song: when the skald's daily rounds have never been filled (a new or newly leveled character that hasn't rested yet), starting a song says to rest first instead of "no rounds left".
-
 ## 0.19.0: buffs on a roll, clearer windows, and rules fixes
 
 ### New
