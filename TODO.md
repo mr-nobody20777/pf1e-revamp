@@ -12,7 +12,6 @@ The roll-window buff manager ("Buffs on a roll") is released in the Unreleased s
 - **Clearer locked rows.** In the dark theme, a locked condition and a locked Not Applied row look alike; give locked rows a distinct style.
 - **Cleaner chat-card labels.** When a buff is turned off for a roll, the card shows both PF1's "+1 [Haste]" and the correction "−1 [Buffs: Haste off]". Both are correct, but a single line would read better.
 
-- **PF1's damage dialog over-reduces halved damage.** In PF1's Apply Damage dialog path (which Nevela's Automation Suite uses for every chat-card click), energy resistance is computed on the unhalved damage and subtracted after halving: 6 slashing + 4 fire, halved, against fire resistance 10 deals 1 instead of 3. PF1e Revamp currently leaves this path to PF1; correcting it would mean adjusting PF1's computed reduction.
 
 ## Planned
 

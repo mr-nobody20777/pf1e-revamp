@@ -150,6 +150,30 @@ export function registerResistanceTests(quench) {
           }
         });
 
+        it("chat-card ½ on mixed damage: halved before resistance (6 slashing + 4 fire, resist fire 10: 3)", async () => {
+          const H = await import("./helpers.mjs");
+          const sceneCtl = await H.useTestScene();
+          const attacker = await H.createTestActor("Quench Mixed Attacker");
+          const parts = [{ formula: "6", types: ["slashing"] }, { formula: "4", types: ["fire"] }];
+          await attacker.createEmbeddedDocuments("Item", [{ name: "Flaming Strike", type: "attack", system: { subType: "weapon", proficient: true, actions: [{ _id: "flamestrike00001", name: "Strike", actionType: "mwak", activation: { type: "attack" }, damage: { parts } }] } }]);
+          const aTok = await H.placeToken(attacker, 2, 2), dTok = await H.placeToken(actor, 3, 2, { disposition: -1 });
+          try {
+            H.setTargets([dTok]);
+            const [card] = await H.useAndCollect(attacker.items.getName("Flaming Strike"));
+            const half = await H.waitFor(() => document.querySelector(`[data-message-id="${card.id}"] [data-action="applyDamage"][data-ratio="0.5"][data-type="normal"]`));
+            dTok.object.control({ releaseOthers: true });
+            const start = hp();
+            half.click();
+            await H.waitFor(() => hp() !== start);
+            assert.equal(start - hp(), 3, "half of 6 slashing; the 2 fire is resisted");
+          } finally {
+            canvas.tokens.releaseAll();
+            await H.deleteTokens([aTok, dTok]);
+            await attacker.delete();
+            await sceneCtl.restore();
+          }
+        });
+
         it("immunity ignores the damage entirely", async () => {
           await actor.update({ "system.traits.di": ["fire"] });
           const start = hp();

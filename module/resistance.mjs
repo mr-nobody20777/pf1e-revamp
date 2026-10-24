@@ -29,7 +29,29 @@ Hooks.once("init", () => {
 // Mark damage coming through PF1's dialog, which already accounts for resistance.
 Hooks.on("pf1ApplyDamageTargetOptions", (app, target, options) => {
   options[FROM_DIALOG] = true;
+  refreshStaleTarget(app, target, options);
 });
+
+// PF1's dialog halves each damage instance (floor(value × ratio)) before working out immunity, DR,
+// energy resistance and hardness. Code that changes a target's ratio afterwards without recomputing
+// (Nevela's Automation Suite calls a `_refreshTargets` method PF1 doesn't have) leaves those reductions
+// worked out on the unhalved damage, then halves on top: 6 slashing + 4 fire, halved, against fire
+// resistance 10 dealt 1 instead of 3. Recompute such a target with PF1's own method. A target that's
+// already current is left as it is, so this does nothing on PF1's normal path.
+function refreshStaleTarget(app, target, options) {
+  const ratio = target?.ratio ?? 1;
+  if (ratio === 1 || typeof app?._refreshTarget !== "function" || !target.uuid) return;
+  const stale = (target.instances ?? []).some((i) => Number.isFinite(i.value) && i.total !== Math.floor(i.value * ratio));
+  if (!stale) return;
+  app._refreshTarget(target.uuid);
+  const fresh = app.targets?.get(target.uuid) ?? target;
+  options.reduction = fresh.reduction?.total || 0;
+  options.instances = fresh.instances.map((i) => {
+    const part = new pf1.models.action.DamagePartModel(pf1.utils.deepClone(i));
+    for (const key of Object.keys(i)) part[key] = i[key];
+    return part;
+  });
+}
 
 /**
  * How much of the damage each instance carries, adding up to `value`. Uses the instances' own amounts;
