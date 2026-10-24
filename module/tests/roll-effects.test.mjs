@@ -1,7 +1,7 @@
 // Buffs on a roll: roll windows list the buffs, conditions and situational bonuses PF1 counts, and
 // changes made there apply to that one roll (corrections to PF1's totals, labeled "Buffs: ...").
 
-import { createTestActor, addItems, cleanup, waitFor } from "./helpers.mjs";
+import { createTestActor, addItems, fromPack, cleanup, waitFor } from "./helpers.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 const SETTING = "rollEffectsInline";
@@ -145,6 +145,35 @@ export function registerRollEffectsTests(quench) {
           root.querySelector('button[data-action="normal"]').click();
           const result = await rolling;
           assert.match(result.rolls[0].formula, /-\s?4\[Buffs: Heroism, Greater off\]/);
+        });
+
+        /** Open a roll window, open its manager, and return the manager's text; the roll is cancelled. */
+        async function managerText(actor, start) {
+          await game.settings.set(MODULE_ID, SETTING, 0);
+          const open = () => [...foundry.applications.instances.values()].filter((a) => a.rendered && (a.element?.querySelector?.(`.${MODULE_ID}-effects`) || a.constructor.name === "EffectsManager"));
+          await waitFor(() => !open().length, { what: "the last roll's windows to close" });
+          const rolling = start();
+          const root = await waitFor(() => [...foundry.applications.instances.values()].find((a) => a.rendered && a.title?.startsWith(`${actor.name}:`) && a.element.querySelector(`.${MODULE_ID}-effects`))?.element, { what: "the roll window" });
+          root.querySelector("[data-action=manage]").click();
+          const text = (await managerOf()).element.textContent;
+          root.querySelector('button[data-action="normal"]').click();
+          await rolling;
+          return text;
+        }
+
+        it("saves without the effect's card: wards and bonuses vs effects are listed as Not Applied, with the reason", async () => {
+          const halfling = await createTestActor("Quench Warded Halfling", { items: [["pf1.classes", "Fighter", { system: { level: 1 } }]] });
+          actors.push(halfling);
+          await halfling.createEmbeddedDocuments("Item", [await fromPack("pf1.races", "Halfling")], { pf1eRevampNoPrompt: true });
+          await halfling.createEmbeddedDocuments("Item", [{ name: "Quench Ward", type: "buff", system: { active: true }, flags: { [MODULE_ID]: { ward: { vs: "evil", saves: { type: "resist", value: 2 } } } } }]);
+          const text = await managerText(halfling, () => halfling.rollSavingThrow("will"));
+          assert.match(text, /Quench Ward · roll from the effect's card, or target its source/);
+          assert.match(text, /only vs fear/i);
+        });
+
+        it("ability checks list the ability's buffs", async () => {
+          const text = await managerText(fighter, () => fighter.rollAbilityTest("str"));
+          assert.match(text, /Strength \+4\s*\+2/, "Bull's Strength's +4 Strength: +2 on the check");
         });
       });
     },

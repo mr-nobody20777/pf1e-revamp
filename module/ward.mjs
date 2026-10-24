@@ -18,6 +18,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote } from "./footnote.mjs";
 import { isActiveGM, onSceneCatchUp } from "./util.mjs";
+import { registerRollEffect } from "./roll-effects.mjs";
 
 const ward = (vs, value) => ({ vs, ac: { type: "deflection", value }, saves: { type: "resist", value } });
 const KNOWN_WARDS = {
@@ -168,12 +169,27 @@ Hooks.on("renderChatMessagePF", (message, html) => {
   }
 });
 
-Hooks.on("pf1PreActorRollSave", (actor, rollOptions, saveId) => {
-  let source = null;
-  const card = rollOptions.reference ? fromUuidSync(rollOptions.reference) : null;
-  if (card) source = ChatMessage.implementation.getSpeakerActor(card.speaker);
-  else if (game.user.targets.size === 1) source = game.user.targets.first().actor;
+// Saves: shown in the roll window (roll-effects.mjs); listed as not applying, with the reason, when the
+// effect's source isn't of the warded alignment or isn't known
+registerRollEffect({
+  collect(actor, roll) {
+    if (roll.kind !== "save") return [];
+    const wards = getWards(actor).filter((b) => wardFor(b).saves);
+    if (!wards.length) return [];
+    let source = null;
+    const card = roll.reference ? fromUuidSync(roll.reference) : null;
+    if (card) source = ChatMessage.implementation.getSpeakerActor(card.speaker);
+    else if (game.user.targets.size === 1) source = game.user.targets.first().actor;
 
-  const bonus = wardBonus(actor, source, "saves", ["allSavingThrows", saveId]);
-  if (bonus) rollOptions.parts.push(`${bonus.value}[${bonus.label}]`);
+    const bonus = wardBonus(actor, source, "saves", ["allSavingThrows", roll.saveId]);
+    const best = wards.reduce((a, b) => (wardFor(b).saves.value > wardFor(a).saves.value ? b : a));
+    const grant = wardFor(best).saves;
+    if (bonus) return [{ id: "ward", label: bonus.label, part: bonus.label, type: grant.type, roll: bonus.value, applies: true }];
+    const reason = !source
+      ? "roll from the effect's card, or target its source"
+      : wards.some((b) => isAlignment(source, wardFor(b).vs))
+        ? `a ${BONUS_LABELS[grant.type] ?? grant.type} bonus at least as high already applies`
+        : `${source.name} isn't ${wards.map((b) => wardFor(b).vs).join(" or ")}`;
+    return [{ id: "ward", label: best.name, part: best.name, type: grant.type, roll: grant.value, applies: false, reason }];
+  },
 });

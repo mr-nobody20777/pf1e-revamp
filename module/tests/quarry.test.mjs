@@ -1,7 +1,7 @@
 // Quarry / Improved Quarry (Slayer): select a studied creature, linked buffs, insight bonus on
 // attacks, dismissal via the creature's buff starts the cooldown, +4 with Improved Quarry.
 
-import { createTestActor, useAndCollect, formulas, cleanup, useTestScene, placeToken, setTargets, deleteTokens, waitFor, waitForItem } from "./helpers.mjs";
+import { createTestActor, addItems, useAndCollect, formulas, cleanup, useTestScene, placeToken, setTargets, deleteTokens, waitFor, waitForItem } from "./helpers.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -54,6 +54,17 @@ export function registerQuarryTests(quench) {
           const [card] = await useAndCollect(slayer.items.getName("Longsword"));
           assert.match(formulas(card)[0].attack, /2\[Quarry \(insight\)\]/);
           assert.isTrue(card.getFlag(MODULE_ID, "vsQuarry"));
+        });
+
+        it("doesn't stack with True Strike (both insight): only on the attacks without it", async () => {
+          setTargets([goblinToken]);
+          const [strike] = await addItems(slayer, [["pf1e-revamp.buffs", "True Strike", { system: { active: true } }]]);
+          const [card] = await useAndCollect(slayer.items.getName("Longsword"));
+          const f = formulas(card);
+          assert.match(f[0].attack, /20\[True Strike\]/);
+          assert.notMatch(f[0].attack, /Quarry/, "the +20 insight wins");
+          assert.match(f[1].attack, /2\[Quarry \(insight\)\]/, "True Strike is used up after the first attack");
+          await strike.delete();
         });
 
         it("deleting the creature's buff dismisses the quarry and starts a 24-hour cooldown", async () => {

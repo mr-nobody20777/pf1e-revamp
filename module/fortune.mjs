@@ -22,6 +22,7 @@
 import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { esc, isActiveGM, ownerWhisper } from "./util.mjs";
+import { TYPED } from "./roll-effects.mjs";
 
 const KEEP_HIGHEST = "2d20kh";
 const MARK = "pf1eRevampFortune";
@@ -29,11 +30,11 @@ const MARK = "pf1eRevampFortune";
 // One-time bonuses: the first matching active buff applies to the next roll of these kinds
 // ("attack" or a PF1 actor roll: "Save", "Skill", ...), then switches off.
 const NEXT_ROLL = [
-  { label: "True Strike", bonus: 20, kinds: ["attack"], match: (b) => b.flags[MODULE_ID]?.trueStrike },
-  { label: "Guidance", bonus: 1, kinds: ["attack", "Save", "Skill"], match: (b) => b.name.toLowerCase() === "guidance" },
+  { label: "True Strike", bonus: 20, type: "insight", kinds: ["attack"], match: (b) => b.flags[MODULE_ID]?.trueStrike },
+  { label: "Guidance", bonus: 1, type: "competence", kinds: ["attack", "Save", "Skill"], match: (b) => b.name.toLowerCase() === "guidance" },
   // Luck variant channeling: "a channel bonus or a luck bonus (creature's choice) on one roll (attack roll, CMB check,
   // saving throw, or skill check) made before the end of your next turn"
-  { label: "Luck channel", bonus: (b) => b.flags[MODULE_ID].channelLuck.bonus, kinds: ["attack", "Save", "Skill"], match: (b) => !!b.flags[MODULE_ID]?.channelLuck },
+  { label: "Luck channel", bonus: (b) => b.flags[MODULE_ID].channelLuck.bonus, type: (b) => b.flags[MODULE_ID].channelLuck.type ?? "luck", kinds: ["attack", "Save", "Skill"], match: (b) => !!b.flags[MODULE_ID]?.channelLuck },
 ];
 // These bonuses are "on a single roll" of the creature's choosing: every roll window gets a ticked box per
 // bonus, and unticking it saves the bonus for a later roll. Rolls made without a window use it.
@@ -48,6 +49,7 @@ function nextRollToggle(def, buff, onChange) {
   return label;
 }
 const bonusOf = (def, buff) => (typeof def.bonus === "function" ? def.bonus(buff) : def.bonus);
+const typeOf = (def, buff) => (typeof def.type === "function" ? def.type(buff) : def.type);
 
 const activeBuffs = (actor) => (actor?.itemTypes?.buff ?? []).filter((b) => b.isActive);
 const hasFortune = (actor) => activeBuffs(actor).some((b) => b.flags[MODULE_ID]?.fortune === "best");
@@ -90,6 +92,8 @@ Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
   for (const { def, buff } of nextRollBonuses(actor, "attack")) {
     if (used.includes(buff.id) || rollData[SKIPPED]?.includes(buff.id)) continue;
     parts.push(`${bonusOf(def, buff)}[${def.label}]`);
+    // Same-type situational bonuses (Quarry's insight) don't stack with it
+    (rollData[TYPED] ??= []).push({ type: typeOf(def, buff), value: bonusOf(def, buff) });
     used.push(buff.id);
   }
 });

@@ -11,7 +11,7 @@
 
 **Before:** PF1 adds up every buff and condition into one number. You couldn't see which ones counted, which lost to a higher bonus of the same type, or leave one out for a single roll without switching the buff off.
 
-**Now:** attack, save and skill windows have a **Buffs** line.
+**Now:** attack, save, skill and ability-check windows have a **Buffs** line.
 
 - **A few effects** (4 or fewer by default) show right in the window as small chips. Untick one to leave it out of this roll.
 - **More than that**, the line shows the totals instead, e.g. *Attack +7 · Damage +8 from 8 effects · 4 not applied*, and a **Manage…** button opens a small window listing every effect:
@@ -24,7 +24,9 @@
 - Stacking is PF1's own: bonuses of the same type don't stack (the highest counts); dodge, untyped, circumstance and racial bonuses stack; penalties always stack.
 - A bonus that loses to a higher one can be ticked only after everything beating it is turned off, and it never moves up on its own.
 - **Conditions** (shaken, sickened...) are marked 🔒: only the GM can turn them off for a roll. Everything else, anyone can change.
-- Situational bonuses that don't apply right now (no studied creature targeted) can be ticked by anyone, for theater-of-mind play.
+- Situational bonuses that don't apply right now can be ticked by anyone, for theater-of-mind play: Studied Target or Quarry when that creature isn't targeted, an alignment ward when the save's source isn't known or isn't of that alignment, a bonus "vs fear" on a save that isn't against fear.
+- The module's own bonuses follow the same stacking: Quarry's insight bonus doesn't add to True Strike's (only the +20 counts on that attack).
+- The Weapon Finesse shield penalty (armor check penalty on a finessed shield bash) is imposed by the rules: 🔒, GM only.
 - Rolls made without a window (shift-click) use PF1's totals plus the situational bonuses that apply.
 
 How many effects show as chips is a per-player setting: see [Settings](Settings).

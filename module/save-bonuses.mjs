@@ -19,6 +19,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { evaluate } from "./util.mjs";
+import { registerRollEffect } from "./roll-effects.mjs";
 
 // Words in a note → test against the effect
 const KEYWORDS = [
@@ -100,7 +101,7 @@ export function parseNote(line) {
     if (part.kinds.length || part.forms.length) parts.push(part);
     previous = part;
   }
-  return parts.length ? { formula, type, parts } : null;
+  return parts.length ? { formula, type, parts, against: m[4].trim().replace(/[\s,;:]+$/, "") } : null;
 }
 
 /** A note's text as separate lines (notes often hold several, e.g. "+2 vs enchantment\nImmune to magic sleep"). */
@@ -114,7 +115,7 @@ function matches(parts, effect) {
   });
 }
 
-/** Bonuses this actor gets on this save against this effect, after stacking. */
+/** Bonuses this actor gets on this save against this effect (any effect, without one), after stacking. */
 export function saveBonuses(actor, saveId, effect) {
   const candidates = [];
   // The race item and its racial trait items often state the same bonus in different words
@@ -127,16 +128,17 @@ export function saveBonuses(actor, saveId, effect) {
       if (note.target !== "allSavingThrows" && note.target !== saveId) continue;
       for (const line of noteLines(note.text ?? "")) {
         const parsed = parseNote(line);
-        if (!parsed || !matches(parsed.parts, effect)) continue;
+        if (!parsed || (effect && !matches(parsed.parts, effect))) continue;
         const value = evaluate(parsed.formula, item);
         if (!value) continue;
         const key = `${value}|${parsed.type}`;
         if (racialSource && racialSeen.has(key)) continue;
         if (racialSource) racialSeen.add(key);
-        candidates.push({ value, type: parsed.type, label: item.name });
+        candidates.push({ value, type: parsed.type, label: item.name, against: parsed.against });
       }
     }
   }
+  if (!effect) return candidates; // against different effects: they never meet in one roll
   const stacking = new Set(pf1.config.stackingBonusTypes ?? ["untyped", "dodge", "racial", "circumstance"]);
   const out = candidates.filter((c) => stacking.has(c.type) || c.value < 0);
   const byType = new Map();
@@ -148,14 +150,24 @@ export function saveBonuses(actor, saveId, effect) {
   return out;
 }
 
-Hooks.on("pf1PreActorRollSave", (actor, rollOptions, saveId) => {
-  const card = rollOptions.reference ? fromUuidSync(rollOptions.reference) : null;
-  const effect = effectOf(card);
-  if (!effect) return;
-  for (const b of saveBonuses(actor, saveId, effect)) {
-    rollOptions.parts ??= [];
-    rollOptions.parts.push(`${b.value}[${b.label}]`);
-  }
+// Shown in the roll window (roll-effects.mjs). Bonuses against other kinds of effects are listed as
+// not applying, so the player sees them (and can tick one when the GM says it applies).
+registerRollEffect({
+  collect(actor, roll) {
+    if (roll.kind !== "save") return [];
+    const effect = effectOf(roll.reference ? fromUuidSync(roll.reference) : null);
+    const id = (b) => `save-vs.${b.label}.${b.against}`;
+    const applied = effect ? saveBonuses(actor, roll.saveId, effect) : [];
+    const out = applied.map((b) => ({ id: id(b), label: b.label, part: b.label, type: b.type, roll: b.value, applies: true, tooltip: `vs ${b.against}` }));
+    const seen = new Set(out.map((b) => b.id));
+    for (const b of saveBonuses(actor, roll.saveId, null)) {
+      if (seen.has(id(b))) continue;
+      seen.add(id(b));
+      const reason = effect ? `only vs ${b.against}` : `only vs ${b.against}; roll from the effect's card`;
+      out.push({ id: id(b), label: b.label, part: b.label, type: b.type, roll: b.value, applies: false, reason });
+    }
+    return out;
+  },
 });
 
 /* -------------------------------------------- */

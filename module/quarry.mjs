@@ -138,7 +138,13 @@ registerRollEffect({
     if (!findQuarry(actor)?.getFlag(MODULE_ID, FLAG)) return [];
     const applies = !!quarryAgainstTargets(actor);
     const reason = game.user.targets.size ? "your target isn't your quarry" : "no target selected";
-    return [{ id: "quarry", label: "Quarry", part: "Quarry (insight)", type: "insight", atk: hasImproved(actor) ? 4 : 2, applies, reason }];
+    // Insight bonuses don't stack: only the part above an insight bonus the slayer already has counts
+    const existing = Math.max(0, ...actor.changes.filter((c) => c.type === "insight" && ["attack", "wattack", "mattack", "rattack"].includes(c.target)).map((c) => c.value ?? 0));
+    const atk = Math.max(0, (hasImproved(actor) ? 4 : 2) - existing);
+    if (!atk) return [{ id: "quarry", label: "Quarry", type: "insight", atk: hasImproved(actor) ? 4 : 2, applies: false, reason: "a higher insight bonus already applies" }];
+    const trueStrike = actor.itemTypes.buff.some((b) => b.isActive && b.flags[MODULE_ID]?.trueStrike);
+    const tooltip = trueStrike ? "Doesn't stack with True Strike's +20 insight: it counts only on attacks without True Strike" : "";
+    return [{ id: "quarry", label: "Quarry", part: "Quarry (insight)", type: "insight", atk, applies, reason, tooltip }];
   },
 });
 

@@ -12,12 +12,12 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote } from "./footnote.mjs";
+import { registerRollEffect } from "./roll-effects.mjs";
 
 const SETTING = "shieldBashMartial";
 const BASH_SHIELDS = ["lightShield", "heavyShield"];
 const SHIELD_TRAINED_SOURCE = "Compendium.pf-content.pf-traits.Item.KQOcLTeWu57NjXZW";
 const WEAPON_FINESSE_SOURCE = "Compendium.pf1.feats.Item.vWiTqHC4Y3Xn1Pme";
-const FINESSE = "pf1eRevampShieldFinesse"; // roll data marker
 
 Hooks.once("init", () => {
   game.settings.register(MODULE_ID, SETTING, {
@@ -114,12 +114,22 @@ Hooks.on("pf1CreateActionUse", (actionUse) => {
   const ability = actionUse.shared.rollData.action?.ability;
   if (!ability || ability.attack === "dex") return;
   ability.attack = "dex";
-  actionUse.shared.rollData[FINESSE] = { acp: shieldAcp(item) };
 });
 
-Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
-  const acp = rollData[FINESSE]?.acp;
-  if (acp > 0) parts.push(`-${acp}[Weapon Finesse: shield ACP]`);
+// The penalty, shown in the roll window (roll-effects.mjs) as imposed: only the GM can leave it out
+registerRollEffect({
+  collect(actor, roll) {
+    if (roll.kind !== "attack") return [];
+    const { action } = roll;
+    const item = action.item;
+    // Only when the bash is switched to Dex above (an attack already set to Dex is left as it is)
+    if (!isBashShield(item) || action.actionType !== "mwak" || action.ability?.attack === "dex") return [];
+    if (!hasWeaponFinesse(actor) || !bashCountsAsLight(item, actor)) return [];
+    const abilities = actor.system.abilities ?? {};
+    const acp = shieldAcp(item);
+    if ((abilities.dex?.mod ?? 0) <= (abilities.str?.mod ?? 0) || !(acp > 0)) return [];
+    return [{ id: "finesse-shield-acp", label: "Weapon Finesse: shield ACP", type: "untyped", atk: -acp, applies: true, imposed: true, tooltip: "Weapon Finesse: the shield's armor check penalty applies to attack rolls" }];
+  },
 });
 
 /* -------------------------------------------- */

@@ -21,6 +21,8 @@ import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
 import { esc } from "./util.mjs";
 
 const KEY = "pf1eRevampRollEffects";
+/** rollData key where features that add their own typed bonus to an attack record it: [{ type, value }] */
+export const TYPED = "pf1eRevampTypedBonuses";
 const SETTING = "rollEffectsInline";
 const PART_LABEL = { atk: "Attack", dmg: "Damage", roll: "" };
 
@@ -43,10 +45,13 @@ const providers = [];
 
 /**
  * Register a situational bonus. `collect(actor, roll)` returns entries for this roll:
- *   { id, label, part, type, atk, dmg, roll, applies, reason }
- * roll is { kind: "attack", action } | { kind: "save", saveId } | { kind: "skill", skillId }.
- * `part` labels the bonus in the roll formula; atk/dmg (attacks) or roll (saves, skills) are its values.
- * Entries that don't apply right now are listed as Not Applied with `reason`.
+ *   { id, label, part, type, atk, dmg, roll, applies, reason, imposed, tooltip }
+ * roll is { kind: "attack", action } | { kind: "save", saveId, reference } | { kind: "skill", skillId }
+ * | { kind: "ability", abilityId }; `reference` is the UUID of the card the save was rolled from.
+ * `part` labels the bonus in the roll formula; atk/dmg (attacks) or roll (other rolls) are its values.
+ * Entries that don't apply right now are listed as Not Applied with `reason`. Imposed entries (penalties
+ * from gear or rules) can only be turned off by the GM. Values should already allow for the roller's
+ * own bonuses of the same type; between providers, only the highest of a type counts.
  */
 export function registerRollEffect(provider) {
   providers.push(provider);
@@ -82,6 +87,7 @@ function damageTargets(action) {
 }
 
 function rollTargets(actor, roll) {
+  if (roll.kind === "ability") return { roll: { targets: ["allChecks", `${roll.abilityId}Checks`], ability: roll.abilityId } };
   if (roll.kind === "save") {
     const ability = actor.system.attributes.savingThrows?.[roll.saveId]?.ability ?? { fort: "con", ref: "dex", will: "wis" }[roll.saveId];
     return { roll: { targets: ["allSavingThrows", roll.saveId], ability } };
@@ -149,8 +155,23 @@ function buildModel(actor, roll) {
     }
   }
 
-  model.provided = providers.flatMap((p) => p.collect(actor, roll) ?? []).filter(Boolean);
+  model.provided = collectProvided(actor, roll);
   return model;
+}
+
+const STACKING = () => new Set(pf1.config.stackingBonusTypes ?? ["untyped", "dodge", "racial", "circumstance"]);
+
+/** Situational bonuses for this roll; of several with the same type, only the highest counts. */
+function collectProvided(actor, roll) {
+  const list = providers.flatMap((p) => p.collect(actor, roll) ?? []).filter(Boolean);
+  const stacking = STACKING();
+  const worth = (p) => Math.max(p.atk ?? 0, p.dmg ?? 0, p.roll ?? 0);
+  for (const p of list) {
+    if (!p.applies || stacking.has(p.type ?? "untyped") || worth(p) <= 0) continue;
+    const better = list.find((o) => o !== p && o.applies && o.type === p.type && (worth(o) > worth(p) || (worth(o) === worth(p) && list.indexOf(o) < list.indexOf(p))));
+    if (better) Object.assign(p, { applies: false, reason: `${better.label} is higher`, beatenBy: better.id });
+  }
+  return list;
 }
 
 /* -------------------------------------------- */
@@ -244,13 +265,22 @@ function partsFor(plan, part, rollData) {
     } else correction += shift;
   }
   if (correction) out.push(`${correction}[${plan.label[part] ?? "Buffs"}]`);
-  for (const p of plan.provided) if (p[part]) out.push(`${p[part]}[${p.part ?? p.label}]`);
+  const stacking = STACKING();
+  for (const p of plan.provided) {
+    let value = p[part] ?? 0;
+    // Another feature's bonus of the same type on this roll (True Strike's +20 insight) wins if higher
+    if (value > 0 && !stacking.has(p.type ?? "untyped")) {
+      const other = Math.max(0, ...(rollData[TYPED] ?? []).filter((t) => t.type === p.type).map((t) => t.value));
+      value = Math.max(0, value - other);
+    }
+    if (value) out.push(`${value}[${p.part ?? p.label}]`);
+  }
   return out;
 }
 
 /** The plan for a roll made without a window: PF1's totals plus the situational bonuses that apply. */
 const defaultPlan = (actor, roll) => {
-  const provided = providers.flatMap((p) => p.collect(actor, roll) ?? []).filter((p) => p?.applies);
+  const provided = collectProvided(actor, roll).filter((p) => p.applies);
   return { delta: {}, abilities: {}, label: {}, provided };
 };
 
@@ -322,17 +352,21 @@ function rows(model, state) {
   for (const p of model.provided) {
     const values = Object.fromEntries(model.parts.map((part) => [part, p[part] ?? 0]));
     const parts = model.parts.filter((part) => p[part]);
+    const negative = parts.some((part) => p[part] < 0);
     out.push({
-      section: p.applies ? sectionOf(parts) : "na",
+      section: p.applies || state.provided.get(p.id) ? sectionOf(parts) : "na",
       key: p.id,
       kind: "provided",
       label: p.label,
       value: valueText(values, model.parts),
       raw: Math.max(...parts.map((part) => Math.abs(p[part]))),
-      negative: false,
+      negative,
+      imposed: !!p.imposed,
       type: p.type && p.type !== "untyped" ? p.type : "",
       checked: !!state.provided.get(p.id),
-      note: p.applies ? "" : p.reason ?? "",
+      disabled: (p.imposed && !gm) || (!!p.beatenBy && !!state.provided.get(p.beatenBy) && !state.provided.get(p.id)),
+      note: p.applies ? "" : state.provided.get(p.id) ? "ticked for this roll" : p.reason ?? "",
+      tooltip: p.imposed && !gm ? "Only the GM can turn this off for this roll" : p.tooltip ?? "",
     });
   }
   // Bonuses biggest first, then ability rows, then chosen penalties, then imposed ones; Not Applied last
@@ -508,16 +542,21 @@ Hooks.on("renderAttackDialog", (app, html) => {
 
 Hooks.on("closeAttackDialog", (app) => attackContexts.get(app)?.close());
 
-Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
-  if (!ATTACK_ACTIONS.includes(action.actionType)) return;
-  rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action });
-  parts.push(...partsFor(rollData[KEY], "atk", rollData));
-});
+// Registered at init, after every module script has loaded, so other features' attack hooks (True
+// Strike's +20 insight) run first and their typed bonuses are known
+Hooks.once("init", () => {
+  Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
+    if (!ATTACK_ACTIONS.includes(action.actionType)) return;
+    rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action });
+    parts.push(...partsFor(rollData[KEY], "atk", rollData));
+    delete rollData[TYPED]; // per attack: a full attack's next attack starts fresh
+  });
 
-Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
-  if (!ATTACK_ACTIONS.includes(action.actionType) || !parts[0]) return;
-  const plan = (rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action }));
-  parts[0].extra.push(...partsFor(plan, "dmg", rollData));
+  Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
+    if (!ATTACK_ACTIONS.includes(action.actionType) || !parts[0]) return;
+    const plan = (rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action }));
+    parts[0].extra.push(...partsFor(plan, "dmg", rollData));
+  });
 });
 
 /* -------------------------------------------- */
@@ -529,7 +568,7 @@ const splitBonus = (text) => (text ?? "").split(/\s*\+\s*/).map((t) => t.trim())
 
 function preActorRoll(kind, idKey) {
   return (actor, rollOptions, id) => {
-    const roll = { kind, [idKey]: id };
+    const roll = { kind, [idKey]: id, reference: rollOptions.reference ?? null };
     const windowed = !(rollOptions.skipDialog ?? pf1.documents.settings.getSkipActionPrompt());
     if (!windowed) {
       const plan = defaultPlan(actor, roll);
@@ -542,7 +581,8 @@ function preActorRoll(kind, idKey) {
 
 Hooks.on("pf1PreActorRollSave", preActorRoll("save", "saveId"));
 Hooks.on("pf1PreActorRollSkill", preActorRoll("skill", "skillId"));
-for (const kind of ["Save", "Skill"]) {
+Hooks.on("pf1PreActorRollAbility", preActorRoll("ability", "abilityId"));
+for (const kind of ["Save", "Skill", "Ability"]) {
   Hooks.on(`pf1ActorRoll${kind}`, (actor) => {
     pending.get(actor.id)?.ctx?.manager?.close();
     pending.delete(actor.id);
