@@ -67,7 +67,7 @@ The roll-window buff manager ("Buffs on a roll") is released in the Unreleased s
 ## Quality and release
 
 ### Testing
-- **Map-based tests.** Several features need tokens placed by a GM and haven't yet been verified with the full party: Raging Song (Inspired Rage, Marching, Strength), Studied Target scaling (+3 at 10th level, additional targets), Bit of Luck, Resistant Touch with the +3 domain bonus, Good Fortune, Aura of Protection, Forewarned on initiative, and Luck variant channeling on the party.
+- **Map-based tests.** Verified with the full party on 2026-10-24: Raging Song (Inspired Rage, Song of Strength, Song of Marching, costs per round, switching and ending), Studied Target at 10th level, Bit of Luck, Resistant Touch, Luck variant channeling on the party, Forewarned and the Prescience offer. Good Fortune and Aura of Protection are handled by PF1 itself.
 - **Manual test coverage.** Still to be checked by hand: other races, trait choices, two-weapon fighting variants, harmful channel energy with saves and Selective Channeling, studied target cleanup, archetype removal, player permissions, and several connected clients.
 - **Two-Weapon Rend.** Add an automated test for its click-to-roll button.
 - **Test tooling.** Nevela's Automation Suite cancels targeted buff spells (such as *Haste*) cast without a target, so tests that cast spells must set a target or use a non-buff spell.

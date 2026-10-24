@@ -141,7 +141,11 @@ export async function startSong(actor, songItem, { prepaid = false, targets = nu
   const pool = findPool(actor);
   if (!pool) return ui.notifications.warn(`${actor.name} has no Raging Song feature to spend rounds from.`);
   const refund = () => prepaid && pool.update({ "system.uses.value": roundsLeft(pool) + 1 });
-  if (!prepaid && roundsLeft(pool) < 1) return ui.notifications.warn(`${actor.name} has no rounds of raging song left.`);
+  if (!prepaid && roundsLeft(pool) < 1) {
+    // A feature added from the compendium (or by leveling) starts with its daily uses empty until the first rest
+    const never = pool.system.uses?.value == null && pool.system.uses?.max > 0;
+    return ui.notifications.warn(never ? `${actor.name}'s rounds of raging song haven't been filled yet: rest (PF1's Rest button on the sheet) to get today's ${pool.system.uses.max} rounds.` : `${actor.name} has no rounds of raging song left.`);
+  }
 
   const skaldToken = actor.getActiveTokens()[0];
   if (!skaldToken) {
