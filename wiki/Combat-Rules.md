@@ -102,7 +102,24 @@ The attack card shows the chosen talent's effect under each attack, with its sav
 
 Bleeding Attack's bleed is tracked with its amount (PF1's Bleed condition has none). The bleeding creature takes the damage at the start of each of its turns, ignoring damage reduction. Any healing stops it, as does a DC 15 Heal check (a button on the bleed message) or removing the Bleed condition. Bleed doesn't stack: a higher bleed replaces a lower one, a lower one is ignored.
 
-Sneak attack feats, items and fortification are not automated yet.
+### Feats, items, traits and spells
+
+- **More dice:** Accomplished Sneak Attacker (+1d6, no more dice than half the character level), Armor of the Shadow Lord (+1d6), the Mantis Blade (+1d6), Sense Vitals (+1d6 per 3 caster levels beyond 3rd, up to 5d6, with manufactured weapons; it also gives sneak attack to characters without it), Merciless Precision (+1d6 against a blinded, dying, entangled, exhausted, frightened, helpless, nauseated, panicked, paralyzed or stunned target).
+- **Bonuses on sneak attacks:** The Vessel Between (+1 on the attack), Blade of the Society (+1 damage), Headband of Ninjitsu (+2 insight on the attack), Sniper Goggles (+2 per die on ranged sneak attacks within 30 ft, at any range with the greater goggles), Sap Adept (+1 per die with nonlethal bludgeoning attacks), Sap Master (double dice against a flat-footed target).
+- **Concealment and range:** Shadow Strike, Mirrored armor, the Shadow Cleaver and Acute Shot (no more dice than the weapon's enhancement bonus) allow sneak attacks against concealed targets; the Headband of Ninjitsu even against total concealment. A Sniping weapon raises the ranged limit to 45 ft (not added to Deadly Range); Sniper Goggles remove it.
+- **Critical hits:** Sneaking Critical adds as many dice as the weapon's critical multiplier to a critical sneak attack; Savage Critical adds the sneak attack dice to a critical hit that isn't a sneak attack.
+- **Other:** Murderer's Blackcloth adds 1 to Bleeding Attack's bleed; an obliviating weapon offers its DC 16 memory loss on the card; Night Stalker's Tonic is listed to tick when its drinker accepts the alchemical burn; with Surprise Attack or Onslaught, the Not Applied reason reminds you to tick sneak attack in a surprise round.
+- **On the target:** the Amulet of Uncanny Defense makes Uncanny Dodge work as Improved Uncanny Dodge, or counts 4 more levels for Improved Uncanny Dodge.
+
+Not automated: Ghostslayer, the Assassin's Sight, Briar Bandit, Inspired Sneak Attack, Opportunity Attacker, Strangler, Savage Critical with Vital Strike, Sweeping Dodge, Ironskin, Nine Lives and Survivor.
+
+## Fortification
+
+Fortification gives a chance to negate a critical hit or sneak attack, "and damage is instead rolled normally". When an attack is a critical threat or a sneak attack against a single target that has fortification, the chance is rolled once for that attack, before its damage. On a negation the critical damage is 0 and the sneak attack dice are dropped, so PF1's own damage buttons apply the right amount. The roll is shown under the attack on the card for everyone, like a miss chance.
+
+- **Sources:** fortification armor or shields (light 25%, moderate 50%, heavy 75%, recognized by name), the monster quality "Fortification (X%)", Shield of Fortification (25%; greater 50%), Twisted Innards (25%, 50% from caster level 7, 75% from 13), Armor Master's fortification (light, moderate from 13th level), Phantom Fortification (50%), Dormant Defense (25% while dazed, stunned or helpless).
+- **Stacking:** the highest chance counts. Secured Armor adds 25% to light or moderate fortification, or gives 25% on its own. Anatomical Savant on the attacker reduces the chance by 25%.
+- **Once-off negations:** a target wearing a Bracelet of Second Chances (7 beads) or a Jingasa of the Fortunate Soldier (once), or with the Fortified trait, gets a button on the card for its owner or the GM. Using it spends the bead or use and shows the attack's normal damage (without precision damage or critical damage), with a button for the GM to apply it.
 
 ## Energy resistance
 

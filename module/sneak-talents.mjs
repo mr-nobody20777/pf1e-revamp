@@ -103,7 +103,13 @@ const RIDERS = [
   { id: "demandAttention", re: /^demand attention/i, perDie: true, save: "will", ability: "cha", dcBonus: (given) => given, text: (n, dc) => `distracted until your next turn (Will DC ${dc} negates)` },
   // Dice
   { id: "marksman", card: false, re: /^marksman'?s shot/i, ranged: true, text: () => "studied target, single ranged attack: sneak attack dice doubled", fields: (terms) => ({ dice: { dmg: termsText(terms.map((t) => ({ ...t, n: t.n * 2 }))) } }) },
-  // Not a rider: its own roll-window entry, alongside one
+  // Not riders: shown alongside one (Assassinate is its own roll-window entry; an obliviating weapon's
+  // effect comes with every sneak attack it deals)
+  { id: "obliviating", hidden: true, save: "fort", text: (n, dc) => `loses all memory of the previous 1d6 minutes and is flat-footed until its next turn (Fortitude DC ${dc} negates)`, apply: async ({ target, saved }) => {
+      if (saved) return "no effect";
+      await target.setCondition("flatFooted", { duration: { rounds: 1 } });
+      return `flat-footed, and loses ${await roll("1d6")} minutes of memory`;
+    } },
   { id: "assassinate", re: /^assassinate/i, save: "fort", hidden: true, text: (n, dc) => `dies on a failed Fortitude save (DC ${dc}); otherwise immune to your assassinate for 24 hours`, apply: async ({ target, saved }) => {
       if (saved) return "survives, and is immune to your assassinate for 24 hours";
       await target.setCondition("dead", true);
@@ -129,7 +135,7 @@ function talentFor(actor, rider) {
 
 /** Class level and save DC for a talent. */
 function dcFor(actor, rider, item, srcs, given = 0) {
-  const level = classLevel(item) || Math.max(0, ...srcs.map((s) => classLevel(s.item)));
+  const level = classLevel(item) || Math.max(0, ...srcs.filter((s) => s.item).map((s) => classLevel(s.item)));
   const mod = actor.system.abilities[rider.ability ?? "int"]?.mod ?? 0;
   return { level, dc: 10 + Math.floor(level / 2) + mod + (rider.dcBonus?.(given) ?? 0) };
 }
@@ -185,7 +191,9 @@ export function riderChoice(actor, terms, action, srcs) {
       const fields = rider.fields?.(kept, keptN, actor) ?? {};
       // For the card: the dice the effect counts (those rolled, or those given up), and the DC
       const { level, dc } = dcFor(actor, rider, def.item, srcs, given);
-      const counted = rider.perDie ? given : rider.instead || rider.forgo ? n : keptN;
+      // Murderer's Blackcloth: +1 bleed on sneak attacks
+      const blackcloth = rider.id === "bleeding" && actor.items.some((i) => i.type === "equipment" && i.system.equipped && /murderer'?s blackcloth/i.test(i.name)) ? 1 : 0;
+      const counted = (rider.perDie ? given : rider.instead || rider.forgo ? n : keptN) + blackcloth;
       const rider_ = { id: rider.id, name: def.item.name, item: def.item.uuid, n: counted, given, dc, level, daily: !!rider.daily, text: rider.text(counted, dc, level, given) };
       if (keptN === 0) return { dice: null, valueText: `${def.item.name} instead of the dice`, ...fields, rider: rider_ };
       return { dice: { dmg: termsText(kept) }, ...fields, ...(given ? { valueText: `+${termsText(kept)} (${def.item.name})` } : {}), rider: rider_ };
@@ -206,6 +214,11 @@ Hooks.on("pf1PreDisplayActionUse", (use) => {
   const riders = [];
   if (entry.rider && riderOf(entry.rider.id)?.card !== false) riders.push(entry.rider);
   const assassinate = provided.find((p) => p.id === "assassinate") && fromUuidSync(provided.find((p) => p.id === "assassinate").assassinate);
+  // An obliviating weapon (bludgeoning melee): on every sneak attack or critical hit, DC 16
+  if (entry.dice && /obliviating/i.test(use.item?.name ?? "")) {
+    const rider = riderOf("obliviating");
+    riders.push({ id: rider.id, name: "Obliviating", item: use.item.uuid, n: 0, given: 0, dc: 16, level: 0, text: rider.text(0, 16) });
+  }
   if (assassinate && entry.dice) {
     const rider = riderOf("assassinate");
     const { level, dc } = dcFor(actor, rider, assassinate, []);

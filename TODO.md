@@ -25,7 +25,6 @@ Next, the focus moves to:
 - **A unified rules layer.** Several features keep their own rule tables (archetype rules, next-roll effects, buff grants, trait rules, save-bonus keywords). Merging them into one data format ("this item grants X when Y") would let new features be added as data rather than code, and would give the roll window a single source for every situational bonus.
 
 ### Combat
-- **Sneak attack, phase 3: feats, items, traits and fortification.** Extra dice and range from feats, items and traits (Accomplished Sneak Attacker, Sniper Goggles, Blade of the Society), and roll fortification chances to negate the precision damage.
 - **Skald Damage Reduction (9th level).** PF1's item has no mechanics. "Subtract 1 from the damage ... from a weapon or a natural attack. At 14th and 19th levels ... increases by 1 ... the skald grants this DR to all allies affected by his inspired rage." Grant scaling DR/— to the skald and share it through Inspired Rage.
 - **Extra Channel.** "You can channel energy two additional times per day." PF1's feat has no mechanics; add two uses of Channel Energy per instance of the feat.
 - **Foretell (Foresight subschool, 8th level).** An aura that either aids allies (+2 luck bonus on ability checks, attack rolls, caster level checks, saving throws and skill checks within 30 ft) or hinders enemies (−2), at the wizard's choice, for rounds per day equal to wizard level. This can reuse the Raging Song engine (target checklist, one round spent per round).

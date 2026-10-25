@@ -66,6 +66,12 @@ export function registerRollEffect(provider) {
   providers.push(provider);
 }
 
+const damageFilters = [];
+/** fn(rollData, parts, action) runs after the dice above are added to an attack's damage (fortification removes them). */
+export function registerDamageFilter(fn) {
+  damageFilters.push(fn);
+}
+
 /* -------------------------------------------- */
 /*  Model: what affects this roll               */
 /* -------------------------------------------- */
@@ -209,7 +215,12 @@ const newState = (model, chosen = new Map()) => ({
 function effective(p, state) {
   if (!p.choice) return p;
   const chosen = state.choices?.get(p.id) ?? p.choice.default;
-  return { ...p, ...p.choice.apply(chosen), chosen };
+  const fields = p.choice.apply(chosen);
+  const out = { ...p, ...fields, chosen };
+  // Numbers add to the entry's own (Powerful Sneak's −2 with a +1 trait bonus on sneak attacks)
+  for (const part of ["atk", "dmg", "roll"]) if (p[part] && fields[part]) out[part] = p[part] + fields[part];
+  if (p.partLabel && fields.partLabel) out.partLabel = Object.fromEntries(Object.keys({ ...p.partLabel, ...fields.partLabel }).map((k) => [k, p[k] && fields[k] ? `${p.partLabel[k]}, ${fields.partLabel[k]}` : (fields[k] ? fields.partLabel[k] : p.partLabel[k])]));
+  return out;
 }
 
 const isIncluded = (model, state, key, change) => !state.off.has(key) && (!model.losers.has(change) || state.on.has(key));
@@ -658,6 +669,9 @@ Hooks.once("init", () => {
       }
       for (const x of p.extraDamage ?? []) parts.push({ base: `${x.formula}[${x.label}]`, extra: [], damageType: x.types, type: "normal" });
     }
+  });
+  Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
+    if (ATTACK_ACTIONS.includes(action.actionType)) for (const fn of damageFilters) fn(rollData, parts, action);
   });
 });
 
