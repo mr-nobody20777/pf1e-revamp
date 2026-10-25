@@ -13,6 +13,18 @@
 //     stunning; mindless creatures (no Intelligence score) to mind-affecting effects.
 //   - Touch and ray spells need their attack to hit (touch AC); a natural 20 always hits, a natural 1
 //     misses.
+//   - Chill Touch: "Each touch channels negative energy that deals 1d6 points of damage. The touched
+//     creature also takes 1 point of Strength damage unless it makes a successful Fortitude saving
+//     throw ... An undead creature you touch takes no damage of either sort, but it must make a
+//     successful Will saving throw or flee as if panicked for 1d4 rounds + 1 round per caster level."
+//     PF1's data has no attack or damage: the melee touch attack is rolled here (base attack bonus,
+//     Strength, or Dexterity with Weapon Finesse, size and attack bonuses) and the damage applied on a hit.
+//   - Hideous Laughter: "On the creature's next turn, it may attempt a new saving throw to end the
+//     effect ... If not, the creature continues laughing for the entire duration"; "A creature whose type
+//     is different from the caster's receives a +4 bonus on its saving throw". Hypnotism: "If you use
+//     this spell in combat, each target gains a +2 bonus on its saving throw. If the spell affects only a
+//     single creature not in combat at the time, the saving throw has a penalty of -2." These modifiers
+//     are ticked entries in the save window.
 //   - Fixes to PF1's spell data: Magic Missile "strikes unerringly" with "an additional missile [for
 //     every two caster levels beyond 1st] ... the maximum of five missiles at 9th level" (PF1 rolls one,
 //     and an attack); cure spells deal their healing as damage to undead "instead of curing their
@@ -36,6 +48,7 @@ import { compendiumBuff, nevelaApplies } from "./buff-grants.mjs";
 import { esc, evaluate, isActiveGM, onGmRequest, createQueue } from "./util.mjs";
 import { isUndead } from "./channel-energy.mjs";
 import { registerFootnote } from "./footnote.mjs";
+import { registerRollEffect } from "./roll-effects.mjs";
 
 const FLAG = "spell";
 const SAVE_NAMES = { fort: "Fortitude", ref: "Reflex", will: "Will" };
@@ -48,6 +61,11 @@ export function spellDef(item) {
   if (item?.type !== "spell") return null;
   return SPELLS[item.name.toLowerCase().replace(/\s*\((?:mythic|communal)\)$/, "")] ?? null;
 }
+
+/** The entry as it applies to this row's creature (Chill Touch on undead has its own effect). */
+const rowDef = (def, row) => (def && row.variant ? { ...def, ...def[row.variant] } : def);
+/** The save this row's creature makes. */
+const saveOf = (data, row) => (data.save ? { ...data.save, type: row.saveType ?? data.save.type } : null);
 
 const actorOf = (uuid) => {
   const doc = fromUuidSync(uuid);
@@ -149,7 +167,12 @@ async function resolveCard(message) {
   const item = caster?.items.get(message.system.item?.id) ?? message.itemSource;
   const def = spellDef(item);
   const spell = { name: data.name, descriptors: [...(item?.system.descriptors?.total ?? item?.system.descriptors?.base ?? [])], save: data.save?.type, harmless: data.harmless };
-  const attack = message.systemRolls?.attacks?.[0]?.attack ?? null;
+  let attack = message.systemRolls?.attacks?.[0]?.attack ?? null;
+  // PF1's data for some touch spells has no attack roll (Chill Touch): roll it here
+  if (def?.touchAttack && !attack && caster) {
+    attack = await new Roll(`1d20 + ${touchBonus(caster)}`).evaluate();
+    data.touch = { total: attack.total, natural: attack.dice[0]?.total };
+  }
   const natural = attack?.dice?.[0]?.total;
 
   for (const row of data.rows) {
@@ -160,7 +183,11 @@ async function resolveCard(message) {
       continue;
     }
     const willing = data.harmless && (isAlly(data, token) || actor === caster);
-    const why = unaffectedBy(def, actor, spell);
+    if (def?.undead && creatureTypes(actor).types.has("undead")) {
+      row.variant = "undead";
+      if (def.undead.save) row.saveType = def.undead.save;
+    }
+    const why = unaffectedBy(rowDef(def, row), actor, { ...spell, save: row.saveType ?? spell.save });
     if (why) {
       Object.assign(row, { state: "unaffected", why });
       continue;
@@ -176,13 +203,20 @@ async function resolveCard(message) {
       }
     }
     // Touch and ray attacks (an ally accepting a harmless touch needs no roll)
-    if (data.attack && attack && !willing) {
+    if ((data.attack || def?.touchAttack) && attack && !willing) {
       const ac = actor.system.attributes?.ac?.touch?.total ?? 10;
       row.attack = { total: attack.total, ac, hit: natural === 20 || (natural !== 1 && attack.total >= ac) };
       if (!row.attack.hit) {
         row.state = "missed";
         continue;
       }
+    }
+    // Damage PF1's card doesn't have (Chill Touch), on a hit
+    const onHit = rowDef(def, row)?.onHit;
+    if (onHit?.damage) {
+      const roll = await new Roll(onHit.damage.formula, { cl: data.cl }).evaluate();
+      await actor.applyDamage(roll.total, { forceDialog: false });
+      row.hitDamage = `${roll.total} ${onHit.damage.type} damage`;
     }
     row.state = data.save && !willing ? "save" : "apply";
   }
@@ -204,7 +238,7 @@ async function resolveCard(message) {
     }
   }
 
-  for (const row of data.rows) if (row.state === "apply") await applyRow(row, def, data, caster, { saved: false });
+  for (const row of data.rows) if (row.state === "apply") await applyRow(row, rowDef(def, row), data, caster, { saved: false });
   data.resolved = true;
   await message.setFlag(MODULE_ID, FLAG, data);
 }
@@ -219,17 +253,21 @@ Hooks.on("createChatMessage", (save) => {
   queue(async () => {
     const card = fromUuidSync(save.system.reference);
     const data = foundry.utils.deepClone(card?.getFlag?.(MODULE_ID, FLAG));
-    if (!data?.resolved || save.system.subject.save !== data.save?.type) return;
+    if (!data?.resolved || !data.save) return;
     const { token: tokenId, actor: actorId } = save.speaker;
-    const row = data.rows.find((r) => r.state === "save" && ((tokenId && r.uuid.endsWith(`Token.${tokenId}`)) || actorOf(r.uuid)?.id === actorId));
+    const mine = (r) => (tokenId && r.uuid.endsWith(`Token.${tokenId}`)) || actorOf(r.uuid)?.id === actorId;
+    const row = data.rows.find((r) => r.state === "save" && mine(r) && saveOf(data, r).type === save.system.subject.save);
     if (!row) return;
     const roll = save.rolls?.[0];
     const natural = roll?.dice?.[0]?.total;
     const passed = natural === 20 || (natural !== 1 && roll?.total >= data.save.dc);
     row.save = { total: roll?.total, passed };
-    const caster = ChatMessage.implementation.getSpeakerActor(card.speaker);
-    const item = caster?.items.get(card.system.item?.id) ?? card.itemSource;
-    await applyRow(row, spellDef(item), data, caster, { saved: passed });
+    if (data.ends) await endEffect(row, data, passed);
+    else {
+      const caster = ChatMessage.implementation.getSpeakerActor(card.speaker);
+      const item = caster?.items.get(card.system.item?.id) ?? card.itemSource;
+      await applyRow(row, rowDef(spellDef(item), row), data, caster, { saved: passed });
+    }
     await card.setFlag(MODULE_ID, FLAG, data);
   });
 });
@@ -239,7 +277,73 @@ async function rollSave(message, index) {
   const data = message.getFlag(MODULE_ID, FLAG);
   const actor = actorOf(data?.rows?.[index]?.uuid);
   if (!actor?.isOwner || !data.save) return;
-  await actor.rollSavingThrow(data.save.type, { dc: data.save.dc, reference: message.uuid });
+  await actor.rollSavingThrow(saveOf(data, data.rows[index]).type, { dc: data.save.dc, reference: message.uuid });
+}
+
+/** Bonus on melee touch attacks: base attack, Strength (Dexterity with Weapon Finesse), size, attack bonuses. */
+function touchBonus(caster) {
+  const rd = caster.getRollData();
+  const finesse = caster.items.some((i) => i.type === "feat" && /^weapon finesse$/i.test(i.name));
+  const ability = finesse ? Math.max(rd.abilities.str.mod, rd.abilities.dex.mod) : rd.abilities.str.mod;
+  const size = pf1.config.sizeMods?.[caster.system.traits?.size?.value ?? caster.system.traits?.size] ?? 0;
+  return [rd.attributes.bab.total, ability, size, rd.attributes.attack?.general ?? 0, rd.attributes.attack?.melee ?? 0].reduce((a, b) => a + (Number(b) || 0), 0);
+}
+
+// Save modifiers that depend on the situation (Hypnotism, Hideous Laughter): ticked in the save window
+registerRollEffect({
+  collect(actor, roll) {
+    if (roll.kind !== "save" || !roll.reference) return [];
+    const card = fromUuidSync(roll.reference);
+    const data = card?.getFlag?.(MODULE_ID, FLAG);
+    const def = SPELLS[data?.name?.toLowerCase()];
+    if (!def?.saveModifiers) return [];
+    const caster = ChatMessage.implementation.getSpeakerActor(card.speaker);
+    const out = [];
+    for (const m of def.saveModifiers) {
+      const applies = m.when === "differentType" ? !sameType(actor, caster) : m.when === "inCombat" ? inCombat(actor) : m.when === "aloneOutOfCombat" ? data.rows.length === 1 && !inCombat(actor) : false;
+      out.push({ id: `spell-save.${m.when}`, label: `${data.name}: ${m.label}`, part: data.name, type: "untyped", roll: m.value, applies, reason: m.reason });
+    }
+    return out;
+  },
+});
+
+const inCombat = (actor) => !!game.combat?.started && game.combat.combatants.some((c) => c.actor === actor || c.actorId === actor.id);
+function sameType(a, b) {
+  const ta = creatureTypes(a).types;
+  return [...creatureTypes(b).types].some((t) => ta.has(t));
+}
+
+/* -------------------------------------------- */
+/*  A new save to end the effect                */
+/* -------------------------------------------- */
+
+// Hideous Laughter: on the creature's next turn in combat, a card with its save to end the effect
+Hooks.on("combatTurnChange", (combat) => {
+  if (!isActiveGM()) return;
+  const actor = combat.combatant?.actor;
+  const buff = actor?.itemTypes.buff.find((b) => b.isActive && b.getFlag(MODULE_ID, "resave"));
+  if (!buff) return;
+  queue(async () => {
+    const resave = buff.getFlag(MODULE_ID, "resave");
+    await buff.unsetFlag(MODULE_ID, "resave");
+    const token = combat.combatant.token;
+    await ChatMessage.implementation.create({
+      speaker: ChatMessage.implementation.getSpeaker({ actor, token }),
+      whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
+      content: `<p><strong>${esc(buff.name)}</strong>: ${esc(actor.name)} may make a new save to end it (a full-round action that doesn't provoke). On a failure it lasts the full duration.</p>`,
+      flags: { [MODULE_ID]: { [FLAG]: { name: buff.name, save: resave.save, cl: resave.cl, ends: buff.uuid, resolved: true, rows: [{ uuid: token?.uuid ?? actor.uuid, name: token?.name ?? actor.name, state: "save" }] } } },
+    });
+  });
+});
+
+/** The new save's result: the effect ends, or continues. */
+async function endEffect(row, data, passed) {
+  row.state = "done";
+  const buff = fromUuidSync(data.ends);
+  if (passed && buff) {
+    await buff.delete();
+    row.applied = [`${data.name} ends`];
+  } else row.applied = [passed ? `${data.name} already ended` : "keeps laughing for the full duration"];
 }
 
 /* -------------------------------------------- */
@@ -254,7 +358,7 @@ async function applyRow(row, def, data, caster, { saved }) {
   const applied = [];
   if (saved && data.damage) applied.push("half damage");
   else if (data.damage) applied.push("full damage");
-  if (saved && def && !def.onSave && !data.damage) applied.push("no effect");
+  if (saved && def && !def.onSave && !data.damage) applied.push(row.hitDamage ? "no further effect" : "no effect");
   if (effect && actor) applied.push(...(await applyEffect(actor, effect, data, caster)));
   if (def?.cooldown && actor && !saved) await actor.setFlag(MODULE_ID, "spellCooldown", { [data.name.toLowerCase()]: game.time.worldTime + def.cooldown * 6 });
   row.applied = applied;
@@ -346,6 +450,17 @@ async function applyEffect(actor, effect, data, caster) {
       out.push(label);
     }
   }
+  // Ability damage (Chill Touch: 1 Strength)
+  for (const [ability, amount] of Object.entries(effect.abilityDamage ?? {})) {
+    const current = actor.system.abilities?.[ability]?.damage ?? 0;
+    await actor.update({ [`system.abilities.${ability}.damage`]: current + amount });
+    out.push(`${amount} ${pf1.config.abilities?.[ability] ?? ability} damage`);
+  }
+  // A new save on the creature's next turn ends it (Hideous Laughter)
+  if (effect.resave && data.save) {
+    const buff = actor.itemTypes.buff.find((b) => b.name === data.name);
+    await buff?.setFlag(MODULE_ID, "resave", { save: data.save, cl: data.cl });
+  }
   if (effect.note) out.push(effect.note);
   return out;
 }
@@ -409,9 +524,11 @@ function rowElement(message, data, row, index) {
   div.style.cssText = `margin: 0.2em 0; padding: 0 4px; border-left: 3px solid ${!row.state || row.state === "save" ? "#888" : good ? "#5a5" : "#b33"};`;
   const parts = [];
   if (row.sr) parts.push(`SR check ${row.sr.total}${gm ? ` vs SR ${row.sr.value}` : ""}: ${row.sr.passed ? "overcome" : "resisted"}`);
-  if (row.attack) parts.push(`${row.attack.total}${gm ? ` vs touch AC ${row.attack.ac}` : ""}: ${row.attack.hit ? "hits" : "misses"}`);
+  if (row.attack) parts.push(`${data.touch ? "melee touch " : ""}${row.attack.total}${gm ? ` vs touch AC ${row.attack.ac}` : ""}: ${row.attack.hit ? "hits" : "misses"}`);
+  if (row.hitDamage) parts.push(esc(row.hitDamage));
   if (row.state === "unaffected") parts.push(`unaffected${gm && row.why ? ` (${esc(row.why)})` : ""}`);
-  if (row.save) parts.push(`${SAVE_NAMES[data.save.type]} ${row.save.total}: ${row.save.passed ? "saved" : "failed"}`);
+  const save = saveOf(data, row);
+  if (row.save) parts.push(`${SAVE_NAMES[save.type]} ${row.save.total}: ${row.save.passed ? "saved" : "failed"}`);
   if (row.applied?.length) parts.push(row.applied.map(esc).join(", "));
   if (!row.state) parts.push("…");
   div.innerHTML = `<strong>${esc(row.name)}</strong>${parts.length ? `: ${parts.join(" · ")}` : ""}`;
@@ -419,8 +536,8 @@ function rowElement(message, data, row, index) {
     if (actor?.isOwner) {
       const button = document.createElement("button");
       button.type = "button";
-      button.textContent = `${SAVE_NAMES[data.save.type]} save`;
-      button.dataset.tooltip = `Roll ${actor.name}'s ${SAVE_NAMES[data.save.type]} save (DC ${data.save.dc}); the result is applied`;
+      button.textContent = `${SAVE_NAMES[save.type]} save`;
+      button.dataset.tooltip = `Roll ${actor.name}'s ${SAVE_NAMES[save.type]} save (DC ${save.dc}); the result is applied`;
       button.style.cssText = "width: auto; line-height: 1.4; margin: 0 0.25em; padding: 0 6px;";
       button.addEventListener("click", (event) => {
         event.preventDefault();
@@ -428,7 +545,7 @@ function rowElement(message, data, row, index) {
         rollSave(message, index);
       });
       div.append(" ", button);
-    } else div.append(`: awaiting the ${SAVE_NAMES[data.save.type]} save`);
+    } else div.append(`: awaiting the ${SAVE_NAMES[save.type]} save`);
   }
   return div;
 }

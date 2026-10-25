@@ -5,6 +5,7 @@ import { createTestActor, addItems, cleanup, useTestScene, placeToken, setTarget
 import { _test as spells } from "../spells.mjs";
 import { settled } from "../util.mjs";
 import { SPELLS } from "../spell-data.mjs";
+import { _test as effects } from "../roll-effects.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -17,7 +18,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -125,6 +126,71 @@ export function registerSpellTests(quench) {
           await zombie.applyDamage(-4, { message: card, forceDialog: false });
           assert.equal(zombie.system.attributes.hp.value, hp - 4);
           await zombie.applyDamage(4, { forceDialog: false });
+        });
+
+        it("Chill Touch: a melee touch attack rolled for it, 1d6 on a hit, 1 Strength damage on a failed Fortitude save", async () => {
+          dice(0.01); // natural 20 hits; the damage rolls its highest
+          const hp = human.system.attributes.hp.value;
+          const card = await cast("Chill Touch", [humanToken]);
+          const r = row(card, human);
+          assert.isTrue(r.attack.hit);
+          assert.equal(r.hitDamage, "6 negative energy damage");
+          await waitFor(() => human.system.attributes.hp.value === hp - 6, { what: "the damage" });
+          dice(0.99);
+          await save(card, human);
+          assert.equal(human.system.abilities.str.damage, 1);
+          await human.update({ "system.abilities.str.damage": 0, "system.attributes.hp.offset": 0 });
+        });
+
+        it("Chill Touch on undead: no damage, a Will save or panicked", async () => {
+          dice(0.01);
+          const hp = zombie.system.attributes.hp.value;
+          const card = await cast("Chill Touch", [zombieToken]);
+          const r = row(card, zombie);
+          assert.equal(r.saveType, "will");
+          assert.isUndefined(r.hitDamage);
+          assert.equal(zombie.system.attributes.hp.value, hp);
+          dice(0.99);
+          await zombie.rollSavingThrow("will", { skipDialog: true, dc: card.getFlag(MODULE_ID, spells.FLAG).save.dc, reference: card.uuid });
+          await waitFor(() => row(card, zombie).state === "done", { what: "the Will save" });
+          assert.isTrue(zombie.statuses.has("panicked"));
+        });
+
+        it("Hypnotism and Hideous Laughter: their save modifiers in the save window", async () => {
+          const hyp = await cast("Hypnotism", [humanToken]);
+          const entries = (actor, card, saveId) => effects.buildModel(actor, { kind: "save", saveId, reference: card.uuid }).provided.filter((p) => p.id.startsWith("spell-save"));
+          const h = entries(human, hyp, "will");
+          assert.deepInclude(h.find((p) => p.id === "spell-save.aloneOutOfCombat"), { roll: -2, applies: true }, "one creature, no combat");
+          assert.isFalse(h.find((p) => p.id === "spell-save.inCombat").applies);
+          const laugh = await cast("Hideous Laughter", [humanToken, zombieToken]);
+          assert.isFalse(entries(human, laugh, "will")[0].applies, "a human, like the caster");
+          assert.deepInclude(entries(zombie, laugh, "will")[0], { roll: 4, applies: true });
+        });
+
+        it("Hideous Laughter: prone, and a new save on its next turn ends it", async () => {
+          const card = await cast("Hideous Laughter", [humanToken]);
+          dice(0.99);
+          await save(card, human);
+          assert.isTrue(human.statuses.has("prone"));
+          const laughing = () => human.itemTypes.buff.find((b) => b.name === "Hideous Laughter");
+          assert.isOk(laughing()?.getFlag(MODULE_ID, "resave"));
+          const combat = await Combat.create({ scene: canvas.scene.id, active: true, flags: { [MODULE_ID]: { quench: true } } });
+          try {
+            await combat.createEmbeddedDocuments("Combatant", [
+              { tokenId: wizardToken.id, sceneId: canvas.scene.id, actorId: wizard.id, initiative: 20 },
+              { tokenId: humanToken.id, sceneId: canvas.scene.id, actorId: human.id, initiative: 10 },
+            ]);
+            await combat.startCombat();
+            const before = new Set(game.messages.keys());
+            await combat.nextTurn();
+            const resave = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.getFlag(MODULE_ID, spells.FLAG)?.ends), { what: "the new save" });
+            dice(0.01);
+            await save(resave, human);
+            await waitFor(() => !laughing(), { what: "the laughter to end" });
+            assert.include(row(resave, human).applied, "Hideous Laughter ends");
+          } finally {
+            await combat.delete();
+          }
         });
 
         it("Daze: immune for a minute after being dazed by it", async () => {

@@ -19,9 +19,17 @@
 //              remove      condition ids removed
 //              changes     bonuses or penalties on a buff named after the spell ([{ target, formula, type }])
 //              marker      a buff with no changes, named after the spell, to track it for its duration
+//              abilityDamage  { str: 1 }: ability damage
+//              resave      a new save on the creature's next turn in combat ends it (Hideous Laughter)
 //              note        text for the GM where the rest isn't automated
 //   onSave     the effect on a successful save ("partial"), same fields
 //   autoHit    no attack roll is needed (Magic Missile), whatever PF1 rolls
+//   touchAttack  PF1's data has no attack roll: a melee touch attack is rolled here (Chill Touch)
+//   onHit      { damage: { formula, type } } applied on a hit, before the save (PF1's card has none)
+//   undead     fields that replace these for undead creatures, e.g. { save: "will", effect }
+//   saveModifiers  [{ when, value, label, reason }] ticked in the save window: when "inCombat",
+//              "aloneOutOfCombat" (the only creature affected, not in combat) or "differentType" (not
+//              of the caster's type)
 //   tiers      effect by Hit Dice: [[up to HD, effect], ...] (Color Spray)
 // Durations: "@cl" rounds per level; a minute is 10 rounds.
 
@@ -52,8 +60,25 @@ export const SPELLS = {
     ],
   },
   sleep: { pool: "4", unless: "unconscious", effect: { conditions: [["sleep", "10 * @cl"]] } },
-  hypnotism: { pool: "2d4", effect: { conditions: [["fascinated", "2d4"]], note: "+2 on the save if the creature is in combat; -2 if it's alone and not in combat" } },
-  "hideous laughter": { intMin: 3, effect: { conditions: [["prone", "@cl"]], marker: true, note: "laughing: no actions (not helpless); a new save each turn as a full-round action. +4 on the save if its type differs from the caster's" } },
+  hypnotism: {
+    pool: "2d4",
+    saveModifiers: [
+      { when: "inCombat", value: 2, label: "in combat", reason: "only in combat" },
+      { when: "aloneOutOfCombat", value: -2, label: "alone, not in combat", reason: "only when it's the only creature affected and isn't in combat" },
+    ],
+    effect: { conditions: [["fascinated", "2d4"]] },
+  },
+  "hideous laughter": {
+    intMin: 3,
+    saveModifiers: [{ when: "differentType", value: 4, label: "a different type from the caster", reason: "only for a creature whose type differs from the caster's" }],
+    effect: { conditions: [["prone", null]], marker: true, resave: true, note: "laughing: can take no actions (not helpless); a new save on its next turn ends it" },
+  },
+  "chill touch": {
+    touchAttack: true,
+    onHit: { damage: { formula: "1d6", type: "negative energy" } },
+    effect: { abilityDamage: { str: 1 }, note: "one touch per caster level" },
+    undead: { save: "will", onHit: null, effect: { conditions: [["panicked", "1d4 + @cl"]] } },
+  },
   "confusion, lesser": { effect: { conditions: [["confused", "1"]] } },
   command: { effect: { marker: true, note: "obeys the command for 1 round (Approach, Drop, Fall: prone, Flee, Halt)" } },
   entangle: { effect: { conditions: [["entangled", "10 * @cl"]], note: "in the area: a new save at the end of the caster's turn; breaking free is a move action (Strength or Escape Artist against the spell's DC)" } },

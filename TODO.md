@@ -21,10 +21,8 @@ Next, the focus moves to:
   - **Cover-dependent abilities** (with cover deferred): Improved Precise Shot, Pinpoint Targeting (its armor and shield part is done), Lob Shot, Low Profile, Combat Sandals, Volley Fire, Covered Sniper, veering weapons.
 - **Cantrips and 1st-level spells** (research: `docs/SPELLS-RESEARCH.md`). Done for the Core Rulebook, Advanced Player's Guide, Ultimate Magic and Ultimate Combat. Still to do:
   - **Other books** (Advanced Class Guide, Advanced Race Guide, Occult Adventures and the rest, about 240 spells), on the same table.
-  - **Chill Touch**: PF1's data has no damage and no attack roll; it needs its 1d6 negative energy per touch, Strength damage on a failed Fortitude save, and the panic effect on undead (Will).
-  - **Effects that repeat**: Entangle's save at the end of each of the caster's turns while in the area, Hideous Laughter's save each turn, Grease's Acrobatics checks.
+  - **Effects that repeat**: Entangle's save at the end of each of the caster's turns while in the area, Grease's Acrobatics checks. Chill Touch's further touches (one per caster level).
   - **Choices made at casting**: Command's command, Magic Missile's split between targets (one damage row per missile).
-  - **Situational save modifiers**: Hypnotism (+2 in combat), Hideous Laughter (+4 against a caster of another type).
   - **Damage from the rows**: apply full or half damage from each creature's row once its save is known, instead of PF1's buttons.
   - **Higher-level spells**: they already get the rows (spell resistance and saves); their effects come after the 1st-level spells are complete.
 

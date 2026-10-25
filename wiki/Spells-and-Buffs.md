@@ -36,7 +36,7 @@ Any spell with a save or spell resistance gets these rows. The spells below also
 | Doom | Shaken 1 minute per level |
 | Color Spray | By Hit Dice: up to 2 HD unconscious 2d4 rounds, then blinded and stunned 1d4 rounds, then stunned 1 round (only living creatures fall unconscious); 3-4 HD blinded and stunned 1d4 rounds, then stunned 1 round; 5 HD or more stunned 1 round |
 | Sleep, Hypnotism | A pool of Hit Dice (4, or 2d4), fewest HD first, then those nearest the spell's origin; asleep, or fascinated |
-| Hideous Laughter, Lesser Confusion, Entangle, Grease, Vanish, Ear-Piercing Scream, Ray of Sickening | Prone, confused, entangled, prone, invisible, dazed 1 round, sickened |
+| Lesser Confusion, Entangle, Grease, Vanish, Ear-Piercing Scream, Ray of Sickening | Confused, entangled, prone, invisible, dazed 1 round, sickened |
 | Ray of Enfeeblement, Touch of Gracelessness | A Strength or Dexterity penalty (1d6 + 1 per two caster levels, maximum +5; halved on a save). The penalty doesn't stack with itself: a lower one doesn't replace a higher one. |
 | Bless, Bane | The buff on the allies (Bless) or enemies (Bane) among the creatures in the area |
 | Shield, Divine Favor, True Strike, Entropic Shield, Expeditious Retreat, Longstrider, Aspect of the Falcon, Lead Blades, Veil of Positive Energy, Adoration, Deadeye's Lore, Gravity Bow, Shock Shield | The buff on the caster, with or without targets |
@@ -44,8 +44,13 @@ Any spell with a save or spell resistance gets these rows. The spells below also
 | Delusional Pride, Negative Reaction | Their penalties, on a buff named after the spell |
 | Charm Person, Charm Animal, Calm Animals, Command, Beguiling Gift, Challenge Evil, Hunter's Howl, Knight's Calling, Unwitting Ally, Forbid Action, Murderous Command, Lock Gaze | A buff named after the spell marks the creature for the spell's duration; the row reminds the GM what it does |
 | Stabilize, Bleed | Stabilized, or no longer stable (a living creature below 0 hit points) |
+| Chill Touch | PF1's version has no attack or damage, so the module rolls the melee touch attack (base attack bonus, Strength or Dexterity with Weapon Finesse, size and attack bonuses). A hit deals 1d6 negative energy damage, and a failed Fortitude save adds 1 point of Strength damage. Undead take no damage; instead they make a Will save or are panicked for 1d4 rounds + 1 per caster level. |
 
-Notes the row adds for the GM: Hypnotism's +2 on the save in combat, Hideous Laughter's +4 for a creature of another type and its save each turn, Entangle's saves in the area, Command's chosen command.
+**Save modifiers.** Hypnotism's +2 in combat (−2 for a single creature not in combat) and Hideous Laughter's +4 for a creature of another type than the caster are ticked entries in the save window, set for the situation.
+
+**Hideous Laughter** knocks the creature prone. On its next turn in combat, a card offers a new save (a full-round action) to its owner and the GM: success ends the laughter, failure means it lasts the full duration.
+
+Notes the row adds for the GM: Entangle's saves in the area, Command's chosen command.
 
 **Fixes to PF1's spell data:**
 - **Magic Missile** rolls one 1d4+1 for every missile (two at 3rd level, up to five at 9th) and needs no attack: the row ignores the attack roll PF1 makes. The missiles can be split between targets; apply each part from the card.
