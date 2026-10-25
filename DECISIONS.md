@@ -30,6 +30,7 @@ feature before changing it. Newest first within each section. Format: **decision
 - **Clerics are prepared casters**; spontaneous casting converts prepared spells (2026-10-22).
 
 ## Classes
+- **Sneak attack applies automatically when the module detects its conditions** (target denied Dex or flanked, in range, not concealed), shown in the roll window where it can be unticked; when not detected it's listed under Not Applied and can be ticked by hand. Before building, research every feat, talent, racial trait, trait and item that touches sneak attack (2026-10-24).
 - **Shared rogue talents are offered to slayers only through the Rogue Talent talent**, not listed directly (2026-10-23).
 - **Talent and feat pickers: our own searchable picker plus a "Browse all feats…" button to PF1's Feat Browser**, with a note that the browser can't check prerequisites (2026-10-23).
 - **Archetype-altered features are renamed "Feature (Archetype)" and their mechanics changed**, not just annotated (2026-10-22).
