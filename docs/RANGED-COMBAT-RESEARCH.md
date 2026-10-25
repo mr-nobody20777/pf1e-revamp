@@ -106,7 +106,7 @@ Touch AC within the first (early) or fifth (advanced) increment; misfire and the
 ## Notes for the design
 - Roll Bonuses already owns the range penalty and shooting into melee; the module should **feed it** rather than duplicate it: recognize the range-changing feats, traits, spells and items in section 1 and adjust Roll Bonuses' range penalty data, so tables don't have to configure each item by hand.
 - Point-Blank Shot is the most common ranged feat and PF1's checkbox ignores the 30 ft limit: tick it automatically when the target is within 30 ft and untick it beyond.
-- Cover is the biggest missing rule: soft cover from creatures in the line of fire happens in most ranged fights, and Improved Precise Shot, Low Profile and similar abilities hinge on it. Detection follows the corner-to-corners rule; walls need Foundry's wall collision checks.
+- Cover is the biggest missing rule (deferred by ruling, 2026-10-25: cover stays manual for now): soft cover from creatures in the line of fire happens in most ranged fights, and Improved Precise Shot, Low Profile and similar abilities hinge on it. Detection follows the corner-to-corners rule; walls need Foundry's wall collision checks.
 - Reloading and thrown-weapon tracking follow the PF2e module's model (a loaded state; thrown weapons leave the hand), opt-in like there.
 - Defenses that need the defender's decision (Deflect Arrows and similar) fit the card-button pattern used for fortification's one-off negations.
 - Many entries are already handled by PF1 changes (flat attack and damage bonuses); those need only a check, not new code.

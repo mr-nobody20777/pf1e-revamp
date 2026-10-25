@@ -13,7 +13,7 @@ Owners: **PF1** (the system), **RB** (Roll Bonuses), **NAS** (Nevela's Automatio
 | 3 | Attack bonus | BAB, ability, size, buffs and conditions (typed, highest of a type), situational bonuses | PF1, Revamp (roll window) | `roll-effects.mjs`, `fortune.mjs`, `quarry.mjs`, `studied-target.mjs` |
 | 4 | Range penalty | –2 per full increment beyond the first; feats and items change it | RB | – (ranged combat phase 1) |
 | 5 | Shooting into melee | –4 (–2, 0 by size), Precise Shot | RB | – |
-| 6 | Cover | +4 AC (soft from creatures, partial +2, improved +8) | – | – (ranged combat) |
+| 6 | Cover | +4 AC (soft from creatures, partial +2, improved +8) | – | – (deferred: stays manual) |
 | 7 | AC the attack targets | Normal, touch (rays, splash, early firearms within one increment), flat-footed | PF1 | – |
 | 8 | Concealment and miss chance | Rolled after a hit; highest applies | NAS (Concealed condition), Revamp | `miss-chance.mjs` |
 | 9 | Critical threat and confirmation | Threat range, confirmation roll | PF1 | `traits.mjs` (confirmation bonuses) |
