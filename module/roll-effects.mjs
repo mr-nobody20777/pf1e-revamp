@@ -190,10 +190,16 @@ const STACKING = () => new Set(pf1.config.stackingBonusTypes ?? ["untyped", "dod
 function collectProvided(actor, roll) {
   const list = providers.flatMap((p) => p.collect(actor, roll) ?? []).filter(Boolean);
   const stacking = STACKING();
-  const worth = (p) => Math.max(p.atk ?? 0, p.dmg ?? 0, p.roll ?? 0);
+  // Same-type bonuses only compete on the same roll (a trait bonus on attacks and one on damage both count)
+  const parts = (p) => ["atk", "dmg", "roll"].filter((k) => (p[k] ?? 0) > 0);
+  const worth = (p, on) => Math.max(0, ...on.map((k) => p[k] ?? 0));
   for (const p of list) {
-    if (!p.applies || stacking.has(p.type ?? "untyped") || worth(p) <= 0) continue;
-    const better = list.find((o) => o !== p && o.applies && o.type === p.type && (worth(o) > worth(p) || (worth(o) === worth(p) && list.indexOf(o) < list.indexOf(p))));
+    if (!p.applies || stacking.has(p.type ?? "untyped") || !parts(p).length) continue;
+    const better = list.find((o) => {
+      const shared = parts(p).filter((k) => (o[k] ?? 0) > 0);
+      if (o === p || !o.applies || o.type !== p.type || !shared.length) return false;
+      return worth(o, shared) > worth(p, shared) || (worth(o, shared) === worth(p, shared) && list.indexOf(o) < list.indexOf(p));
+    });
     if (better) Object.assign(p, { applies: false, reason: `${better.label} is higher`, beatenBy: better.id });
   }
   return list;

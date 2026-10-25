@@ -69,6 +69,32 @@ PF1's save button on a card rolls for whatever token you have selected (or your 
 - **Bonuses against creatures** ("vs. evil creatures") are handled by the alignment wards, not here.
 - **Conditional bonuses** ("when adjacent to an ally", "once per day") and notes about immunities or rerolls are left as reminders, because the module can't know whether the condition is met.
 
+## Ranged combat
+
+Range penalties and shooting into melee come from **Roll Bonuses**, which PF1e Revamp builds on rather than duplicating: Roll Bonuses applies –2 per full range increment beyond the first, refuses attacks beyond the weapon's maximum range, and applies the shooting-into-melee penalty (with Precise Shot). Without Roll Bonuses, the range changes below have no effect; Point-Blank Shot and the roll-window bonuses still work.
+
+### Point-Blank Shot
+PF1's Point-Blank Shot checkbox gives +1 on attack and damage rolls at any distance. PF1e Revamp ticks it when every target is within 30 ft (measured between the nearest squares) and leaves it off beyond, both in the attack window and for attacks rolled without it. You can still change the box by hand. Mythic Point-Blank Shot adds its extra +1 in the roll window; with Arc Slinger, a sling counts its whole first range increment.
+
+### Range changes passed to Roll Bonuses
+These are recognized on the character and adjust Roll Bonuses' range penalty automatically, with no setup on the item:
+
+- **Smaller penalty per increment:** Far Shot (–1 per increment), the sniper's accuracy (halved, with bows and crossbows).
+- **Penalty reduced by 2:** Distance Thrower (thrown weapons), Arc Slinger (slings), Wasteland Hunter (thrown clubs, spears and javelins), Hunter's Eye (the second increment, bows). A reduction never becomes a bonus.
+- **Longer range increment:** Longshot (+10 ft), Hawkeye (+5 ft per 4 levels, bows), Roving Range (+5 ft, not thrown), the Belt of Mighty Hurling and Bomber's Eye (+10 ft, thrown), Skilled Thrower (+10 ft, thrown), the Winding Path Renegade (+10 ft), the flying blade (+5 ft per 4 levels and +5 ft from precise throw, daggers and starknives). Distance weapons and Raging Hurler (thrown, while raging) double it, after the additions.
+
+### Bonuses that depend on distance
+Shown in the roll window, where they can be unticked (or ticked when not detected):
+
+- **Eagle-Eyed:** +2 circumstance against targets more than 100 ft away.
+- **Observant Archer:** +1 trait when the target is at least 10 ft above or below you (token elevation).
+- **Canopy Shooter:** +1 trait damage with Higher Ground ticked and the target within 30 ft.
+- **Improved Charging Hurler:** +2 damage on a charge with a thrown weapon within 30 ft.
+- **Bomber's Eye:** +1 insight on thrown weapon attacks.
+- **Focused Shot:** your Intelligence modifier on damage with a bow or crossbow within 30 ft. It needs a standard action, so it is listed under Not Applied: tick it for a single attack.
+
+Not automated yet: cover (it stays the GM's call), range changes that depend on something the module can't see (Strong Arm, Supple Wrist; Ki Range; Unfolding Wind Strike; steady aim; Bull's Eye), defenses against ranged attacks, reloading, and firearms. See the roadmap.
+
 ## Sneak attack
 
 Attacks add the dice of every Sneak Attack class feature the attacker has (from PF1's own formula on each feature; dice from different classes stack) when the module detects that they apply:

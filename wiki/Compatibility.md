@@ -25,7 +25,7 @@ The two modules complement each other, and PF1e Revamp steps aside where they ov
 | Energy resistance on damage applied through PF1's dialog | Nevela / PF1. PF1e Revamp only adds resistance on quick-applied damage, so nothing is reduced twice. |
 
 ## Also tested alongside
-These were active through all testing with no conflicts found: **Roll Bonuses PF1**, **Koboldworks – Little Helper**, **Koboldworks – Item Hints**, **PF1 Buff Bundles**, **PF1 Mighty Morphin**, **Target Context Notes**, **Statblock Converter**, **Statblock Library**, **socketlib**.
+These were active through all testing with no conflicts found: **Roll Bonuses PF1** (PF1e Revamp's range changes rely on its range-increment penalty), **Koboldworks – Little Helper**, **Koboldworks – Item Hints**, **PF1 Buff Bundles**, **PF1 Mighty Morphin**, **Target Context Notes**, **Statblock Converter**, **Statblock Library**, **socketlib**.
 
 ## Multiplayer
 

@@ -117,6 +117,16 @@ Hooks.on("createChatMessage", (message) => {
   for (const [key, handler] of gmHandlers) if (flags[key] !== undefined) handler(message, flags[key]);
 });
 
+/** Distance between the nearest squares two tokens occupy (large creatures fill several), or null. */
+export function tokenDistance(a, b) {
+  if (!a || !b) return null;
+  if (canvas.grid.isGridless) return canvas.grid.measurePath([a.center, b.center]).distance;
+  const cells = (t) => t.document.getOccupiedGridSpaceOffsets().map((o) => canvas.grid.getCenterPoint(o));
+  let best = Infinity;
+  for (const p of cells(a)) for (const q of cells(b)) best = Math.min(best, canvas.grid.measurePath([p, q]).distance);
+  return best;
+}
+
 /** An item the actor has equipped whose name matches (worn armor, a wondrous item). */
 export const equippedItem = (actor, re) => actor?.items.find((i) => i.type === "equipment" && i.system.equipped && re.test(i.name)) ?? null;
 

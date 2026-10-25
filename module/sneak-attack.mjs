@@ -29,7 +29,7 @@
 // The GM still judges "must be able to see the target ... and reach such a spot": untick it when not.
 
 import { MODULE_ID, RANGED_ATTACKS } from "./const.mjs";
-import { evaluate, classLevel, equippedItem as equipped } from "./util.mjs";
+import { evaluate, classLevel, equippedItem as equipped, tokenDistance } from "./util.mjs";
 import { registerRollEffect, registerDamageFilter, rollPlan } from "./roll-effects.mjs";
 import { missChances, seesInvisible } from "./miss-chance.mjs";
 import { isIncorporeal } from "./resistance.mjs";
@@ -155,15 +155,7 @@ function canFlank(target, attacker, srcs) {
   return ours >= theirs + 4;
 }
 
-/** Distance between the nearest squares the two tokens occupy (large creatures fill several). */
-function distance(a, b) {
-  if (!a || !b) return null;
-  if (canvas.grid.isGridless) return canvas.grid.measurePath([a.center, b.center]).distance;
-  const cells = (t) => t.document.getOccupiedGridSpaceOffsets().map((o) => canvas.grid.getCenterPoint(o));
-  let best = Infinity;
-  for (const p of cells(a)) for (const q of cells(b)) best = Math.min(best, canvas.grid.measurePath([p, q]).distance);
-  return best;
-}
+const distance = tokenDistance;
 
 registerRollEffect({
   collect(actor, roll) {
