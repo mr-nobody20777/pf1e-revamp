@@ -2,6 +2,7 @@
 
 PF1e Revamp recognizes the spell buffs from PF1 and **Pathfinder 1e Content** by name, so there's nothing special to use. Put the buff on the character as usual, and it now does what the spell says.
 
+- [Spells on their targets](#spells-on-their-targets)
 - [Miss chances](#miss-chances)
 - [Alignment wards](#alignment-wards)
 - [One-roll buffs](#one-roll-buffs)
@@ -10,6 +11,48 @@ PF1e Revamp recognizes the spell buffs from PF1 and **Pathfinder 1e Content** by
 - [Buff Library compendium](#buff-library-compendium)
 
 ---
+
+## Spells on their targets
+
+**Before:** PF1 rolled a spell's attack and damage and put a save button on the card, but it never said who was affected, never checked spell resistance, and never applied what a failed save does.
+
+**Now:** a spell's card lists every creature it affects (your targets, or the creatures in its template), with one row each:
+- **Spell resistance** is checked for you: the caster level check (1d20 + caster level, +2 each for Spell Penetration, Greater Spell Penetration and Elven Magic) is rolled for every creature with SR. Everyone sees the roll and whether it got through; only the GM sees the SR value. A resisted spell has no effect on that creature.
+- **Touch and ray spells** are compared with the creature's touch AC (a natural 20 always hits, a natural 1 always misses). Only the GM sees the AC.
+- **Saving throws** are rolled from the row: its owner (or the GM, for NPCs) clicks the save button. PF1's own save button works too: a save rolled against the card fills in the row. A natural 1 always fails and a natural 20 always succeeds.
+- **The result is applied** as soon as it's known: conditions with their duration, the spell's buff at the caster's level for the spell's duration, or a penalty. The row says what was applied.
+- **Harmless spells on allies** (Bless, Shield of Faith, Enlarge Person on a friend) are accepted: no spell resistance, no save.
+- **Immunities** are found when the spell resolves, never shown beforehand: a creature that can't be affected says "unaffected" (the GM sees why). Mind-affecting spells don't affect undead, constructs, vermin, oozes, plants or mindless creatures; undead and constructs ignore Fortitude effects that aren't harmless; Hit Dice limits, creature types ("person" spells: humanoids), sightless creatures and condition immunities (elves and sleep, for example) are all checked.
+- **Damage** stays with PF1's damage buttons; the row says whether the creature takes full or half.
+
+Any spell with a save or spell resistance gets these rows. The spells below also apply their effect:
+
+| Spells | Effect applied |
+|---|---|
+| Daze, Daze Monster | Dazed 1 round (humanoids of 4 HD or less; any living creature of 5 HD or less), then immune to that spell for 1 minute |
+| Flare, Flare Burst | Dazzled 1 minute (not sightless or already dazzled creatures) |
+| Touch of Fatigue, Litany of Weakness, Frostbite | Fatigued |
+| Cause Fear | Frightened 1d4 rounds, or shaken 1 round on a successful save (5 HD or less, living) |
+| Doom | Shaken 1 minute per level |
+| Color Spray | By Hit Dice: up to 2 HD unconscious 2d4 rounds, then blinded and stunned 1d4 rounds, then stunned 1 round (only living creatures fall unconscious); 3-4 HD blinded and stunned 1d4 rounds, then stunned 1 round; 5 HD or more stunned 1 round |
+| Sleep, Hypnotism | A pool of Hit Dice (4, or 2d4), fewest HD first, then those nearest the spell's origin; asleep, or fascinated |
+| Hideous Laughter, Lesser Confusion, Entangle, Grease, Vanish, Ear-Piercing Scream, Ray of Sickening | Prone, confused, entangled, prone, invisible, dazed 1 round, sickened |
+| Ray of Enfeeblement, Touch of Gracelessness | A Strength or Dexterity penalty (1d6 + 1 per two caster levels, maximum +5; halved on a save). The penalty doesn't stack with itself: a lower one doesn't replace a higher one. |
+| Bless, Bane | The buff on the allies (Bless) or enemies (Bane) among the creatures in the area |
+| Shield, Divine Favor, True Strike, Entropic Shield, Expeditious Retreat, Longstrider, Aspect of the Falcon, Lead Blades, Veil of Positive Energy, Adoration, Deadeye's Lore, Gravity Bow, Shock Shield | The buff on the caster, with or without targets |
+| Resistance, Virtue, Shield of Faith, Mage Armor, Enlarge Person, Reduce Person, Magic Fang, Magic Weapon, Bless Weapon, Jump, Sanctuary, Remove Fear, Protection from Chaos/Evil/Good/Law, Faerie Fire, Lullaby, Ant Haul, Crafter's Fortune, Ghostbane Dirge, Ill Omen, Keen Senses, Touch of the Sea, Anticipate Peril, Bungle, Unprepared Combatant, Longshot, Unerring Weapon | The spell's buff on each creature affected |
+| Delusional Pride, Negative Reaction | Their penalties, on a buff named after the spell |
+| Charm Person, Charm Animal, Calm Animals, Command, Beguiling Gift, Challenge Evil, Hunter's Howl, Knight's Calling, Unwitting Ally, Forbid Action, Murderous Command, Lock Gaze | A buff named after the spell marks the creature for the spell's duration; the row reminds the GM what it does |
+| Stabilize, Bleed | Stabilized, or no longer stable (a living creature below 0 hit points) |
+
+Notes the row adds for the GM: Hypnotism's +2 on the save in combat, Hideous Laughter's +4 for a creature of another type and its save each turn, Entangle's saves in the area, Command's chosen command.
+
+**Fixes to PF1's spell data:**
+- **Magic Missile** rolls one 1d4+1 for every missile (two at 3rd level, up to five at 9th) and needs no attack: the row ignores the attack roll PF1 makes. The missiles can be split between targets; apply each part from the card.
+- **Cure spells harm undead and inflict spells heal them**, as the spells say: the card's healing button deals the amount as damage to an undead creature, and its damage button heals one. Halve it for a successful Will save.
+- **Disrupt Undead** only affects undead.
+
+With **Nevela's Automation Suite** set to apply a buff for a spell's action, PF1e Revamp leaves that spell's buff to Nevela and only fills in the rows.
 
 ## Miss chances
 

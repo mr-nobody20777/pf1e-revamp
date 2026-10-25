@@ -46,8 +46,8 @@ function bitOfLuckBuff(caster) {
   };
 }
 
-async function compendiumBuff(name) {
-  for (const id of ["pf1.buffs", "pf-content.pf-buffs"]) {
+export async function compendiumBuff(name) {
+  for (const id of ["pf1.buffs", "pf-content.pf-buffs", `${MODULE_ID}.buffs`]) {
     const pack = game.packs.get(id);
     const entry = pack?.index.find((e) => e.name === name && e.type === "buff");
     if (entry) {
@@ -114,7 +114,7 @@ Hooks.on("deleteItem", restoreResistance);
 /* -------------------------------------------- */
 
 /** Is Nevela's Automation Suite set to apply a buff for this action itself? */
-function nevelaApplies(item, actionId) {
+export function nevelaApplies(item, actionId) {
   if (!game.modules.get(NEVELA)?.active || !game.settings.get(NEVELA, "automaticBuffs")) return false;
   return item.flags[NEVELA]?.buffAutomationByAction?.[actionId]?.enabled === true;
 }

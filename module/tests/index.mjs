@@ -28,6 +28,7 @@ import { registerRangedTests } from "./ranged.test.mjs";
 import { registerRangedDefenseTests } from "./ranged-defense.test.mjs";
 import { registerRangedActionTests } from "./ranged-actions.test.mjs";
 import { registerRangedSpecialTests } from "./ranged-special.test.mjs";
+import { registerSpellTests } from "./spells.test.mjs";
 
 export function registerTests(quench) {
   registerTwoWeaponTests(quench);
@@ -58,4 +59,5 @@ export function registerTests(quench) {
   registerRangedDefenseTests(quench);
   registerRangedActionTests(quench);
   registerRangedSpecialTests(quench);
+  registerSpellTests(quench);
 }

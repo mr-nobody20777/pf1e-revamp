@@ -80,6 +80,7 @@
     "module/ranged.mjs",
     "module/ranged-defense.mjs",
     "module/ranged-actions.mjs",
+    "module/spells.mjs",
     "module/raging-song.mjs",
     "module/quarry.mjs",
     "module/shield-trained.mjs",

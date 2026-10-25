@@ -37,7 +37,7 @@ const isImmune = (types, immunities) => types.every((t) => immunities.has(t)) ||
 // oozes, elementals, incorporeal and amorphous creatures, and some shape-changing spells. Checked when
 // the damage is applied, so the attacker doesn't learn it before attacking.
 const PRECISION_IMMUNE_FORMS = /^(gaseous form|elemental body (iii|iv)|particulate form)$/i;
-function creatureTypes(actor) {
+export function creatureTypes(actor) {
   const race = actor?.race?.system;
   const set = (field) => new Set([...(race?.[field]?.base ?? []), ...(race?.[field]?.total ?? [])].map((t) => String(t).toLowerCase()));
   return { types: set("creatureTypes"), subtypes: set("creatureSubtypes") };

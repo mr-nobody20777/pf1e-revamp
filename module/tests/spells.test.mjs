@@ -1,0 +1,221 @@
+// Spells on the creatures they affect: the card's rows, spell resistance, saves rolled against the card,
+// and the conditions, buffs and penalties applied.
+
+import { createTestActor, addItems, cleanup, useTestScene, placeToken, setTargets, deleteTokens, waitFor } from "./helpers.mjs";
+import { _test as spells } from "../spells.mjs";
+import { settled } from "../util.mjs";
+import { SPELLS } from "../spell-data.mjs";
+
+const MODULE_ID = "pf1e-revamp";
+
+export function registerSpellTests(quench) {
+  quench.registerBatch(
+    "pf1e-revamp.spells",
+    (context) => {
+      const { describe, it, assert, before, after, afterEach } = context;
+
+      describe("Spells: effects on the creatures affected", function () {
+        this.timeout(45000);
+        let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds"];
+        const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
+        const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
+        const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
+        /** Dice that roll their lowest (0.99) or highest (0.01): Foundry turns the random number around. */
+        const dice = (u) => (CONFIG.Dice.randomUniform = () => u);
+
+        async function cast(name, targets) {
+          setTargets(targets);
+          const before = new Set(game.messages.keys());
+          Hooks.once("pf1CreateActionUse", (use) => (use.shared.useMeasureTemplate = false));
+          await wizard.items.getName(name).use({ skipDialog: true });
+          const card = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.type === "action"));
+          await waitFor(() => !card.getFlag(MODULE_ID, spells.FLAG) || card.getFlag(MODULE_ID, spells.FLAG).resolved, { what: "the rows" });
+          return card;
+        }
+        async function save(card, actor) {
+          const data = card.getFlag(MODULE_ID, spells.FLAG);
+          await actor.rollSavingThrow(data.save.type, { skipDialog: true, dc: data.save.dc, reference: card.uuid });
+          await waitFor(() => row(card, actor)?.state === "done", { what: `${actor.name}'s save` });
+          await settled();
+        }
+
+        before(async () => {
+          messagesBefore = new Set(game.messages.keys());
+          uniform = CONFIG.Dice.randomUniform;
+          sceneCtl = await useTestScene();
+          wizard = await createTestActor("Quench Spell Wizard", { abilities: { int: 18 }, items: [["pf1.races", "Human"], ["pf1.classes", "Wizard", { system: { level: 5 } }]] });
+          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(n === "Daze" ? 0 : 1)]));
+          human = await createTestActor("Quench Spell Human", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
+          ogre = await createTestActor("Quench Spell Ogre", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 6 } }]] });
+          friend = await createTestActor("Quench Spell Friend", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
+          zombie = await createTestActor("Quench Spell Zombie", { items: [["pf1.classes", "Warrior", { system: { level: 1 } }]] });
+          await zombie.createEmbeddedDocuments("Item", [{ name: "Zombie", type: "race", system: { creatureTypes: ["undead"] } }]);
+          wizardToken = await placeToken(wizard, 1, 1);
+          friendToken = await placeToken(friend, 2, 1);
+          humanToken = await placeToken(human, 4, 1, { disposition: CONST.TOKEN_DISPOSITIONS.HOSTILE });
+          ogreToken = await placeToken(ogre, 5, 1, { disposition: CONST.TOKEN_DISPOSITIONS.HOSTILE });
+          zombieToken = await placeToken(zombie, 6, 1, { disposition: CONST.TOKEN_DISPOSITIONS.HOSTILE });
+        });
+        afterEach(async () => {
+          CONFIG.Dice.randomUniform = uniform;
+          await settled();
+          for (const actor of [human, ogre, friend, wizard]) {
+            const buffs = actor.itemTypes.buff.map((b) => b.id);
+            if (buffs.length) await actor.deleteEmbeddedDocuments("Item", buffs);
+            const effects = actor.effects.map((e) => e.id);
+            if (effects.length) await actor.deleteEmbeddedDocuments("ActiveEffect", effects);
+            if (actor.getFlag(MODULE_ID, "spellCooldown")) await actor.unsetFlag(MODULE_ID, "spellCooldown");
+          }
+          await human.update({ "system.attributes.sr.formula": "" });
+        });
+        after(async () => {
+          CONFIG.Dice.randomUniform = uniform;
+          await deleteTokens([wizardToken, friendToken, humanToken, ogreToken, zombieToken]);
+          await cleanup([wizard, human, ogre, friend, zombie], messagesBefore);
+          await sceneCtl?.restore();
+        });
+
+        it("every spell in the table exists, with its buff, conditions and change targets", async () => {
+          const spellNames = new Set((await game.packs.get("pf1.spells").getIndex()).map((e) => e.name.toLowerCase()));
+          const buffNames = new Set();
+          for (const id of ["pf1.buffs", "pf-content.pf-buffs", `${MODULE_ID}.buffs`]) for (const e of (await game.packs.get(id)?.getIndex({ fields: ["type"] })) ?? []) if (e.type === "buff") buffNames.add(e.name);
+          const targets = new Set(Object.keys(pf1.config.buffTargets));
+          const problems = [];
+          for (const [name, def] of Object.entries(SPELLS)) {
+            if (!spellNames.has(name)) problems.push(`${name}: no such spell`);
+            const effects = [def.effect, def.onSave, ...(def.tiers ?? []).map((t) => t[1])].filter(Boolean);
+            for (const e of effects) {
+              if (e.buff && !buffNames.has(e.buff)) problems.push(`${name}: no buff "${e.buff}"`);
+              for (const [id] of e.conditions ?? []) if (!pf1.registry.conditions.get(id)) problems.push(`${name}: no condition "${id}"`);
+              for (const c of [...(e.changes ?? []), ...(e.penalty ? [e.penalty] : [])]) if (!targets.has(c.target) && !/^skill\.\w+$/.test(c.target)) problems.push(`${name}: no change target "${c.target}"`);
+            }
+          }
+          assert.deepEqual(problems, []);
+        });
+
+        it("Daze: a failed Will save dazes the humanoid for 1 round; one over 4 HD is unaffected", async () => {
+          const card = await cast("Daze", [humanToken, ogreToken]);
+          assert.equal(row(card, human).state, "save");
+          assert.deepInclude(row(card, ogre), { state: "unaffected", why: "4 HD or less only" });
+          dice(0.99);
+          await save(card, human);
+          assert.isFalse(row(card, human).save.passed);
+          assert.isTrue(human.statuses.has("dazed"));
+          assert.include(row(card, human).applied.join(), "dazed 1 round");
+        });
+
+        it("undead are immune to mind-affecting spells (found when the spell resolves)", async () => {
+          const card = await cast("Daze", [zombieToken]);
+          assert.deepInclude(row(card, zombie), { state: "unaffected", why: "only humanoid creatures" });
+          const sleep = await cast("Sleep", [zombieToken]);
+          assert.deepInclude(row(sleep, zombie), { state: "unaffected", why: "immune to mind-affecting effects" });
+        });
+
+        it("Magic Missile: a missile per two caster levels beyond 1st, no attack needed", async () => {
+          const card = await cast("Magic Missile", [humanToken]);
+          assert.match(card.systemRolls.attacks[0].damage[0].formula, /^3d4 \+ 3/, "CL 5: three missiles");
+          assert.isUndefined(row(card, human).attack);
+          assert.equal(row(card, human).state, "done");
+        });
+
+        it("Cure Light Wounds harms undead (the card's healing button deals damage)", async () => {
+          const card = await cast("Cure Light Wounds", [zombieToken]);
+          const hp = zombie.system.attributes.hp.value;
+          await zombie.applyDamage(-4, { message: card, forceDialog: false });
+          assert.equal(zombie.system.attributes.hp.value, hp - 4);
+          await zombie.applyDamage(4, { forceDialog: false });
+        });
+
+        it("Daze: immune for a minute after being dazed by it", async () => {
+          await human.setFlag(MODULE_ID, "spellCooldown", { daze: game.time.worldTime + 60 });
+          const card = await cast("Daze", [humanToken]);
+          assert.equal(row(card, human).state, "unaffected");
+        });
+
+        it("a successful save: no effect; a natural 20 always saves", async () => {
+          const card = await cast("Flare", [humanToken]);
+          dice(0.01);
+          await save(card, human);
+          assert.isTrue(row(card, human).save.passed);
+          assert.isFalse(human.statuses.has("dazzled"));
+          assert.include(row(card, human).applied, "no effect");
+        });
+
+        it("Cause Fear: frightened on a failed save, shaken 1 round on a successful one", async () => {
+          const card = await cast("Cause Fear", [humanToken, friendToken]);
+          dice(0.99);
+          await save(card, human);
+          assert.isTrue(human.statuses.has("frightened"));
+          dice(0.01);
+          await save(card, friend);
+          assert.isTrue(friend.statuses.has("shaken"));
+          assert.include(row(card, friend).applied.join(), "shaken 1 round");
+        });
+
+        it("spell resistance: rolled automatically; a resisted spell has no save; only the GM sees the SR", async () => {
+          await human.update({ "system.attributes.sr.formula": "40" });
+          const card = await cast("Daze", [humanToken]);
+          const r = row(card, human);
+          assert.equal(r.state, "resisted");
+          assert.equal(r.sr.value, 40);
+          assert.isFalse(r.sr.passed);
+          assert.match((await card.renderHTML()).textContent, /SR check \d+ vs SR 40: resisted/);
+        });
+
+        it("Bless: allies among the targets get the buff, enemies aren't listed", async () => {
+          const card = await cast("Bless", [friendToken, humanToken]);
+          assert.deepEqual(rows(card).map((r) => r.name), [friend.name]);
+          await waitFor(() => friend.itemTypes.buff.some((b) => b.name === "Bless" && b.isActive), { what: "Bless" });
+          assert.equal(friend.itemTypes.buff.find((b) => b.name === "Bless").system.level, 5);
+          const bane = await cast("Bane", [friendToken, humanToken]);
+          assert.deepEqual(rows(bane).map((r) => r.name), [human.name]);
+        });
+
+        it("Shield: on the caster, with no targets", async () => {
+          const card = await cast("Shield", []);
+          assert.deepEqual(rows(card).map((r) => r.name), [wizard.name]);
+          await waitFor(() => wizard.itemTypes.buff.some((b) => b.name === "Shield" && b.isActive), { what: "Shield" });
+        });
+
+        it("Sleep: 4 HD in all, fewest HD first", async () => {
+          const card = await cast("Sleep", [ogreToken, humanToken, friendToken]);
+          assert.equal(row(card, ogre).state, "unaffected", "6 HD: more than the pool");
+          assert.equal(row(card, human).state, "save");
+          assert.equal(row(card, friend).state, "save");
+          dice(0.99);
+          await save(card, human);
+          assert.isTrue(human.statuses.has("sleep"));
+        });
+
+        it("Color Spray: by Hit Dice", async () => {
+          const card = await cast("Color Spray", [humanToken, ogreToken]);
+          dice(0.99);
+          await save(card, human);
+          await save(card, ogre);
+          for (const id of ["unconscious", "blind", "stunned"]) assert.isTrue(human.statuses.has(id), `1 HD: ${id}`);
+          assert.isTrue(ogre.statuses.has("stunned"));
+          assert.isFalse(ogre.statuses.has("blind"), "5 HD or more: stunned only");
+          assert.include(row(card, ogre).applied.join(), "stunned 1 round");
+        });
+
+        it("Ray of Enfeeblement: hits touch AC, a Strength penalty; a lower one later doesn't replace it", async () => {
+          dice(0.01); // natural 20: hits
+          const card = await cast("Ray of Enfeeblement", [humanToken]);
+          assert.isTrue(row(card, human).attack.hit);
+          dice(0.99); // fails the save; the penalty rolls its lowest: 1 + 2
+          await save(card, human);
+          const buff = human.itemTypes.buff.find((b) => b.name === "Ray of Enfeeblement");
+          assert.equal(buff.system.changes[0].formula, "-3");
+          await buff.update({ "system.changes": [{ formula: "-6", target: "str", type: "untyped" }] });
+          dice(0.01);
+          const again = await cast("Ray of Enfeeblement", [humanToken]);
+          dice(0.99);
+          await save(again, human);
+          assert.equal(human.itemTypes.buff.find((b) => b.name === "Ray of Enfeeblement").system.changes[0].formula, "-6");
+        });
+      });
+    },
+    { displayName: "PF1e Revamp: Spells" }
+  );
+}

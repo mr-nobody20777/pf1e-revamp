@@ -21,7 +21,7 @@ The two modules complement each other, and PF1e Revamp steps aside where they ov
 |---|---|
 | Stoneskin, Resist Energy, Protection from Energy and Protection from Arrows (damage absorption), Fire Shield, Mirror Image, temporary HP | **Nevela** |
 | Its *Concealed* condition's miss chance | **Nevela**. PF1e Revamp only rolls when a buff (Blur, Displacement...) gives a *higher* miss chance, and then strikes Nevela's roll through. |
-| Putting a buff on targets when an action is used | **Nevela**, for any action you've enabled its buff automation on. PF1e Revamp only applies Bit of Luck, Guidance and Resistant Touch when Nevela isn't set to. |
+| Putting a buff on targets when an action is used | **Nevela**, for any action you've enabled its buff automation on. PF1e Revamp only applies Bit of Luck, Guidance, Resistant Touch and spell buffs (Bless, Shield of Faith...) when Nevela isn't set to; the spell's rows (spell resistance, saves, conditions) are still filled in. |
 | Energy resistance on damage applied through PF1's dialog | Nevela / PF1. PF1e Revamp only adds resistance on quick-applied damage, so nothing is reduced twice. |
 
 ## Also tested alongside
