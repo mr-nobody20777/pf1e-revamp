@@ -35,11 +35,12 @@ const buff = (actor, re) => (actor?.itemTypes?.buff ?? []).find((b) => b.isActiv
 function weaponKind(action) {
   const item = action?.item;
   const names = [item?.name ?? "", ...(item?.system?.baseTypes ?? [])].join(" ").toLowerCase();
+  const sling = /sling/.test(names);
   return {
-    thrown: action?.actionType === "twak",
+    thrown: action?.actionType === "twak" && !sling, // PF1 marks slings as thrown attacks (Strength to damage)
     bow: /\b(long|short)?bow\b/.test(names) && !/crossbow/.test(names),
     crossbow: /crossbow/.test(names),
-    sling: /sling/.test(names),
+    sling,
     names,
   };
 }

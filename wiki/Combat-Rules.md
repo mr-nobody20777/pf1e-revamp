@@ -107,9 +107,28 @@ Shown in the roll window, where they can be unticked (or ticked when not detecte
 
 **Shooting while prone.** Firing a bow or sling (without Prone Slinger) while prone gives a warning: only crossbows, shuriken and firearms can be used prone.
 
+### Loaded weapons and reloading (optional)
+
+With **Track loaded ranged weapons** on (Settings; off by default), crossbows, slings and firearms keep track of how many shots they have loaded. Firing an empty one is refused with a message; reload it with the **Reload** button in the weapon's note (item sheet), or on the attack card once the weapon is empty. The button names the action reloading takes and whether it provokes, and posts that to chat (with a reminder if enemies threaten you). A full attack fires only the loaded shots. Weapons reload when combat ends.
+
+| Weapon | Capacity | Reload |
+|---|---|---|
+| Hand and light crossbow, sling, halfling sling staff | 1 | Move action |
+| Heavy crossbow, crank crossbows | 1 | Full-round action |
+| Repeating crossbows | 5 | Full-round action (a new case) |
+| Double crossbow, double sling | 2 | As above |
+| Early firearms (pistols, muskets…) | 1 per barrel (double-barreled 2, pepperbox 6) | Standard action per barrel (one-handed), full-round action (two-handed) |
+| Advanced firearms (revolvers, rifles) | 6 for a revolver | Move action |
+
+Faster with: Rapid Reload (hand and light crossbows and slings become free actions, heavy crossbows a move action, firearms one step faster; a Rapid Reload chosen for one weapon applies to that weapon), Crossbow Mastery (every crossbow free, without provoking), Crossbow Training (elves), Warslinger and Juggle Load (slings free), Ammo Drop (slings, swift action). A weapon that reloads as a free action isn't tracked at all. Bows and thrown weapons don't need loading (PF1 already removes a thrown weapon from its stack when it's thrown).
+
+### Shooting while threatened
+
+When a ranged weapon attack is made while an enemy that can act (not helpless, unconscious, stunned and so on) is adjacent, the card notes that the attack provokes attacks of opportunity. This is always on and only a reminder: whether an attack of opportunity happens is still the enemy's choice. Reach weapons aren't considered. Abilities that prevent it silence the note: Point-Blank Master (chosen weapon), safe shot (archers with bows, crossbowmen with crossbows), Close-Quarters Thrower, nimble shot weapons, Sword and Pistol (crossbows and firearms), Deft Shootist and Art of the Gun (firearms).
+
 Not automated: **wind** (the GM's call, along with Weathered Warrior, Storm Hunter and similar), cover.
 
-Not automated yet: range changes that depend on something the module can't see (Strong Arm, Supple Wrist; Ki Range; Unfolding Wind Strike; steady aim; Bull's Eye), reloading, and firearms. See the roadmap.
+Not automated yet: range changes that depend on something the module can't see (Strong Arm, Supple Wrist; Ki Range; Unfolding Wind Strike; steady aim; Bull's Eye), full attacks with thrown weapons and Quick Draw (PF1 gives a single attack), and firearm special rules. See the roadmap.
 
 ## Sneak attack
 

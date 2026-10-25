@@ -14,8 +14,9 @@ The roll-window buff manager ("Buffs on a roll") is released in the Unreleased s
 
 ### Next priorities
 Next, the focus moves to:
-- **Ranged combat** (research: `docs/RANGED-COMBAT-RESEARCH.md`). Phases: range and Point-Blank Shot (done), defenses against ranged attacks (done; wind left to the GM), action economy (loaded weapons and reloading, opt-in), special shots and firearms. Cover is deferred and stays manual for now.
+- **Ranged combat** (research: `docs/RANGED-COMBAT-RESEARCH.md`). Phases: range and Point-Blank Shot (done), defenses against ranged attacks (done; wind left to the GM), action economy (done: loaded weapons and reloading, opt-in), special shots and firearms. Cover is deferred and stays manual for now.
   - **Conditional range changes**, left out of the first phase because they depend on something the module can't see yet: Strong Arm, Supple Wrist (+10 ft after moving 10 ft), Ki Range and the zen archer's ki pool (ki spent for range), Unfolding Wind Strike (Perfect Style active), the musket master's steady aim (a move action), and Bull's Eye (a cursed target).
+  - **Thrown weapons at the full rate of attacks.** PF1 gives a full attack with a thrown weapon only one attack, even with Quick Draw ("may throw weapons at his full normal rate of attacks"); allow the iterative attacks when the character has Quick Draw, the quick throwing spell, or a returning weapon.
   - **Cover-dependent abilities** (with cover deferred): Improved Precise Shot, Pinpoint Targeting, Lob Shot, Low Profile, Combat Sandals, Volley Fire, Covered Sniper, veering weapons.
 - **Cantrips and 1st-level spells**: automate their effects across the spell lists, starting with the most commonly used.
 
