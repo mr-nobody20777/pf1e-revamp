@@ -30,6 +30,7 @@ feature before changing it. Newest first within each section. Format: **decision
 - **Clerics are prepared casters**; spontaneous casting converts prepared spells (2026-10-22).
 
 ## Classes
+- **Sneak attack against a creature immune to precision damage is blocked outright**: it can't be ticked in the roll window by anyone, unlike other Not Applied entries (2026-10-24).
 - **Sneak attack in phases** (research: `docs/SNEAK-ATTACK-RESEARCH.md`). Phase 1: dice from every class feature (PF1's formulas, summed), denied Dex / flanking / invisible-attacker detection, 30 ft range, concealment, immune creatures, Improved Uncanny Dodge, no crit multiplication, nonlethal with nonlethal weapons, Deadly Range and Sniper's Eye. Phase 2: talents, one asterisk talent per attack chosen in the roll window. Phase 3: feats, items, traits, spells, and fortification rolls (2026-10-24).
 - **Sneak attack applies automatically when the module detects its conditions** (target denied Dex or flanked, in range, not concealed), shown in the roll window where it can be unticked; when not detected it's listed under Not Applied and can be ticked by hand. Before building, research every feat, talent, racial trait, trait and item that touches sneak attack (2026-10-24).
 - **Shared rogue talents are offered to slayers only through the Rogue Talent talent**, not listed directly (2026-10-23).

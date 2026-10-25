@@ -60,10 +60,10 @@ function isTotalConcealment(actor) {
 }
 
 /**
- * Best miss chance a defender has against this attack.
- * @returns {{ chance: number, label: string, concealment?: boolean, nevela?: boolean } | null}
+ * Every miss chance a defender has against this attack.
+ * @returns {Array<{ chance: number, label: string, concealment?: boolean, nevela?: boolean }>}
  */
-export function defenderMissChance(defender, attacker, item, actionType) {
+export function missChances(defender, attacker, item, actionType) {
   const melee = MELEE.includes(actionType);
   const candidates = [];
 
@@ -90,8 +90,13 @@ export function defenderMissChance(defender, attacker, item, actionType) {
     candidates.push({ chance: nevelaActive() && isTotalConcealment(defender) ? 50 : 20, label: "Concealed", concealment: true, nevela: nevelaActive() });
   }
 
+  return candidates;
+}
+
+/** Best miss chance a defender has against this attack (they don't stack), or null. */
+export function defenderMissChance(defender, attacker, item, actionType) {
   // Highest wins; on a tie, leave it to Nevela's roll so it isn't rolled twice
-  return candidates.reduce((best, c) => (!best || c.chance > best.chance || (c.chance === best.chance && c.nevela) ? c : best), null);
+  return missChances(defender, attacker, item, actionType).reduce((best, c) => (!best || c.chance > best.chance || (c.chance === best.chance && c.nevela) ? c : best), null);
 }
 
 // preCreateChatMessage can't wait for an async Roll (v13 dice can't be rolled synchronously), so

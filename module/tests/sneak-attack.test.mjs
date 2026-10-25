@@ -7,8 +7,11 @@ import { _test as sneak } from "../sneak-attack.mjs";
 
 const sneakEntry = (actor, flanking = false) => {
   const action = actor.items.getName("Longsword").defaultAction;
-  return effects.buildModel(actor, { kind: "attack", action, flanking }).provided.find((p) => p.id === "sneak-attack");
+  return effects.buildModel(actor, { kind: "attack", action, flags: { flanking } }).provided.find((p) => p.id === "sneak-attack");
 };
+const FLAGS = "pf1e-revampAttackFlags";
+// The attack window a use just opened (closed ones can linger in ui.windows)
+const newAttackWindow = (before) => Object.entries(ui.windows).find(([id, w]) => !before.has(id) && w.constructor.name === "AttackDialog" && w.rendered)?.[1];
 
 export function registerSneakAttackTests(quench) {
   quench.registerBatch(
@@ -45,10 +48,23 @@ export function registerSneakAttackTests(quench) {
           await sceneCtl?.restore();
         });
 
-        it("slayer 6: 2d6, from PF1's own formula on the feature", () => {
+        it("slayer 6: 2d6, from PF1's own formula on the feature; different die sizes stay apart", () => {
           const [src] = sneak.sources(slayer);
           assert.equal(src.dice, 2);
           assert.equal(sneakEntry(slayer).dice.dmg, "2d6");
+          assert.equal(sneak.diceText([{ dice: 3, size: 6 }, { dice: 1, size: 8 }, { dice: 1, size: 6 }]), "4d6 + 1d8");
+        });
+
+        it("formulas without wrapping parentheses still count", async () => {
+          const feature = slayer.items.getName("Sneak Attack (SLA)");
+          const action = feature.defaultAction;
+          const before = foundry.utils.deepClone(action._source.damage.parts);
+          await action.update({ "damage.parts": [{ formula: "ceil(@class.level / 2)d6", types: [] }] });
+          try {
+            assert.equal(sneak.sources(slayer)[0]?.dice, 3);
+          } finally {
+            await feature.defaultAction.update({ "damage.parts": before });
+          }
         });
 
         it("not flanked and not denied Dex: listed as not applying, with the reason", () => {
@@ -104,15 +120,44 @@ export function registerSneakAttackTests(quench) {
           await slayer.setCondition("invisible", true);
           const e = sneakEntry(slayer);
           assert.isTrue(e.applies);
-          assert.match(e.tooltip, /can't see you/);
+          assert.match(e.tooltip, /: the target can't see you/);
         });
 
-        it("immune creatures (oozes)", async () => {
+        it("concealment counts even when a bigger miss chance (Blink) isn't concealment", async () => {
+          await goblin.setCondition("flatFooted", true);
+          const [blink] = await addItems(goblin, [["pf-content.pf-buffs", "Blink", { system: { active: true } }]]);
+          const [effect] = await goblin.createEmbeddedDocuments("ActiveEffect", [{ name: "Concealed", img: "icons/svg/mystery-man.svg", statuses: ["concealed"] }]);
+          try {
+            assert.match(sneakEntry(slayer).reason ?? "", /concealment/);
+          } finally {
+            await effect.delete();
+            await blink.delete();
+          }
+        });
+
+        it("immune creatures (oozes, precision immunity): blocked, nobody can tick it", async () => {
           await goblin.setCondition("flatFooted", true);
           const [race] = await addItems(goblin, [["pf1.races", "Human"]]);
           await race.update({ "system.creatureTypes.base": ["ooze"] });
-          assert.match(sneakEntry(slayer).reason, /oozes/);
-          await race.delete();
+          try {
+            const e = sneakEntry(slayer);
+            assert.match(e.reason, /oozes/);
+            assert.isTrue(e.blocked);
+          } finally {
+            await race.delete();
+          }
+          await goblin.update({ "system.traits.di": ["precision"] });
+          try {
+            const action = slayer.items.getName("Longsword").defaultAction;
+            const model = effects.buildModel(slayer, { kind: "attack", action, flags: {} });
+            const state = effects.newState(model, new Map([["sneak-attack", true]]));
+            assert.isFalse(state.provided.get("sneak-attack"), "a tick doesn't override the block");
+            const row = effects.rows(model, state).find((r) => r.key === "sneak-attack");
+            assert.isTrue(row.disabled);
+            assert.match(row.tooltip, /immune to precision damage/);
+          } finally {
+            await goblin.update({ "system.traits.di": [] });
+          }
         });
 
         it("damage: its own part in normal damage, never in critical damage", async () => {
@@ -121,16 +166,60 @@ export function registerSneakAttackTests(quench) {
           const formulas = async (critical) => (await action.rollDamage({ data: action.getRollData(), critical })).map((r) => r.formula).join(" + ");
           assert.match(await formulas(false), /2d6\[Sneak Attack\]/);
           assert.notMatch(await formulas(true), /Sneak Attack/, "not multiplied on a critical hit");
+          const [, sneakRoll] = await action.rollDamage({ data: action.getRollData() });
+          assert.includeMembers([...sneakRoll.options.damageType], ["slashing", "precision"], "typed precision as well as the weapon's type");
+        });
+
+        it("once per volley: not on Manyshot's extra arrow", async () => {
+          await goblin.setCondition("flatFooted", true);
+          const action = slayer.items.getName("Shortbow").defaultAction;
+          const roll = async (attackCount) => {
+            const data = action.getRollData();
+            Object.assign(data, { attackCount, [FLAGS]: { manyshotAttacks: [1] } });
+            return (await action.rollDamage({ data })).map((r) => r.formula).join(" + ");
+          };
+          assert.match(await roll(0), /Sneak Attack/);
+          assert.notMatch(await roll(1), /Sneak Attack/);
+        });
+
+        it("without the attack window: flanking from PF1's action use", async () => {
+          const before = new Set(game.messages.keys());
+          await slayer.items.getName("Longsword").use({ skipDialog: true, options: { flanking: true } });
+          const card = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.type === "action"));
+          assert.match(card.systemRolls.attacks[0].damage.map((d) => d.formula).join(" + "), /2d6\[Sneak Attack\]/);
+        });
+
+        it("ticking Flanking keeps the choices already made in the window", async () => {
+          await goblin.setCondition("flatFooted", true);
+          const windowsBefore = new Set(Object.keys(ui.windows));
+          const using = slayer.items.getName("Longsword").use({ skipDialog: false });
+          const dialog = await waitFor(() => newAttackWindow(windowsBefore), { what: "the attack window" });
+          const root = () => dialog.element[0];
+          const sneakBox = await waitFor(() => root().querySelector('.pf1e-revamp-effects input[data-key="sneak-attack"]'));
+          assert.isTrue(sneakBox.checked);
+          sneakBox.checked = false;
+          sneakBox.dispatchEvent(new Event("change", { bubbles: true }));
+          const flank = root().querySelector('input[name="flanking"]');
+          flank.checked = true;
+          flank.dispatchEvent(new Event("change", { bubbles: true }));
+          await waitFor(() => dialog.flags.flanking && root().querySelector('.pf1e-revamp-effects input[data-key="sneak-attack"]'));
+          assert.isFalse(root().querySelector('.pf1e-revamp-effects input[data-key="sneak-attack"]').checked, "still unticked");
+          assert.isFalse(!!dialog.rollData.pf1eRevampRollEffects?.provided?.some?.((p) => p.id === "sneak-attack"));
+          await waitFor(() => dialog._state === Application.RENDER_STATES.RENDERED); // not mid re-render
+          await dialog.close();
+          await using;
         });
 
         it("the attack window: ticking Flanking adds it, and the roll carries it", async () => {
           const before = new Set(game.messages.keys());
+          const windowsBefore = new Set(Object.keys(ui.windows));
           const using = slayer.items.getName("Longsword").use({ skipDialog: false });
-          const dialog = await waitFor(() => Object.values(ui.windows).find((w) => w.constructor.name === "AttackDialog" && w.actor === slayer), { what: "the attack window" });
+          const dialog = await waitFor(() => newAttackWindow(windowsBefore), { what: "the attack window" });
           const box = await waitFor(() => dialog.element[0].querySelector('input[name="flanking"]'));
           box.checked = true;
           box.dispatchEvent(new Event("change", { bubbles: true }));
-          await waitFor(() => /Sneak Attack/.test(dialog.element[0].querySelector(".pf1e-revamp-effects")?.textContent ?? "") && dialog.flags.flanking);
+          // Ticked (not merely listed under Not Applied) once the window has re-rendered
+          await waitFor(() => dialog.flags.flanking && dialog.element[0].querySelector('.pf1e-revamp-effects input[data-key="sneak-attack"]')?.checked, { what: "sneak attack to be ticked" });
           [...dialog.element[0].querySelectorAll("button")].find((b) => b.textContent.trim() === game.i18n.localize("PF1.SingleAttack")).click();
           await using;
           const card = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.type === "action"));

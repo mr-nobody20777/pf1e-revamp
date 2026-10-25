@@ -45,14 +45,16 @@ const providers = [];
 
 /**
  * Register a situational bonus. `collect(actor, roll)` returns entries for this roll:
- *   { id, label, part, type, atk, dmg, roll, dice, applies, reason, imposed, tooltip }
+ *   { id, label, part, type, atk, dmg, roll, dice, damageType, applies, blocked, reason, imposed, tooltip }
  * roll is { kind: "attack", action } | { kind: "save", saveId, reference } | { kind: "skill", skillId }
  * | { kind: "ability", abilityId }; `reference` is the UUID of the card the save was rolled from.
  * `part` labels the bonus in the roll formula; atk/dmg (attacks) or roll (other rolls) are its values.
  * `dice` adds dice instead ({ dmg: "3d6" }): a damage part of their own that isn't multiplied on a
- * critical hit (sneak attack and other precision damage).
- * Attack rolls also carry `flanking`, the attack window's Flanking box.
- * Entries that don't apply right now are listed as Not Applied with `reason`. Imposed entries (penalties
+ * critical hit (sneak attack and other precision damage), with `damageType` added to the weapon's types.
+ * Attack rolls also carry `flags`, the attack window's checkboxes ({ flanking, charge, highGround,
+ * manyshot, rapidShot, pointBlankShot }); the window is rebuilt, keeping the player's choices, when they change.
+ * Entries that don't apply right now are listed as Not Applied with `reason`; `blocked` ones can't be
+ * ticked by anyone (a target immune to the bonus). Imposed entries (penalties
  * from gear or rules) can only be turned off by the GM. Values should already allow for the roller's
  * own bonuses of the same type; between providers, only the highest of a type counts.
  */
@@ -191,7 +193,12 @@ function collectProvided(actor, roll) {
 /*  Choices and their effect                    */
 /* -------------------------------------------- */
 
-const newState = (model) => ({ off: new Set(), on: new Set(), provided: new Map(model.provided.map((p) => [p.id, !!p.applies])) });
+const newState = (model, chosen = new Map()) => ({
+  off: new Set(),
+  on: new Set(),
+  chosen, // provided ids → the player's tick, kept when the model is rebuilt
+  provided: new Map(model.provided.map((p) => [p.id, !p.blocked && (chosen.get(p.id) ?? !!p.applies)])),
+});
 
 const isIncluded = (model, state, key, change) => !state.off.has(key) && (!model.losers.has(change) || state.on.has(key));
 
@@ -385,9 +392,9 @@ function rows(model, state) {
       imposed: !!p.imposed,
       type: p.type && p.type !== "untyped" ? p.type : "",
       checked: !!state.provided.get(p.id),
-      disabled: (p.imposed && !gm) || (!!p.beatenBy && !!state.provided.get(p.beatenBy) && !state.provided.get(p.id)),
+      disabled: !!p.blocked || (p.imposed && !gm) || (!!p.beatenBy && !!state.provided.get(p.beatenBy) && !state.provided.get(p.id)),
       note: p.applies ? "" : state.provided.get(p.id) ? "ticked for this roll" : p.reason ?? "",
-      tooltip: p.imposed && !gm ? "Only the GM can turn this off for this roll" : p.tooltip ?? "",
+      tooltip: p.blocked ? `Can't apply: ${p.reason}` : p.imposed && !gm ? "Only the GM can turn this off for this roll" : p.tooltip ?? "",
     });
   }
   // Bonuses biggest first, then ability rows, then chosen penalties, then imposed ones; Not Applied last
@@ -485,7 +492,10 @@ function bind(root, ctx) {
       const { key, kind } = box.dataset;
       const on = box.checked;
       const entry = ctx.model.entries.get(key);
-      if (kind === "provided") ctx.state.provided.set(key, on);
+      if (kind === "provided") {
+        ctx.state.provided.set(key, on);
+        ctx.state.chosen.set(key, on);
+      }
       else if (entry?.beaten) on ? ctx.state.on.add(key) : ctx.state.on.delete(key);
       else on ? ctx.state.off.delete(key) : ctx.state.off.add(key);
       // A beaten bonus switched on stays on only while nothing in the roll beats it
@@ -508,9 +518,17 @@ function bind(root, ctx) {
 function makeContext(actor, roll, { place, apply, owner }) {
   const model = buildModel(actor, roll);
   const ctx = { actor, model, state: newState(model), manager: null };
+  // Called while the window renders (PF1 marks it rendered only after its render hooks)
+  ctx.rebuild = (next) => {
+    ctx.model = buildModel(actor, next);
+    ctx.state.provided = newState(ctx.model, ctx.state.chosen).provided;
+    apply(planFor(ctx.model, ctx.state));
+    ctx.redraw();
+    ctx.manager?.render();
+  };
   ctx.update = () => {
     if (!owner.rendered) return ctx.close();
-    apply(planFor(model, ctx.state));
+    apply(planFor(ctx.model, ctx.state));
     ctx.redraw();
     ctx.manager?.render();
   };
@@ -546,16 +564,11 @@ Hooks.on("renderAttackDialog", (app, html) => {
   const actor = action?.actor;
   if (!actor || !ATTACK_ACTIONS.includes(action.actionType) || !app.rollData) return;
   let ctx = attackContexts.get(app);
-  const flanking = !!app.flags?.flanking;
-  // The Flanking box changes what applies (sneak attack): start again from that window state
-  if (ctx && ctx.model.roll.flanking !== flanking) {
-    ctx.close();
-    attackContexts.delete(app);
-    root.querySelector(`.${MODULE_ID}-effects`)?.remove();
-    ctx = null;
-  }
+  const roll = { kind: "attack", action, flags: windowFlags(app.flags) };
+  // A checkbox such as Flanking changes what applies (sneak attack)
+  if (ctx && !foundry.utils.objectsEqual(ctx.model.roll.flags, roll.flags)) ctx.rebuild(roll);
   if (!ctx) {
-    ctx = makeContext(actor, { kind: "attack", action, flanking }, {
+    ctx = makeContext(actor, roll, {
       owner: app,
       place: {
         root: () => app.element[0] ?? app.element,
@@ -575,25 +588,40 @@ Hooks.on("renderAttackDialog", (app, html) => {
 
 Hooks.on("closeAttackDialog", (app) => attackContexts.get(app)?.close());
 
+// The attack window's checkboxes, from the window itself or (no window) from PF1's action use
+const WINDOW_FLAGS = { flanking: "flanking", charge: "charge", highGround: "highGround", manyshot: "manyshot", "rapid-shot": "rapidShot", "point-blank-shot": "pointBlankShot" };
+const windowFlags = (flags = {}) => Object.fromEntries(Object.entries(WINDOW_FLAGS).map(([k, name]) => [name, !!flags[k]]));
+const useFlags = (shared) => ({ flanking: !!shared.flanking, charge: !!shared.charge, highGround: !!shared.highGround, manyshot: !!shared.manyShot, rapidShot: !!shared.formData?.["rapid-shot"], pointBlankShot: !!shared.pointBlankShot });
+
+const FLAGS = `${MODULE_ID}AttackFlags`; // on the roll data: the use's flags, and which attacks are Manyshot's extra arrow
+const actionUses = new WeakMap(); // the action use's roll data → its shared state
+Hooks.on("pf1CreateActionUse", (use) => use.shared?.rollData && actionUses.set(use.shared.rollData, use.shared));
+
 // Registered at init, after every module script has loaded, so other features' attack hooks (True
 // Strike's +20 insight) run first and their typed bonuses are known
 Hooks.once("init", () => {
   Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
     if (!ATTACK_ACTIONS.includes(action.actionType)) return;
-    rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action, flanking: !!(config?.flanking ?? rollData.flanking) });
+    const shared = actionUses.get(rollData);
+    rollData[FLAGS] ??= shared ? { ...useFlags(shared), manyshotAttacks: shared.attacks.flatMap((a, i) => (a.type === "manyshot" ? [i] : [])) } : {};
+    rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action, flags: rollData[FLAGS] });
     parts.push(...partsFor(rollData[KEY], "atk", rollData));
     delete rollData[TYPED]; // per attack roll: a full attack's next attack starts fresh (no typed damage bonuses yet)
   });
 
   Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
     if (!ATTACK_ACTIONS.includes(action.actionType) || !parts[0]) return;
-    const plan = (rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action }));
+    const plan = (rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action, flags: rollData[FLAGS] ?? {} }));
     parts[0].extra.push(...partsFor(plan, "dmg", rollData));
     // Dice (sneak attack) aren't multiplied on a critical hit: only in the normal damage roll, whose
-    // total PF1 adds to the separate critical damage roll
-    if (rollData.critMult > 1) return;
+    // total PF1 adds to the separate critical damage roll. Precision damage counts once per volley, so
+    // not on Manyshot's extra arrow.
+    if (rollData.critMult > 1 || rollData[FLAGS]?.manyshotAttacks?.includes(rollData.attackCount)) return;
     for (const p of plan.provided) {
-      if (p.dice?.dmg) parts.push({ base: `${p.dice.dmg}[${p.part ?? p.label}]`, extra: [], damageType: parts[0].damageType, type: "normal" });
+      if (!p.dice?.dmg) continue;
+      const types = [...new Set([...(parts[0].damageType ?? []), ...(p.damageType ? [p.damageType] : [])])];
+      const formula = p.dice.dmg.includes("+") ? `(${p.dice.dmg})` : p.dice.dmg;
+      parts.push({ base: `${formula}[${p.part ?? p.label}]`, extra: [], damageType: types, type: "normal" });
     }
   });
 });

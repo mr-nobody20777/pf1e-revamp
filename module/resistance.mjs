@@ -1,8 +1,9 @@
 // Energy resistance and immunity on quick-applied damage. PF1 only applies resistances through its
 // Apply Damage dialog; the quick path (applying straight from a chat card) applies the full amount.
 // This reduces each damage instance by the target's best matching energy resistance, or ignores it
-// entirely if the target is immune to all of its types, and whispers what happened. The dialog path
-// is left alone, since the dialog already handles resistances.
+// entirely if the target is immune to all of its types (or to precision or nonlethal damage it carries),
+// and whispers what happened. The dialog path is left alone, since the dialog already handles
+// resistances (its precision/nonlethal immunity is corrected below).
 //
 // Order: the rules don't say whether a save for half or resistance comes first (no FAQ). Following the
 // usual table reading and the guideline of applying effects in the order most favorable to the creature,
@@ -10,7 +11,7 @@
 // Doubling (ratio above 1) keeps resistance first, which is also the more favorable order.
 
 import { MODULE_ID } from "./const.mjs";
-import { esc } from "./util.mjs";
+import { esc, wrapMethod } from "./util.mjs";
 
 const SETTING = "quickApplyResistance";
 const FROM_DIALOG = `${MODULE_ID}FromDialog`;
@@ -23,6 +24,28 @@ Hooks.once("init", () => {
     config: true,
     type: Boolean,
     default: true,
+  });
+});
+
+// Precision and nonlethal are modifiers on other damage types (sneak attack is "piercing, precision"),
+// and immunity to them blocks that damage. PF1 only counts damage as immune when every one of its
+// types is the immune type, so it would let typed precision damage through.
+const isModifier = (type) => !!pf1.registry.damageTypes.get(type)?.isModifier;
+const isImmune = (types, immunities) => types.every((t) => immunities.has(t)) || types.some((t) => isModifier(t) && immunities.has(t));
+
+Hooks.once("setup", () => {
+  wrapMethod("pf1.applications.ApplyDamage.prototype._processImmunities", function (wrapped, target) {
+    let immunized = wrapped(target);
+    for (const di of target.di ?? []) {
+      if (!di.active || !di.id || !isModifier(di.id)) continue;
+      for (const instance of target.instances) {
+        if (instance.immune || !instance.typeIds?.has(di.id)) continue;
+        instance.immune = true;
+        immunized += instance.total;
+        instance.total = 0;
+      }
+    }
+    return immunized;
   });
 });
 
@@ -127,7 +150,7 @@ Hooks.on("pf1ApplyDamage", (actor, options) => {
     const types = [...(instance.types ?? [])];
     const share = shares[i] ?? 0;
     if (!types.length || share <= 0) return;
-    if (types.every((t) => immunities.has(t))) {
+    if (isImmune(types, immunities)) {
       reduced += share;
       notes.push(`immune to ${types.join("/")} (${share})`);
       return;

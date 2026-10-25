@@ -78,6 +78,21 @@ export function registerResistanceTests(quench) {
           assert.equal(hp(), start - 5, "8 halved to 4 (2 fire + 2 cold): the cold still lands");
         });
 
+        it("immunity to precision blocks precision damage that also has a weapon type (sneak attack)", async () => {
+          await actor.update({ "system.traits.di": ["precision"] });
+          try {
+            const start = hp();
+            await actor.applyDamage(10, { instances: [part(["slashing"], 6), part(["piercing", "precision"], 4)] });
+            assert.equal(hp(), start - 6, "quick apply");
+            // PF1's dialog: only damage whose every type is the immune one counted, before the fix
+            const target = { di: [{ id: "precision", active: true }], instances: [{ total: 4, typeIds: new Set(["piercing", "precision"]) }, { total: 6, typeIds: new Set(["slashing"]) }] };
+            assert.equal(pf1.applications.ApplyDamage.prototype._processImmunities.call({}, target), 4, "dialog");
+            assert.equal(target.instances[1].total, 6);
+          } finally {
+            await actor.update({ "system.traits.di": [] });
+          }
+        });
+
         it("several types without amounts and no card to read them from: left to the GM, not guessed", async () => {
           const start = hp();
           await actor.applyDamage(10, { instances: [instance(["slashing"]), instance(["fire"])] });
