@@ -131,7 +131,7 @@ registerFootnote((item) => {
 
 const giftedSpell = (actor) => actor?.itemTypes?.feat.find((f) => ruleFor(f) === RULES["Gifted Adept"])?.getFlag(MODULE_ID, FLAG)?.spell ?? null;
 const hasSwordlordsPage = (actor) => actor?.itemTypes?.feat.some((f) => f.system.subType === "trait" && baseName(f.name) === "Swordlord's Page");
-const CRIT = "pf1eRevampCritConfirm";
+export const CRIT = "pf1eRevampCritConfirm"; // on the roll data during a critical confirmation roll
 const EDGED = ["slashing", "piercing"];
 
 Hooks.once("setup", () => {

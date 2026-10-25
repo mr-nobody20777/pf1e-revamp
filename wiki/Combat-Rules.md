@@ -126,9 +126,17 @@ Faster with: Rapid Reload (hand and light crossbows and slings become free actio
 
 When a ranged weapon attack is made while an enemy that can act (not helpless, unconscious, stunned and so on) is adjacent, the card notes that the attack provokes attacks of opportunity. This is always on and only a reminder: whether an attack of opportunity happens is still the enemy's choice. Reach weapons aren't considered. Abilities that prevent it silence the note: Point-Blank Master (chosen weapon), safe shot (archers with bows, crossbowmen with crossbows), Close-Quarters Thrower, nimble shot weapons, Sword and Pistol (crossbows and firearms), Deft Shootist and Art of the Gun (firearms).
 
+### Special shots and firearms
+
+- **Firearms against touch AC.** An early firearm attacks touch AC when the target is within its first range increment; an advanced firearm, within five increments (range changes from feats and items count). It still isn't a touch attack for feats such as Deadly Aim. The GM's AC line on the card shows it.
+- **Aspect of the Falcon:** bows and crossbows threaten on 19–20 with a ×3 multiplier. A weapon that already threatens on a wider range keeps it.
+- **Critical confirmation:** Toxophilite (+2, bows) and Alkenstar Defender (+1, ranged weapons).
+- **In the attack window, applied when they fit:** Halfling Slinger (+1 racial with slings); Arrow-Splitter (+1 against a target two or more sizes smaller than you); Large Target (slings: +1 damage per size category the target is larger than you, as precision damage, so precision immunity stops it); Coordinated Shot (+1 when an ally with the feat threatens the target, +2 when that ally flanks it with another ally; you don't count as flanking with a ranged weapon).
+- **In the attack window, to tick:** Bullseye Shot (+4, after a move action spent steadying the shot), Pinpoint Targeting (a single attack as a standard action without moving: the target gets no armor, natural armor or shield bonus, shown on the GM's AC line; the cover it also ignores stays the GM's call) and, on melee attacks, Opening Volley (+4 circumstance after damaging the target with a ranged attack since your last turn). The module can't see the earlier actions these depend on.
+
 Not automated: **wind** (the GM's call, along with Weathered Warrior, Storm Hunter and similar), cover.
 
-Not automated yet: range changes that depend on something the module can't see (Strong Arm, Supple Wrist; Ki Range; Unfolding Wind Strike; steady aim; Bull's Eye), full attacks with thrown weapons and Quick Draw (PF1 gives a single attack), and firearm special rules. See the roadmap.
+Not automated yet: range changes that depend on something the module can't see (Strong Arm, Supple Wrist; Ki Range; Unfolding Wind Strike; steady aim; Bull's Eye), full attacks with thrown weapons and Quick Draw (PF1 gives a single attack), gunslinger deeds and misfires. See the roadmap.
 
 ## Sneak attack
 

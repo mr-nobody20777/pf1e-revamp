@@ -18,11 +18,19 @@
 //     Charau-Ka Slayer +1 against thrown weapons; Breeze-Kissed +2 against nonmagical ranged attacks; Low
 //     Profile +1 dodge; Armor of Arrow Attraction –15. Shown under the attack, after the roll, to the GM
 //     and the target's owner only (players don't see enemy statistics); a deflection is shown to all.
+//   - Firearms (Ultimate Combat): "the attack resolves against the target's touch AC when the target is
+//     within the first range increment" (early firearms; advanced: within five increments), "but this
+//     type of attack is not considered a touch attack for the purposes of feats and abilities such as
+//     Deadly Aim". Pinpoint Targeting: "The target does not gain any armor, natural armor, or shield
+//     bonuses to its Armor Class." Both shown on the AC line.
 //   - Prone attackers can't use most ranged weapons: crossbows, shuriken and firearms can (Prone Slinger:
 //     slings). A warning, not a block.
 
 import { MODULE_ID, RANGED_ATTACKS } from "./const.mjs";
-import { esc, onGmRequest, requestedByOwner, equippedItem } from "./util.mjs";
+import { esc, onGmRequest, requestedByOwner, equippedItem, tokenDistance } from "./util.mjs";
+import { rollPlan } from "./roll-effects.mjs";
+import { rangeChanges } from "./ranged.mjs";
+import { loading } from "./ranged-actions.mjs";
 
 const FLAG = "rangedDefense";
 const WEAPON_ATTACKS = ["rwak", "twak"]; // ranged weapon attacks (not spells, not maneuvers)
@@ -107,15 +115,24 @@ Hooks.on("pf1PreDisplayActionUse", (use) => {
   const action = use.action;
   if (!RANGED_ATTACKS.includes(action?.actionType)) return;
   const targets = (use.shared.targets ?? []).map((t) => t.document ?? t).filter((t) => t?.actor);
-  const touch = !!action.touch;
+  const pinpoint = !!rollPlan(use.shared.rollData)?.provided?.some((p) => p.pinpoint);
+  const gun = loading(use.actor, use.item);
+  const mine = use.token?.object ?? use.actor?.getActiveTokens()[0];
+  const increment = ((Number(action.range?.value) || 0) + rangeChanges(use.actor, action).add) || 0;
   const out = [];
   for (const token of targets) {
     const defender = token.actor;
     const changes = acAgainstRanged(defender, action);
     const deflector = deflectorOf(defender, action);
-    if (!changes.length && !deflector) continue;
-    const ac = defender.system.attributes.ac?.[touch ? "touch" : "normal"]?.total ?? null;
-    out.push({ uuid: token.uuid, name: token.name, ac, changes, deflector });
+    const dist = tokenDistance(mine, token.object);
+    const firearmTouch = !!gun?.firearm && increment > 0 && dist != null && dist <= increment * (gun.advanced ? 5 : 1);
+    if (!changes.length && !deflector && !firearmTouch && !pinpoint) continue;
+    const ac = defender.system.attributes.ac;
+    const touch = !!action.touch || firearmTouch;
+    let base = ac?.[touch ? "touch" : "normal"]?.total ?? null;
+    // Pinpoint Targeting: no armor, natural armor or shield bonus (touch AC already has none)
+    if (pinpoint && !touch && base != null) base -= ["normal", "shield", "natural"].reduce((t, k) => t + Math.max(0, defender.system.ac?.[k]?.total ?? 0), 0);
+    out.push({ uuid: token.uuid, name: token.name, ac: base, changes, deflector, firearmTouch, pinpoint });
   }
   if (!out.length) return;
   const totals = use.shared.chatAttacks.map((a) => ({ total: a.attack?.total ?? null, natural: a.attack?.d20?.total ?? a.attack?.dice?.[0]?.total ?? null }));
@@ -144,10 +161,15 @@ Hooks.on("renderChatMessagePF", (message, html) => {
       const actor = fromUuidSync(t.uuid)?.actor;
       const seesStats = game.user.isGM || !!actor?.isOwner; // enemy statistics stay hidden from players
       const bonus = t.changes.reduce((s, c) => s + c.value, 0);
-      if (seesStats && bonus && t.ac != null && roll.total != null) {
+      if (seesStats && (bonus || t.firearmTouch || t.pinpoint) && t.ac != null && roll.total != null) {
         const ac = t.ac + bonus;
         const hits = roll.natural === 20 || (roll.natural !== 1 && roll.total >= ac);
-        lines.push(line(`<strong>${esc(t.name)}</strong>: AC ${ac} against this ranged attack (${t.changes.map((c) => `${c.value > 0 ? "+" : ""}${c.value} ${esc(c.label)}`).join(", ")}): ${roll.total} ${hits ? "hits" : "misses"}`, !hits));
+        const why = [
+          t.firearmTouch ? "touch AC: a firearm within range" : null,
+          t.pinpoint ? "no armor, natural armor or shield: Pinpoint Targeting" : null,
+          ...t.changes.map((c) => `${c.value > 0 ? "+" : ""}${c.value} ${esc(c.label)}`),
+        ].filter(Boolean);
+        lines.push(line(`<strong>${esc(t.name)}</strong>: AC ${ac} against this ranged attack (${why.join(", ")}): ${roll.total} ${hits ? "hits" : "misses"}`, !hits));
       }
       if (t.deflector && actor && (game.user.isGM || actor.isOwner) && usedThisRound(actor) < t.deflector.perRound) {
         const d = t.deflector;

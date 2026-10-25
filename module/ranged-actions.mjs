@@ -57,13 +57,13 @@ function featFor(actor, re, names) {
 }
 
 /**
- * How this weapon loads: { capacity, step, provokes, firearm } (step: the action to reload it fully,
+ * How this weapon loads: { capacity, step, provokes, firearm, advanced } (step: the action to reload it fully,
  * after feats), or null for weapons that don't load (bows, thrown weapons).
  */
 export function loading(actor, item) {
   if (item?.type !== "weapon" && item?.type !== "attack") return null;
   const n = namesOf(item);
-  let capacity = 1, step, firearm = false;
+  let capacity = 1, step, firearm = false, advanced = false;
   if (/crossbow/.test(n)) {
     capacity = /repeating/.test(n) ? 5 : /double crossbow/.test(n) ? 2 : 1;
     step = /heavy|repeating|crank/.test(n) ? "full-round" : "move";
@@ -79,14 +79,14 @@ export function loading(actor, item) {
     else if (feat(actor, /^ammo drop/i)) step = "swift";
   } else if (/pistol|musket|rifle|revolver|pepperbox|blunderbuss|gun\b/.test(n)) {
     firearm = true;
-    const advanced = /revolver|^rifle|\brifle\b(?!.*pepperbox)|nagant|mosin|radium/.test(n) && !/pepperbox|cylinder/.test(n);
+    advanced = /revolver|^rifle|\brifle\b(?!.*pepperbox)|nagant|mosin|radium/.test(n) && !/pepperbox|cylinder/.test(n);
     capacity = /double-barreled|double barreled/.test(n) ? 2 : /pepperbox|revolver/.test(n) ? 6 : /cylinder/.test(n) ? 5 : 1;
     const twoHanded = /musket|rifle|blunderbuss/.test(n);
     step = advanced ? "move" : twoHanded ? "full-round" : "standard";
     if (featFor(actor, /^rapid reload\b/i, n)) step = advanced ? "free" : faster(step);
   } else return null;
   const quietReload = (step === "free" && !firearm) || feat(actor, /^(ammo drop|juggle load|slipslinger style)/i) && /sling/.test(n) || (/crossbow/.test(n) && feat(actor, /^crossbow mastery/i)) || (firearm && feat(actor, /^protective line/i));
-  return { capacity, step, provokes: !quietReload, firearm };
+  return { capacity, step, provokes: !quietReload, firearm, advanced };
 }
 
 export const loadedShots = (item, info) => item.getFlag(MODULE_ID, LOADED) ?? info.capacity;
@@ -129,7 +129,7 @@ function registerWrappers() {
 // Registered at init/setup. Loaded after init (the tests, before Foundry is restarted to load a new
 // script), it does both at once: the quick-apply resistance setting is registered at init, so its presence
 // shows init has passed.
-if (game.ready || game.settings.settings.has(`${MODULE_ID}.quickApplyResistance`)) {
+if (game.ready || game.settings?.settings?.has(`${MODULE_ID}.quickApplyResistance`)) {
   registerSetting();
   registerWrappers();
 } else {
