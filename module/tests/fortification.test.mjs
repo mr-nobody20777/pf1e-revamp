@@ -4,6 +4,7 @@
 import { createTestActor, addItems, cleanup, useTestScene, placeToken, setTargets, deleteTokens, waitFor } from "./helpers.mjs";
 import { _test as effects } from "../roll-effects.mjs";
 import { _test as fort } from "../fortification.mjs";
+import { applyRider } from "../sneak-talents.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -105,6 +106,58 @@ export function registerFortificationTests(quench) {
           const attack0 = card.systemRolls.attacks[0];
           assert.isTrue(card.getFlag(MODULE_ID, fort.FLAG).attacks[0].crit);
           assert.equal((attack0.critDamage ?? []).reduce((t, r) => t + r.total, 0), 0, "not even the Strength bonus PF1 adds after the hook");
+        });
+
+        it("talents are offered only where the sneak attack wasn't negated", async () => {
+          await item(goblin, armor("Chainmail of Moderate Fortification"));
+          const [bleeding] = await addItems(slayer, [["pf1.class-abilities", "Bleeding Attack"]]);
+          made.push(bleeding);
+          await slayer.setFlag(MODULE_ID, "lastSneakRider", "bleeding");
+          // Full attack: the first attack's fortification roll is 1 (negated), everything after rolls high
+          const card = await attack([0.01, 0.99]);
+          const fortData = card.getFlag(MODULE_ID, fort.FLAG);
+          assert.isTrue(fortData.attacks[0].roll.negated);
+          assert.isFalse(fortData.attacks[1].roll.negated);
+          const riders = card.getFlag(MODULE_ID, "sneakRiders");
+          assert.notInclude(riders.attacks, 0, "no Bleeding Attack on the negated attack");
+          assert.include(riders.attacks, 1);
+          assert.match(await applyRider(card, 0, 0), /negated/, "and it can't be applied there");
+          await slayer.unsetFlag(MODULE_ID, "lastSneakRider");
+        });
+
+        it("a talent keeps Sap Master's doubled dice", async () => {
+          const [master, bleeding] = await addItems(slayer, [["pf-content.pf-feats", "Sap Master"], ["pf1.class-abilities", "Bleeding Attack"]]);
+          made.push(master, bleeding);
+          const [sap] = await addItems(slayer, [["pf1.weapons-and-ammo", "Sap"]]);
+          made.push(sap);
+          await sap.defaultAction.update({ nonlethal: true });
+          const model = effects.buildModel(slayer, { kind: "attack", action: sap.defaultAction, flags: {} });
+          const state = effects.newState(model);
+          state.choices.set("sneak-attack", "bleeding");
+          const planned = effects.planFor(model, state).provided.find((p) => p.id === "sneak-attack");
+          assert.equal(planned.dice.dmg, "4d6", "2d6 doubled, with Bleeding Attack chosen");
+        });
+
+        it("Manyshot: the extra arrow gets no sneak attack, no fortification line and no talent", async () => {
+          await item(goblin, armor("Chainmail of Light Fortification"));
+          const extras = await addItems(slayer, [["pf1.weapons-and-ammo", "Shortbow"], ["pf1.feats", "Manyshot"], ["pf1.weapons-and-ammo", "Arrow", { system: { quantity: 20 } }], ["pf1.class-abilities", "Bleeding Attack"]]);
+          made.push(...extras);
+          await slayer.setFlag(MODULE_ID, "lastSneakRider", "bleeding");
+          const before = new Set(game.messages.keys());
+          const windowsBefore = new Set(Object.keys(ui.windows));
+          const using = slayer.items.getName("Shortbow").use({ skipDialog: false });
+          const dialog = await waitFor(() => Object.entries(ui.windows).find(([id, w]) => !windowsBefore.has(id) && w.constructor.name === "AttackDialog" && w.rendered)?.[1], { what: "the attack window" });
+          const box = dialog.element[0].querySelector('input[name="manyshot"]');
+          box.checked = true;
+          box.dispatchEvent(new Event("change", { bubbles: true }));
+          await waitFor(() => dialog.flags.manyshot && dialog._state === Application.RENDER_STATES.RENDERED);
+          [...dialog.element[0].querySelectorAll("button")].find((b) => b.textContent.trim() === game.i18n.localize("PF1.FullAttack")).click();
+          await using;
+          const card = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.type === "action"));
+          await slayer.unsetFlag(MODULE_ID, "lastSneakRider");
+          assert.notMatch(card.systemRolls.attacks[1].damage.map((d) => d.formula).join(" + "), /Sneak Attack/, "the Manyshot arrow");
+          assert.notOk(card.getFlag(MODULE_ID, fort.FLAG)?.attacks?.[1]?.sneak, "fortification doesn't treat it as a sneak attack");
+          assert.notInclude(card.getFlag(MODULE_ID, "sneakRiders").attacks, 1, "no talent on it");
         });
 
         it("Anatomical Savant lowers the chance by 25%", async () => {
