@@ -117,6 +117,12 @@ Hooks.on("createChatMessage", (message) => {
   for (const [key, handler] of gmHandlers) if (flags[key] !== undefined) handler(message, flags[key]);
 });
 
+/** An item the actor has equipped whose name matches (worn armor, a wondrous item). */
+export const equippedItem = (actor, re) => actor?.items.find((i) => i.type === "equipment" && i.system.equipped && re.test(i.name)) ?? null;
+
+/** Did the user who made this GM request own the actor (players may only ask for their own)? */
+export const requestedByOwner = (request, actor) => !!actor && !!request.author && (request.author.isGM || actor.testUserPermission(request.author, "OWNER"));
+
 /** Users to whisper an actor's prompts to: its player owners, or the GMs if it has none. */
 export function ownerWhisper(actor) {
   const owners = game.users.filter((u) => !u.isGM && actor.testUserPermission(u, "OWNER")).map((u) => u.id);

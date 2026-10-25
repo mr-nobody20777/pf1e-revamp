@@ -29,7 +29,7 @@
 // The GM still judges "must be able to see the target ... and reach such a spot": untick it when not.
 
 import { MODULE_ID, RANGED_ATTACKS } from "./const.mjs";
-import { evaluate, classLevel } from "./util.mjs";
+import { evaluate, classLevel, equippedItem as equipped } from "./util.mjs";
 import { registerRollEffect, registerDamageFilter, rollPlan } from "./roll-effects.mjs";
 import { missChances, seesInvisible } from "./miss-chance.mjs";
 import { isIncorporeal } from "./resistance.mjs";
@@ -77,7 +77,6 @@ const viciousClaws = (actor, item) => item?.subType === "natural" && /claw/i.tes
 // all of the character's attacks until the end of her next turn, flanked or not
 const HUNTER = "Hunter's Surprise";
 // Phase 3: feats, items and traits
-const equipped = (actor, re) => actor?.items.find((i) => i.type === "equipment" && i.system.equipped && re.test(i.name)) ?? null;
 const MERCILESS = ["blind", "dying", "entangled", "exhausted", "frightened", "helpless", "nauseated", "panicked", "paralyzed", "stunned"];
 const isBludgeoningNonlethal = (action) =>
   (action.nonlethal || !!action.item?.system.properties?.nnl) && (action.damage?.parts ?? []).some((p) => [...(p.types ?? [])].includes("bludgeoning"));
@@ -123,7 +122,7 @@ function ignoresConcealment(actor, action, ranged, total) {
   if (total) return null;
   if (hasFeat(actor, /^shadow strike/i).length) return "Shadow Strike";
   if (/shadow cleaver/i.test(action.item?.name ?? "")) return "Shadow Cleaver";
-  if (actor.items.some((i) => i.type === "equipment" && i.system.equipped && /mirrored/i.test(i.name))) return "Mirrored";
+  if (equipped(actor, /mirrored/i)) return "Mirrored";
   if (ranged && hasFeat(actor, /^acute shot/i).length && (action.item?.system.enh ?? 0) > 0) return "Acute Shot";
   return null;
 }
@@ -176,8 +175,15 @@ registerRollEffect({
     if (!srcs.length) return [];
     if (viciousClaws(actor, action.item)) srcs = srcs.map((s) => ({ ...s, size: 8 }));
     const base = { id: "sneak-attack", label: "Sneak Attack", type: "untyped", dice: { dmg: diceText(srcs) }, damageType: "precision", showIn: ["dmg"] };
-    const choice = riderChoice(actor, termsOf(srcs), action, srcs);
-    if (choice) base.choice = choice;
+    // The dice as this attack has them (Sap Master doubles them, Acute Shot caps them); the talent
+    // dropdown works from these
+    let terms = termsOf(srcs);
+    const withChoice = () => {
+      base.dice = { dmg: terms.map((t) => `${t.n}d${t.size}`).join(" + ") };
+      const choice = riderChoice(actor, terms, action, srcs);
+      if (choice) base.choice = choice;
+      return base;
+    };
     // Assassinate: ticked by the player once the target has been studied for 1 round
     const assassinate = hasFeat(actor, /^assassinate/i)[0];
     const extra = assassinate ? [{ id: "assassinate", label: "Assassinate", type: "untyped", showIn: ["dmg"], valueText: "Fortitude or die", applies: false, reason: "tick it after studying the target for 1 round (a standard action)", assassinate: assassinate.uuid }] : [];
@@ -187,8 +193,8 @@ registerRollEffect({
     }
     // In a surprise round, Surprise Attack and Onslaught make it apply: a tick for the player
     const surprise = hasFeat(actor, /^(surprise attack|onslaught)/i)[0];
-    const not = (reason) => [{ ...base, applies: false, reason: surprise ? `${reason}; tick it in a surprise round (${surprise.name})` : reason }, ...extra];
-    const yes = (tooltip) => [{ ...base, applies: true, tooltip }, ...extra];
+    const not = (reason) => [{ ...withChoice(), applies: false, reason: surprise ? `${reason}; tick it in a surprise round (${surprise.name})` : reason }, ...extra];
+    const yes = (tooltip) => [{ ...withChoice(), applies: true, tooltip: `${base.dice.dmg}: ${tooltip}` }, ...extra];
 
     const targets = [...game.user.targets];
     if (targets.length !== 1) return not(targets.length ? "more than one target" : "no target selected");
@@ -215,7 +221,7 @@ registerRollEffect({
     if (bonus.dmg) base.dmg = bonus.dmg;
     base.partLabel = { atk: `Sneak Attack (${bonus.partLabel.atk})`, dmg: `Sneak Attack (${bonus.partLabel.dmg})` };
     if (isBludgeoningNonlethal(action) && hasFeat(actor, /^sap master/i).length && target.statuses?.has("flatFooted")) {
-      base.dice = { dmg: termsOf(srcs).map((t) => `${t.n * 2}d${t.size}`).join(" + ") };
+      terms = terms.map((t) => ({ ...t, n: t.n * 2 }));
     }
 
     // Concealment (any, not only the best miss chance); Sniper's Eye allows ranged attacks within 30 ft
@@ -228,14 +234,14 @@ registerRollEffect({
       const through = snipersEye ? "Sniper's Eye" : ignoresConcealment(actor, action, ranged, total);
       if (!through) return not(`${worst.label}: concealment`);
       // Acute Shot: no more dice than the weapon's magic bonus
-      if (through === "Acute Shot") base.dice = { dmg: `${Math.min(n, action.item.system.enh)}d6` };
+      if (through === "Acute Shot") terms = [{ n: Math.min(n, action.item.system.enh), size: 6 }];
     }
 
-    if (preyOf(actor) === targetToken.document.uuid) return yes(`${base.dice.dmg}: ${HUNTER} (your prey)`);
+    if (preyOf(actor) === targetToken.document.uuid) return yes(`${HUNTER} (your prey)`);
     const denied = deniedDex(target, actor);
-    if (denied) return yes(`${base.dice.dmg}: ${denied}`);
+    if (denied) return yes(denied);
     if (!ranged && roll.flags?.flanking) {
-      if (canFlank(target, actor, srcs)) return yes(`${base.dice.dmg}: you flank the target`);
+      if (canFlank(target, actor, srcs)) return yes("you flank the target");
       return not("Improved Uncanny Dodge: can't be flanked by you");
     }
     return not("the target isn't flanked or denied its Dexterity bonus");
@@ -248,9 +254,10 @@ registerRollEffect({
 //   - Savage Critical: "When you ... confirm a critical hit against an opponent, add your sneak attack
 //     damage to the damage from the attack. This feat has no effect on attacks that already allow you
 //     to add sneak attack damage." (Its Vital Strike half isn't automated.)
+// PF1 rolls the critical damage critMult − 1 times, counting them in critCount: these go in the first only.
 registerDamageFilter((rollData, parts, action) => {
   const actor = action.actor;
-  if (!(rollData.critMult > 1) || !actor || !parts[0]) return;
+  if (!(rollData.critMult > 1) || (rollData.critCount ?? 1) > 1 || !actor || !parts[0]) return;
   const sneak = rollPlan(rollData)?.provided.find((p) => p.id === "sneak-attack");
   const types = [...new Set([...(parts[0].damageType ?? []), "precision"])];
   if (sneak?.dice?.dmg && hasFeat(actor, /^sneaking critical/i).length) {

@@ -15,7 +15,7 @@
 //     of the Fortunate Soldier, once; Fortified): a button on the card for the target's owner or the GM.
 
 import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
-import { esc, classLevel, onGmRequest } from "./util.mjs";
+import { esc, classLevel, onGmRequest, equippedItem as worn, requestedByOwner } from "./util.mjs";
 import { rollPlan, registerDamageFilter } from "./roll-effects.mjs";
 
 const KEY = `${MODULE_ID}Fortification`; // on the action use's roll data: attack index → roll
@@ -24,9 +24,13 @@ const LEVELS = { light: 25, moderate: 50, heavy: 75 };
 
 const feat = (actor, re) => (actor?.itemTypes?.feat ?? []).find((f) => f.isActive !== false && re.test(f.name)) ?? null;
 const buff = (actor, re) => (actor?.itemTypes?.buff ?? []).find((b) => b.isActive && re.test(b.name)) ?? null;
-const worn = (actor, re) => actor?.items.find((i) => i.type === "equipment" && i.system.equipped && re.test(i.name)) ?? null;
 
 /** The defender's chance to negate a critical hit or sneak attack: { chance, label } or null. */
+export const negatedSneak = (message, index) => {
+  const a = message?.getFlag(MODULE_ID, FLAG)?.attacks?.[index];
+  return !!a && (!!a.roll?.negated || !!message.getFlag(MODULE_ID, FLAG)?.negated?.[index]);
+};
+
 export function fortificationOf(defender) {
   if (!defender) return null;
   const found = [];
@@ -69,24 +73,33 @@ Hooks.on("pf1PreAttackRoll", (action, config, rollData) => {
   const chance = fort ? Math.min(100, fort.chance - savant) : 0;
   if (chance <= 0) return void (results[index] = null);
   const roll = d100();
-  results[index] = { chance, label: fort.label, savant: !!savant, roll, negated: roll <= chance };
+  results[index] = { chance, label: fort.label, savant: !!savant, roll, negated: roll <= chance, target: targets[0].document.uuid };
 });
+
+class SealedParts extends Array {
+  push() {
+    return this.length;
+  }
+}
 
 // A negated hit: no critical damage (PF1 rolls it separately from the normal damage), no precision dice
 registerDamageFilter((rollData, parts) => {
   if (!rollData[KEY]?.[rollData.attackCount ?? 0]?.negated) return;
   if (rollData.critMult > 1) {
-    for (const part of parts) Object.assign(part, { base: "0", extra: [] });
+    // PF1 pushes damage changes, extra parts and the ability modifier into the first part after this
+    // hook: an array that ignores pushes keeps the critical damage at 0
+    parts.splice(1);
+    Object.assign(parts[0], { base: "0", extra: new SealedParts() });
     return;
   }
   for (let k = parts.length - 1; k > 0; k--) if ([...(parts[k].damageType ?? [])].includes("precision")) parts.splice(k, 1);
+  const extra = parts[0]?.extra ?? [];
+  for (let k = extra.length - 1; k >= 0; k--) if (/\[Sneak Attack\b/.test(extra[k])) extra.splice(k, 1);
 });
 
 /* -------------------------------------------- */
 /*  The card                                    */
 /* -------------------------------------------- */
-
-const hasSneak = (use) => !!rollPlan(use.shared.rollData)?.provided.some((p) => p.id === "sneak-attack" && p.dice?.dmg);
 
 // One-off negations the defender can choose: { label, left } or null
 function oneOffs(defender) {
@@ -104,18 +117,20 @@ function oneOffs(defender) {
 }
 
 Hooks.on("pf1PreDisplayActionUse", (use) => {
-  const results = use.shared.rollData?.[KEY];
-  const target = use.shared.targets?.length === 1 ? use.shared.targets[0] : null;
+  const results = use.shared.rollData?.[KEY] ?? {};
+  // The creature the rolls were made against (targets can change while the attack window is open)
+  const rolledAgainst = Object.values(results).find((r) => r?.target)?.target;
+  const target = rolledAgainst ? fromUuidSync(rolledAgainst) : use.shared.targets?.length === 1 ? use.shared.targets[0].document : null;
   if (!target?.actor) return;
-  const sneak = hasSneak(use);
+  const sneak = rollPlan(use.shared.rollData)?.provided.find((p) => p.id === "sneak-attack" && p.dice?.dmg);
   const attacks = {};
   use.shared.chatAttacks.forEach((a, i) => {
-    if (!a.hasCritConfirm && !(sneak && a.type !== "manyshot")) return; // neither a threat nor a sneak attack
-    const roll = results?.[i] ?? null;
-    attacks[i] = { roll, crit: !!a.hasCritConfirm, sneak: sneak && a.type !== "manyshot" };
+    const sneaks = !!sneak && use.shared.attacks?.[i]?.type !== "manyshot"; // once per volley
+    if (!a.hasCritConfirm && !sneaks) return; // neither a threat nor a sneak attack
+    attacks[i] = { roll: results[i] ?? null, crit: !!a.hasCritConfirm, sneak: sneaks, sneakBonus: sneaks ? (sneak.dmg ?? 0) : 0 };
   });
   if (!Object.values(attacks).some((a) => a.roll) && !oneOffs(target.actor).length) return;
-  use.shared.chatData[`flags.${MODULE_ID}.${FLAG}`] = { target: target.document.uuid, attacks, negated: {} };
+  use.shared.chatData[`flags.${MODULE_ID}.${FLAG}`] = { target: target.uuid, attacks, negated: {} };
 });
 
 function what({ crit, sneak }) {
@@ -192,7 +207,8 @@ export async function negate(message, index, key) {
   else if (option.left != null) await item.update({ "system.uses.value": option.left - 1 });
   // Normal damage: the damage rolls without precision damage, and no critical damage
   const rolls = message.systemRolls?.attacks?.[index]?.damage ?? [];
-  const amount = rolls.filter((r) => ![...(r.options?.damageType ?? [])].includes("precision")).reduce((t, r) => t + (r.total ?? 0), 0);
+  const bonus = data.attacks?.[index]?.sneak ? (data.attacks[index].sneakBonus ?? 0) : 0;
+  const amount = Math.max(0, rolls.filter((r) => ![...(r.options?.damageType ?? [])].includes("precision")).reduce((t, r) => t + (r.total ?? 0), 0) - bonus);
   const result = { by: option.label, amount };
   await message.update({ [`flags.${MODULE_ID}.${FLAG}.negated.${index}`]: result });
   return result;
@@ -200,7 +216,8 @@ export async function negate(message, index, key) {
 
 onGmRequest("negateHit", async (request, { message, index, key }) => {
   const card = game.messages.get(message);
-  if (card) await negate(card, index, key);
+  const target = fromUuidSync(card?.getFlag(MODULE_ID, FLAG)?.target)?.actor;
+  if (card && requestedByOwner(request, target)) await negate(card, index, key);
   await request.delete();
 });
 

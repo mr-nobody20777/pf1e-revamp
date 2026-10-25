@@ -12,10 +12,11 @@
 //   - Same-source bonuses (Offensive Defense, Emboldening Strike) don't stack: a new hit refreshes them.
 
 import { MODULE_ID, MELEE_ATTACKS } from "./const.mjs";
-import { esc, classLevel, onGmRequest } from "./util.mjs";
+import { esc, classLevel, onGmRequest, equippedItem, requestedByOwner } from "./util.mjs";
 import { rollPlan } from "./roll-effects.mjs";
 import { precisionImmune } from "./resistance.mjs";
 import { setBleed } from "./bleed.mjs";
+import { negatedSneak } from "./fortification.mjs";
 
 const EFFECT = "Adds an effect (one per attack)";
 const INSTEAD = "Instead of the dice";
@@ -192,7 +193,7 @@ export function riderChoice(actor, terms, action, srcs) {
       // For the card: the dice the effect counts (those rolled, or those given up), and the DC
       const { level, dc } = dcFor(actor, rider, def.item, srcs, given);
       // Murderer's Blackcloth: +1 bleed on sneak attacks
-      const blackcloth = rider.id === "bleeding" && actor.items.some((i) => i.type === "equipment" && i.system.equipped && /murderer'?s blackcloth/i.test(i.name)) ? 1 : 0;
+      const blackcloth = rider.id === "bleeding" && equippedItem(actor, /murderer'?s blackcloth/i) ? 1 : 0;
       const counted = (rider.perDie ? given : rider.instead || rider.forgo ? n : keptN) + blackcloth;
       const rider_ = { id: rider.id, name: def.item.name, item: def.item.uuid, n: counted, given, dc, level, daily: !!rider.daily, text: rider.text(counted, dc, level, given) };
       if (keptN === 0) return { dice: null, valueText: `${def.item.name} instead of the dice`, ...fields, rider: rider_ };
@@ -232,7 +233,10 @@ Hooks.on("pf1PreDisplayActionUse", (use) => {
     else if (item && usesLeft(item) > 0) item.update({ "system.uses.value": usesLeft(item) - 1 });
   } else if (actor.getFlag(MODULE_ID, LAST) && entry.choice) actor.unsetFlag(MODULE_ID, LAST);
   if (!riders.length) return;
-  const attacks = use.shared.chatAttacks.map((a, i) => (a.type === "manyshot" || !a.damage?.rolls?.length ? -1 : i)).filter((i) => i >= 0);
+  // Not Manyshot's extra arrow (precision damage once per volley), nor an attack whose sneak attack
+  // fortification negated
+  const fort = use.shared.rollData?.[`${MODULE_ID}Fortification`] ?? {};
+  const attacks = use.shared.chatAttacks.map((a, i) => (use.shared.attacks?.[i]?.type === "manyshot" || !a.damage?.rolls?.length || fort[i]?.negated ? -1 : i)).filter((i) => i >= 0);
   const target = use.shared.targets?.[0]?.document?.uuid ?? null;
   use.shared.chatData[`flags.${MODULE_ID}.${FLAG}`] = { riders, attacks, attacker: actor.uuid, target, applied: {} };
 });
@@ -289,6 +293,7 @@ export async function applyRider(message, r, index) {
   const target = fromUuidSync(data.target)?.actor ?? null;
   let result;
   if (!rider.self && !target) result = "no target";
+  else if (!rider.self && negatedSneak(message, index)) result = "no effect: the sneak attack was negated";
   else if (!rider.instead && !rider.forgo && !rider.perDie && target && immuneToPrecision(target)) result = "no effect: no sneak attack damage was dealt (immune to precision damage)";
   else {
     let saved = false;
@@ -307,7 +312,8 @@ export async function applyRider(message, r, index) {
 
 onGmRequest("applySneakRider", async (request, { message, rider, index }) => {
   const card = game.messages.get(message);
-  if (card) await applyRider(card, rider, index);
+  const attacker = fromUuidSync(card?.getFlag(MODULE_ID, FLAG)?.attacker);
+  if (card && requestedByOwner(request, attacker)) await applyRider(card, rider, index);
   await request.delete();
 });
 

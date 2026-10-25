@@ -9,7 +9,7 @@
 // bypasses any damage reduction the creature might possess." A higher bleed replaces a lower one.
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM, onGmRequest } from "./util.mjs";
+import { esc, isActiveGM, onGmRequest, requestedByOwner } from "./util.mjs";
 
 const FLAG = "bleed";
 const HEALED = `${MODULE_ID}BleedHealed`;
@@ -61,7 +61,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
 
 onGmRequest("stopBleed", async (message, uuid) => {
   const actor = fromUuidSync(uuid);
-  if (actor) await stopBleed(actor);
+  if (requestedByOwner(message, actor)) await stopBleed(actor);
   await message.delete();
 });
 

@@ -45,7 +45,7 @@ export function registerFortificationTests(quench) {
         before(async () => {
           messagesBefore = new Set(game.messages.keys());
           sceneCtl = await useTestScene();
-          slayer = await createTestActor("Quench Fort Slayer", { items: [["pf1.classes", "Slayer", { system: { level: 6 } }], ["pf1.weapons-and-ammo", "Longsword"]] });
+          slayer = await createTestActor("Quench Fort Slayer", { abilities: { str: 16 }, items: [["pf1.classes", "Slayer", { system: { level: 6 } }], ["pf1.weapons-and-ammo", "Longsword"]] });
           goblin = await createTestActor("Quench Fort Goblin", { abilities: { con: 30 }, items: [["pf1.classes", "Fighter", { system: { level: 3 } }]] });
           await waitFor(() => slayer.items.getName("Sneak Attack (SLA)"));
           slayerToken = await placeToken(slayer, 2, 2);
@@ -84,6 +84,14 @@ export function registerFortificationTests(quench) {
           assert.match(text, /75%: rolled 1 → sneak attack negated/);
         });
 
+        it("negated: the sneak attack's flat bonuses go too (Blade of the Society)", async () => {
+          await item(goblin, armor("Chainmail of Heavy Fortification"));
+          const [blade] = await addItems(slayer, [["pf-content.pf-traits", "Blade of the Society (Rogue, Pathfinder Society)"]]);
+          made.push(blade);
+          const card = await attack([0.01, 0.5]);
+          assert.notMatch(damage(card), /Sneak Attack/);
+        });
+
         it("not negated: the dice stay", async () => {
           await item(goblin, armor("Chainmail of Light Fortification"));
           const card = await attack([0.99, 0.5]);
@@ -96,7 +104,7 @@ export function registerFortificationTests(quench) {
           const card = await attack([0.01, 0.01]); // fortification 1; Foundry's dice count down from the top, so a natural 20
           const attack0 = card.systemRolls.attacks[0];
           assert.isTrue(card.getFlag(MODULE_ID, fort.FLAG).attacks[0].crit);
-          assert.equal((attack0.critDamage ?? []).reduce((t, r) => t + r.total, 0), 0);
+          assert.equal((attack0.critDamage ?? []).reduce((t, r) => t + r.total, 0), 0, "not even the Strength bonus PF1 adds after the hook");
         });
 
         it("Anatomical Savant lowers the chance by 25%", async () => {
@@ -142,6 +150,10 @@ export function registerFortificationTests(quench) {
           const [sneaking] = await addItems(slayer, [["pf-content.pf-feats", "Sneaking Critical"]]);
           made.push(sneaking);
           assert.match(await critFormula(), /2d6\[Sneaking Critical\]/, "longsword ×2");
+          // PF1 rolls the critical damage critMult − 1 times: only the first gets the dice
+          const second = action.getRollData();
+          second.critCount = 2;
+          assert.notMatch((await action.rollDamage({ data: second, critical: true })).map((r) => r.formula).join(" + "), /Sneaking Critical/);
           await sneaking.delete();
           await goblin.setCondition("flatFooted", false);
           try {
