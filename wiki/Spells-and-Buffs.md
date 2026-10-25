@@ -18,7 +18,8 @@ PF1e Revamp recognizes the spell buffs from PF1 and **Pathfinder 1e Content** by
 
 **Now:** a spell's card lists every creature it affects (your targets, or the creatures in its template), with one row each:
 - **Spell resistance** is checked for you: the caster level check (1d20 + caster level, +2 each for Spell Penetration, Greater Spell Penetration and Elven Magic) is rolled for every creature with SR. Everyone sees the roll and whether it got through; only the GM sees the SR value. A resisted spell has no effect on that creature.
-- **Touch and ray spells** are compared with the creature's touch AC (a natural 20 always hits, a natural 1 always misses). Only the GM sees the AC.
+- **Touch and ray spells** are compared with the creature's touch AC (a natural 20 always hits, a natural 1 always misses). Only the GM sees the AC. Many touch spells have no attack roll in PF1's data (Touch of Fatigue, Touch of Blindness); for a touch spell on a creature that isn't a willing ally, the module rolls the melee touch attack (base attack bonus, Strength or Dexterity with Weapon Finesse, size and attack bonuses).
+- **Personal spells** (range: personal) go on the caster.
 - **Saving throws** are rolled from the row: its owner (or the GM, for NPCs) clicks the save button. PF1's own save button works too: a save rolled against the card fills in the row. A natural 1 always fails and a natural 20 always succeeds.
 - **The result is applied** as soon as it's known: conditions with their duration, the spell's buff at the caster's level for the spell's duration, or a penalty. The row says what was applied.
 - **Harmless spells on allies** (Bless, Shield of Faith, Enlarge Person on a friend) are accepted: no spell resistance, no save.
@@ -44,11 +45,19 @@ Any spell with a save or spell resistance gets these rows. The spells below also
 | Delusional Pride, Negative Reaction | Their penalties, on a buff named after the spell |
 | Charm Person, Charm Animal, Calm Animals, Command, Beguiling Gift, Challenge Evil, Hunter's Howl, Knight's Calling, Unwitting Ally, Forbid Action, Murderous Command, Lock Gaze | A buff named after the spell marks the creature for the spell's duration; the row reminds the GM what it does |
 | Stabilize, Bleed | Stabilized, or no longer stable (a living creature below 0 hit points) |
+| Mudball | A ranged touch attack; a hit blinds with no save (see the new saves below) |
+| Shadow Trap, Unlock Flesh | Entangled, staggered (living creatures); new saves each turn (below) |
+| Sotto Voce, Endothermic Touch, Touch of Blindness, Nauseating Dart, Touch of Bloodletting, Advanced Scurvy | Shaken 1 round (living, 4 HD or less), staggered, blinded 1 round, nauseated 1 round, exhausted (a wounded creature only), fatigued with −1 on Strength- and Dexterity-based checks |
+| Itching Curse, Ironbeard, Hairline Fractures | −1 on attacks, saves, skills and ability checks; +1 AC; −2 AC (earth creatures) |
+| Delay Disease, Jitterbugs, Linebreaker, Marid's Mastery, Heightened Awareness, Long Arm, Monkey Fish, Stunning Barrier, Hobble, Fumblestep, Swallow Your Fear, Chastise, Unbreakable Heart, Aspect of the Nightingale, Haze of Dreams, Tap Inner Beauty, Weapons Against Evil | The spell's buff (Advanced Race Guide, Advanced Class Guide, Occult Adventures and others) |
+| Paranoia | Marked for its duration, with a reminder of what it does |
 | Chill Touch | PF1's version has no attack or damage, so the module rolls the melee touch attack (base attack bonus, Strength or Dexterity with Weapon Finesse, size and attack bonuses). A hit deals 1d6 negative energy damage, and a failed Fortitude save adds 1 point of Strength damage. Undead take no damage; instead they make a Will save or are panicked for 1d4 rounds + 1 per caster level. |
 
 **Save modifiers.** Hypnotism's +2 in combat (−2 for a single creature not in combat) and Hideous Laughter's +4 for a creature of another type than the caster are ticked entries in the save window, set for the situation.
 
-**Hideous Laughter** knocks the creature prone. On its next turn in combat, a card offers a new save (a full-round action) to its owner and the GM: success ends the laughter, failure means it lasts the full duration.
+**New saves to end an effect.** On the affected creature's turn in combat, a card offers its owner and the GM a new save:
+- **Hideous Laughter**: once, on its next turn (a full-round action); failure means it lasts the full duration.
+- **Mudball** (Reflex, at the start of its turn), **Shadow Trap** (a full-round action) and **Unlock Flesh** (a standard action): every turn until it succeeds, which ends the blindness, entanglement or staggering.
 
 Notes the row adds for the GM: Entangle's saves in the area, Command's chosen command.
 

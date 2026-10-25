@@ -18,7 +18,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -46,7 +46,7 @@ export function registerSpellTests(quench) {
           uniform = CONFIG.Dice.randomUniform;
           sceneCtl = await useTestScene();
           wizard = await createTestActor("Quench Spell Wizard", { abilities: { int: 18 }, items: [["pf1.races", "Human"], ["pf1.classes", "Wizard", { system: { level: 5 } }]] });
-          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(n === "Daze" ? 0 : 1)]));
+          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue"].includes(n) ? 0 : 1)]));
           human = await createTestActor("Quench Spell Human", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
           ogre = await createTestActor("Quench Spell Ogre", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 6 } }]] });
           friend = await createTestActor("Quench Spell Friend", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
@@ -188,6 +188,53 @@ export function registerSpellTests(quench) {
             await save(resave, human);
             await waitFor(() => !laughing(), { what: "the laughter to end" });
             assert.include(row(resave, human).applied, "Hideous Laughter ends");
+          } finally {
+            await combat.delete();
+          }
+        });
+
+        it("a touch spell with no attack roll in PF1's data gets a melee touch attack", async () => {
+          dice(0.99); // natural 1: misses
+          const card = await cast("Touch of Fatigue", [humanToken]);
+          assert.isFalse(card.getFlag(MODULE_ID, spells.FLAG).touchRoll.ranged);
+          assert.deepInclude(row(card, human), { state: "missed" });
+          assert.match((await card.renderHTML()).textContent, /melee touch \d+ vs touch AC \d+: misses/);
+        });
+
+        it("a personal spell goes on the caster", async () => {
+          const card = await cast("Linebreaker", [humanToken]);
+          assert.deepEqual(rows(card).map((r) => r.name), [wizard.name]);
+          await waitFor(() => wizard.itemTypes.buff.some((b) => b.name === "Linebreaker"), { what: "Linebreaker" });
+        });
+
+        it("Mudball: a ranged touch blinds with no save; a Reflex save each turn until it's shaken off", async () => {
+          dice(0.01);
+          const card = await cast("Mudball", [humanToken]);
+          assert.isTrue(card.getFlag(MODULE_ID, spells.FLAG).touchRoll.ranged);
+          assert.equal(row(card, human).state, "done");
+          await waitFor(() => human.statuses.has("blind"), { what: "blinded" });
+          const combat = await Combat.create({ scene: canvas.scene.id, active: true, flags: { [MODULE_ID]: { quench: true } } });
+          const resaveCard = async () => {
+            const before = new Set(game.messages.keys());
+            await combat.nextTurn();
+            return waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.getFlag(MODULE_ID, spells.FLAG)?.ends), { what: "the new save" });
+          };
+          try {
+            await combat.createEmbeddedDocuments("Combatant", [
+              { tokenId: wizardToken.id, sceneId: canvas.scene.id, actorId: wizard.id, initiative: 20 },
+              { tokenId: humanToken.id, sceneId: canvas.scene.id, actorId: human.id, initiative: 10 },
+            ]);
+            await combat.startCombat();
+            const first = await resaveCard();
+            assert.equal(first.getFlag(MODULE_ID, spells.FLAG).save.type, "ref");
+            dice(0.99);
+            await save(first, human);
+            assert.isTrue(human.statuses.has("blind"), "failed: still blinded");
+            await combat.nextTurn(); // the wizard
+            const second = await resaveCard();
+            dice(0.01);
+            await save(second, human);
+            await waitFor(() => !human.statuses.has("blind"), { what: "the mud wiped off" });
           } finally {
             await combat.delete();
           }

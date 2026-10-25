@@ -7,6 +7,7 @@
 //   pool       a number of Hit Dice affected in total, fewest HD first, then nearest (Sleep)
 //   living     only living creatures (not undead or constructs)
 //   dying      only a creature below 0 hit points (Stabilize, Bleed)
+//   wounded    only a creature below its maximum hit points (Touch of Bloodletting)
 //   sighted    sightless creatures are unaffected
 //   intMin     creatures with a lower Intelligence (or none) are unaffected
 //   unless     a condition that makes the creature unaffected (Flare: already dazzled)
@@ -20,11 +21,15 @@
 //              changes     bonuses or penalties on a buff named after the spell ([{ target, formula, type }])
 //              marker      a buff with no changes, named after the spell, to track it for its duration
 //              abilityDamage  { str: 1 }: ability damage
-//              resave      a new save on the creature's next turn in combat ends it (Hideous Laughter)
+//              resave      a new save on the creature's next turn in combat ends it (Hideous Laughter);
+//                          { every, save, removes, action }: every turn until it succeeds, with that save,
+//                          removing these conditions, taking this action
 //              note        text for the GM where the rest isn't automated
 //   onSave     the effect on a successful save ("partial"), same fields
 //   autoHit    no attack roll is needed (Magic Missile), whatever PF1 rolls
-//   touchAttack  PF1's data has no attack roll: a melee touch attack is rolled here (Chill Touch)
+//   touchAttack  true / "ranged": the touch attack is rolled here; a spell with a range of touch and no
+//              attack roll of its own gets a melee touch attack anyway (Mudball: "ranged")
+//   initialSave  false: no save when cast, only the new saves to end it (Mudball)
 //   onHit      { damage: { formula, type } } applied on a hit, before the save (PF1's card has none)
 //   undead     fields that replace these for undead creatures, e.g. { save: "will", effect }
 //   saveModifiers  [{ when, value, label, reason }] ticked in the save window: when "inCombat",
@@ -71,7 +76,7 @@ export const SPELLS = {
   "hideous laughter": {
     intMin: 3,
     saveModifiers: [{ when: "differentType", value: 4, label: "a different type from the caster", reason: "only for a creature whose type differs from the caster's" }],
-    effect: { conditions: [["prone", null]], marker: true, resave: true, note: "laughing: can take no actions (not helpless); a new save on its next turn ends it" },
+    effect: { conditions: [["prone", null]], marker: true, resave: { action: "a full-round action that doesn't provoke" }, note: "laughing: can take no actions (not helpless); a new save on its next turn ends it" },
   },
   "chill touch": {
     touchAttack: true,
@@ -153,4 +158,57 @@ export const SPELLS = {
   "negative reaction": { effect: { changes: [{ target: "skill.blf", formula: "-10", type: "untyped" }, { target: "skill.dip", formula: "-10", type: "untyped" }, { target: "skill.int", formula: "-10", type: "untyped" }] } },
   "shock shield": { self: true, effect: { buff: "Shock Shield" } },
   "unerring weapon": { effect: { buff: "Unerring Weapon" } },
+
+  /* Other books ----------------------------------------------------------------------------------- */
+  // Advanced Race Guide
+  "delay disease": { effect: { buff: "Delay Disease" } },
+  jitterbugs: { effect: { buff: "Jitterbugs" } },
+  linebreaker: { effect: { buff: "Linebreaker" } },
+  "marid's mastery": { effect: { buff: "Marid's Mastery" } },
+  mudball: {
+    touchAttack: "ranged",
+    initialSave: false,
+    effect: { conditions: [["blind", null]], marker: true, resave: { every: true, save: "ref", removes: ["blind"], action: "at the start of its turn" }, note: "an adjacent creature can wipe it off as a standard action" },
+  },
+  "unlock flesh": {
+    living: true,
+    effect: { conditions: [["staggered", "@cl"]], marker: true, resave: { every: true, removes: ["staggered"], action: "a standard action that doesn't provoke" } },
+  },
+  // Advanced Class Guide
+  "heightened awareness": { effect: { buff: "Heightened Awareness" } },
+  "long arm": { effect: { buff: "Long Arm" } },
+  "monkey fish": { effect: { buff: "Monkey Fish" } },
+  "stunning barrier": { effect: { buff: "Stunning Barrier" } },
+  // Occult Adventures and others
+  hobble: { effect: { buff: "Hobble" } },
+  fumblestep: { effect: { buff: "Fumblestep" } },
+  "swallow your fear": { effect: { buff: "Swallow Your Fear" } },
+  chastise: { effect: { buff: "Chastise" } },
+  "unbreakable heart": { effect: { buff: "Unbreakable Heart" } },
+  "aspect of the nightingale": { effect: { buff: "Aspect of the Nightingale" } },
+  "haze of dreams": { effect: { buff: "Haze of Dreams" } },
+  "tap inner beauty": { effect: { buff: "Tap Inner Beauty" } },
+  "weapons against evil": { effect: { buff: "Weapons Against Evil" } },
+  "sotto voce": { living: true, hdMax: 4, effect: { conditions: [["shaken", "1"]] } },
+  "endothermic touch": { effect: { conditions: [["staggered", "@cl"]], note: "moves at half speed" } },
+  "touch of blindness": { effect: { conditions: [["blind", "1"]], note: "one touch per caster level" } },
+  "shadow trap": {
+    effect: { conditions: [["entangled", "@cl"]], marker: true, resave: { every: true, removes: ["entangled"], action: "a full-round action" }, note: "can't move more than 5 feet from where it was" },
+  },
+  "itching curse": {
+    effect: { changes: [{ target: "attack", formula: "-1", type: "untyped" }, { target: "allSavingThrows", formula: "-1", type: "untyped" }, { target: "skills", formula: "-1", type: "untyped" }, { target: "allChecks", formula: "-1", type: "untyped" }], note: "none of it on a turn it scratches (a move action)" },
+  },
+  ironbeard: { effect: { changes: [{ target: "ac", formula: "1", type: "untyped" }], note: "+1 armor bonus that stacks with worn armor; 20% spell failure for verbal components" } },
+  "nauseating dart": { effect: { conditions: [["nauseated", "1"]], note: "only if the dart hit (a ranged attack, 1d2 piercing)" } },
+  "touch of bloodletting": { wounded: true, effect: { conditions: [["exhausted", "@cl"]], note: "1 bleed each round; a DC 15 Heal check or any healing spell ends it" } },
+  "hairline fractures": { types: ["earth"], effect: { changes: [{ target: "ac", formula: "-2", type: "untyped" }] } },
+  paranoia: { effect: { marker: true, note: "treats every creature as an enemy and must make attacks of opportunity; -2 on attacks, weapon damage, checks and saves when adjacent to two or more creatures" } },
+  "advanced scurvy": {
+    living: true,
+    effect: {
+      conditions: [["fatigued", null]],
+      changes: ["strSkills", "dexSkills", "strChecks", "dexChecks"].map((target) => ({ target, formula: "-1", type: "untyped" })),
+      note: "heals naturally at half rate; +1 to bleed it takes",
+    },
+  },
 };
