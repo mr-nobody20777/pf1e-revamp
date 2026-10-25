@@ -25,6 +25,7 @@ import { registerSneakAttackTests } from "./sneak-attack.test.mjs";
 import { registerSneakTalentTests } from "./sneak-talents.test.mjs";
 import { registerFortificationTests } from "./fortification.test.mjs";
 import { registerRangedTests } from "./ranged.test.mjs";
+import { registerRangedDefenseTests } from "./ranged-defense.test.mjs";
 
 export function registerTests(quench) {
   registerTwoWeaponTests(quench);
@@ -52,4 +53,5 @@ export function registerTests(quench) {
   registerSneakTalentTests(quench);
   registerFortificationTests(quench);
   registerRangedTests(quench);
+  registerRangedDefenseTests(quench);
 }

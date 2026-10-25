@@ -13,6 +13,9 @@
 //     The blinker's own attacks have a 20% miss chance, and their spells a 20% chance to go off on
 //     the Ethereal Plane. Blind-Fight doesn't help against blink.
 //   - Entropic Shield 20% against ranged attacks that need an attack roll.
+//   - Against ranged attacks only: Air Barrier and Spirit Shield (50% from 13th level), Wind Ward (20%,
+//     50% from 16th level), Stormlure (50%), Distracting Pattern (20%); Arrow-Collecting armor (20%
+//     against projectiles, not thrown weapons). The level is the buff's level.
 //   - Blind-Fight: in melee, a miss due to concealment is rerolled once.
 //
 // Nevela's Automation Suite rolls its own miss chance for its Concealed condition. When that's the
@@ -31,7 +34,13 @@ const BUFFS = {
   blink: { label: "Blink", chance: 50, blink: true },
   "entropic shield": { label: "Entropic Shield", chance: 20, rangedOnly: true },
   "crystalline dust": { label: "Crystalline Dust", chance: 20 },
+  "air barrier": { label: "Air Barrier", chanceAt: (level) => (level >= 13 ? 50 : 0), rangedOnly: true },
+  "spirit shield": { label: "Spirit Shield", chanceAt: (level) => (level >= 13 ? 50 : 0), rangedOnly: true },
+  "wind ward": { label: "Wind Ward", chanceAt: (level) => (level >= 16 ? 50 : 20), rangedOnly: true },
+  stormlure: { label: "Stormlure", chance: 50, rangedOnly: true },
+  "distracting pattern": { label: "Distracting Pattern", chance: 20, rangedOnly: true },
 };
+const ARROW_COLLECTING = /arrow-collecting/i;
 
 const missBuff = (item) => (item.type === "buff" ? BUFFS[item.name.toLowerCase()] ?? null : null);
 const activeMissBuffs = (actor) => (actor?.itemTypes?.buff ?? []).filter((b) => b.isActive && missBuff(b));
@@ -77,8 +86,12 @@ export function missChances(defender, attacker, item, actionType) {
       if (chance) candidates.push({ chance, label: buff.name });
       continue;
     }
-    candidates.push({ chance: rule.chance, label: buff.name, concealment: rule.concealment });
+    const chance = rule.chanceAt ? rule.chanceAt(buff.system.level ?? 0) : rule.chance;
+    if (chance) candidates.push({ chance, label: buff.name, concealment: rule.concealment });
   }
+  // Arrow-Collecting armor: projectiles only (not thrown weapons, rays or massive projectiles)
+  const collecting = defender.items.find((i) => i.type === "equipment" && i.system.equipped && ARROW_COLLECTING.test(i.name));
+  if (collecting && RANGED.includes(actionType) && actionType === "rwak") candidates.push({ chance: 20, label: collecting.name });
 
   // Unseen opponents have total concealment
   if (attacker.statuses.has("blind")) candidates.push({ chance: 50, label: "Blinded attacker", concealment: true });
@@ -198,7 +211,9 @@ registerFootnote((item) => {
   const rule = missBuff(item);
   if (!rule) return null;
   const vs = rule.rangedOnly ? "ranged attacks" : "attacks";
-  let text = `Automated: a ${rule.chance}% miss chance is rolled on ${vs} against you, shown under each attack on the card.`;
+  const chance = rule.chanceAt ? rule.chanceAt(item.system.level ?? 0) : rule.chance;
+  if (!chance) return [`Automated from the level its miss chance starts: then rolled on ${vs} against you, shown under each attack on the card.`];
+  let text = `Automated: a ${chance}% miss chance is rolled on ${vs} against you, shown under each attack on the card.`;
   if (rule.blink) text += " Drops to 20% (or none) for attackers who see invisible creatures or strike ethereal ones; targeted spells against you have a 50% chance to fail; your own attacks have a 20% miss chance.";
   if (rule.sight) text += " Negated by true seeing.";
   if (rule.concealment) text += " Blind-Fight rerolls a miss in melee.";

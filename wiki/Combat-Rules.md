@@ -93,7 +93,23 @@ Shown in the roll window, where they can be unticked (or ticked when not detecte
 - **Bomber's Eye:** +1 insight on thrown weapon attacks.
 - **Focused Shot:** your Intelligence modifier on damage with a bow or crossbow within 30 ft. It needs a standard action, so it is listed under Not Applied: tick it for a single attack.
 
-Not automated yet: cover (it stays the GM's call), range changes that depend on something the module can't see (Strong Arm, Supple Wrist; Ki Range; Unfolding Wind Strike; steady aim; Bull's Eye), defenses against ranged attacks, reloading, and firearms. See the roadmap.
+### Defenses against ranged attacks
+
+**AC on the card.** When something changes a target's AC against a ranged attack, the attack card shows the adjusted AC under the attack and whether the roll hits, for everyone (it's the result of the attack, like a miss chance):
+
+- prone: +4 (+6 with Prone Shooter); PF1's Prone condition doesn't apply this itself;
+- deflection against ranged weapons: Bullet Shield (+4, +1 per 5 caster levels, up to +8), Arrowmaster's Bracers (+1), arrow catching shields (+1). Deflection bonuses don't stack, so only the part above the target's existing deflection bonus counts;
+- Low Profile (+1 dodge), Breeze-Kissed (+2 against nonmagical ranged attacks), Charau-Ka Slayer (+1 against thrown weapons), rebounding shields (+2 against thrown weapons), Armor of Arrow Attraction (–15).
+
+**Deflecting.** A target that can deflect a ranged weapon attack gets a **Deflect** button on the card for its owner or the GM: Deflect Arrows (and the ninja trick, duelist, juggler and Ulfen Guard versions), Missile Shield with a shield, Vambraces of Defense, Wicked Wings (when not flying), an arrow deflection shield (the button rolls its Reflex save, DC 20 plus the attack's enhancement bonus) and Cut from the Air (the defender's melee attack must beat the shown total). It works once per round (more with the mythic versions), not while flat-footed, and not against natural attacks, spells or rays. The card then marks the attack "deflected: no damage" (or "caught" with Snatch Arrows).
+
+**Damage reduction against ranged weapons.** Applied when ranged weapon damage is applied from the card: Protection from Arrows (DR 10/magic, used up after absorbing 10 points per caster level, up to 100; the buff ends then), Arrowmaster's Bracers (DR 5/magic), the archer's ranged defense (DR 5/–). The best one applies; a weapon with an enhancement bonus overcomes /magic. With PF1's Apply Damage dialog, the GM applies it there.
+
+**Shooting while prone.** Firing a bow or sling (without Prone Slinger) while prone gives a warning: only crossbows, shuriken and firearms can be used prone.
+
+Not automated: **wind** (the GM's call, along with Weathered Warrior, Storm Hunter and similar), cover.
+
+Not automated yet: range changes that depend on something the module can't see (Strong Arm, Supple Wrist; Ki Range; Unfolding Wind Strike; steady aim; Bull's Eye), reloading, and firearms. See the roadmap.
 
 ## Sneak attack
 
@@ -171,4 +187,4 @@ The core rules: *"if you wind up with a fraction, round down… Exception: Certa
 
 ## Miss chances
 
-Miss chances from Blur, Displacement, Blink, Entropic Shield, invisibility and blindness are rolled on attack cards. See [Spells and Buffs](Spells-and-Buffs#miss-chances).
+Miss chances from Blur, Displacement, Blink, Entropic Shield, invisibility and blindness are rolled on attack cards, as are these against ranged attacks only: Air Barrier and Spirit Shield (50% from 13th level), Wind Ward (20%, 50% from 16th level), Stormlure (50%), Distracting Pattern (20%) and Arrow-Collecting armor (20% against projectiles, not thrown weapons). See [Spells and Buffs](Spells-and-Buffs#miss-chances).

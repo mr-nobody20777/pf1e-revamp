@@ -78,6 +78,7 @@
     "module/sneak-attack.mjs",
     "module/fortification.mjs",
     "module/ranged.mjs",
+    "module/ranged-defense.mjs",
     "module/raging-song.mjs",
     "module/quarry.mjs",
     "module/shield-trained.mjs",
