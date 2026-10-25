@@ -4,6 +4,7 @@ Rulings made with the project lead, so later changes don't quietly undo them. Re
 feature before changing it. Newest first within each section. Format: **decision**: why (date).
 
 ## General UX
+- **What players see about enemies**: random rolls (miss chances, fortification) are shown on cards to everyone, since they're chance outcomes; fixed enemy statistics (AC, damage reduction, immunities) are not: they show only to the GM and the creature's owner, or take effect without being announced (precision immunity) (2026-10-25).
 - **Raging Song keeps the plain "no rounds left" message**, also when the daily rounds were never filled (a new feature before the first rest); no separate "rest first" wording (2026-10-24).
 - **Every window the module opens names the creature it acts for** (`util.titleFor`: "Title – Name", PF1's style), and **every control that can't act says why** (tooltip or message), never silently doing nothing. PF1's card save button rolls for the selected token: warn (don't block) when that isn't a card target. From the PF2e study, where a save rolled for the wrong creature unnoticed (2026-10-23).
 - **Any dropdown or list the module adds with more than 10 options gets a search box** (`util.addSearch` / `searchSelects`): long lists are painful to scroll (2026-10-23).
