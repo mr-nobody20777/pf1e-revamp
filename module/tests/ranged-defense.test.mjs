@@ -67,13 +67,22 @@ export function registerRangedDefenseTests(quench) {
           assert.isUndefined(defense.acAgainstRanged(goblin, sword()).find((c) => /deflection/.test(c.label)), "melee attacks: nothing");
         });
 
-        it("the card: the AC line for a prone target, to everyone", async () => {
+        it("the card: the AC line for a prone target, to the GM and the target's owner only", async () => {
           await goblin.setCondition("prone", true);
           const card = await shoot();
           const data = card.getFlag(MODULE_ID, defense.FLAG);
           assert.equal(data.targets[0].changes[0].value, 4);
           const text = (await card.renderHTML()).querySelector(".pf1e-revamp-ranged-defense")?.textContent ?? "";
           assert.match(text, /AC \d+ against this ranged attack \(\+4 prone\): \d+ (hits|misses)/);
+          // A player who doesn't own the target doesn't see enemy statistics
+          Object.defineProperty(game.user, "isGM", { get: () => false, configurable: true });
+          Object.defineProperty(goblin, "isOwner", { get: () => false, configurable: true });
+          try {
+            assert.isNull((await card.renderHTML()).querySelector(".pf1e-revamp-ranged-defense"));
+          } finally {
+            delete game.user.isGM;
+            delete goblin.isOwner;
+          }
         });
 
         it("Deflect Arrows: offered on the card, once per round, not when flat-footed", async () => {

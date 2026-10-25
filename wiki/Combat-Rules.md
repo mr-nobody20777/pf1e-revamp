@@ -95,7 +95,7 @@ Shown in the roll window, where they can be unticked (or ticked when not detecte
 
 ### Defenses against ranged attacks
 
-**AC on the card.** When something changes a target's AC against a ranged attack, the attack card shows the adjusted AC under the attack and whether the roll hits, for everyone (it's the result of the attack, like a miss chance):
+**AC on the card.** When something changes a target's AC against a ranged attack, the attack card shows the adjusted AC under the attack and whether the roll hits, to the GM and the target's owner only (players don't see enemy statistics):
 
 - prone: +4 (+6 with Prone Shooter); PF1's Prone condition doesn't apply this itself;
 - deflection against ranged weapons: Bullet Shield (+4, +1 per 5 caster levels, up to +8), Arrowmaster's Bracers (+1), arrow catching shields (+1). Deflection bonuses don't stack, so only the part above the target's existing deflection bonus counts;

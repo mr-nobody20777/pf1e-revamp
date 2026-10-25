@@ -16,7 +16,8 @@
 //     weapons (Bullet Shield +4, +1 per 5 caster levels, maximum +8; Arrowmaster's Bracers +1; arrow
 //     catching shields +1) doesn't stack with other deflection bonuses. Rebounding shields +2 and
 //     Charau-Ka Slayer +1 against thrown weapons; Breeze-Kissed +2 against nonmagical ranged attacks; Low
-//     Profile +1 dodge; Armor of Arrow Attraction –15. Shown under the attack, after the roll, to everyone.
+//     Profile +1 dodge; Armor of Arrow Attraction –15. Shown under the attack, after the roll, to the GM
+//     and the target's owner only (players don't see enemy statistics); a deflection is shown to all.
 //   - Prone attackers can't use most ranged weapons: crossbows, shuriken and firearms can (Prone Slinger:
 //     slings). A warning, not a block.
 
@@ -140,13 +141,14 @@ Hooks.on("renderChatMessagePF", (message, html) => {
     data.targets.forEach((t, k) => {
       const done = data.deflected?.[`${k}-${i}`];
       if (done) return lines.push(line(`<strong>${esc(t.name)}</strong> ${done.caught ? "caught" : "deflected"} it (${esc(done.by)}): no damage`, false));
+      const actor = fromUuidSync(t.uuid)?.actor;
+      const seesStats = game.user.isGM || !!actor?.isOwner; // enemy statistics stay hidden from players
       const bonus = t.changes.reduce((s, c) => s + c.value, 0);
-      if (bonus && t.ac != null && roll.total != null) {
+      if (seesStats && bonus && t.ac != null && roll.total != null) {
         const ac = t.ac + bonus;
         const hits = roll.natural === 20 || (roll.natural !== 1 && roll.total >= ac);
         lines.push(line(`<strong>${esc(t.name)}</strong>: AC ${ac} against this ranged attack (${t.changes.map((c) => `${c.value > 0 ? "+" : ""}${c.value} ${esc(c.label)}`).join(", ")}): ${roll.total} ${hits ? "hits" : "misses"}`, !hits));
       }
-      const actor = fromUuidSync(t.uuid)?.actor;
       if (t.deflector && actor && (game.user.isGM || actor.isOwner) && usedThisRound(actor) < t.deflector.perRound) {
         const d = t.deflector;
         const div = line(`<strong>${esc(t.name)}</strong> can deflect it if it hits${d.save ? ` (Reflex DC ${d.save})` : d.cutFromTheAir ? ` (a melee attack roll above ${roll.total})` : ""}:`, true);
