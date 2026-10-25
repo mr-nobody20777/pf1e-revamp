@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Sneak attack.** Attacks add the dice of every Sneak Attack class feature (rogue, unchained rogue, ninja, slayer, and archetype versions; dice from different classes stack) when the target is denied its Dexterity bonus to AC or, for melee attacks, when the attack window's Flanking box is ticked. Denied Dexterity covers flat-footed, blinded, cowering, helpless, paralyzed, pinned, stunned, unconscious, asleep and petrified targets, buffs that remove Dexterity to AC, and an invisible attacker the target can't see. Sneak attack is not applied beyond 30 ft with ranged attacks (Deadly Range adds 10 ft), against concealed targets (Sniper's Eye allows ranged attacks within 30 ft), against creatures immune to precision damage (oozes, elementals, incorporeal creatures without a ghost touch weapon, amorphous creatures, gaseous form, elemental body III/IV, particulate form), and against Uncanny Dodge and Improved Uncanny Dodge where they apply. The dice are their own part of the damage roll and are not multiplied on a critical hit. The roll window lists sneak attack so it can be unticked, or, when it wasn't detected, ticked by hand under Not Applied. Talents, feats and items that change sneak attack follow in later releases.
+
 ## 0.19.0: buffs on a roll, clearer windows, and rules fixes
 
 ### New

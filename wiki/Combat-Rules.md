@@ -69,6 +69,25 @@ PF1's save button on a card rolls for whatever token you have selected (or your 
 - **Bonuses against creatures** ("vs. evil creatures") are handled by the alignment wards, not here.
 - **Conditional bonuses** ("when adjacent to an ally", "once per day") and notes about immunities or rerolls are left as reminders, because the module can't know whether the condition is met.
 
+## Sneak attack
+
+Attacks add the dice of every Sneak Attack class feature the attacker has (from PF1's own formula on each feature; dice from different classes stack) when the module detects that they apply:
+
+- **The target is denied its Dexterity bonus to AC:** flat-footed, blinded, cowering, helpless, paralyzed, pinned, stunned, unconscious, asleep or petrified; a buff that removes its Dexterity bonus; or the attacker is invisible and the target can't see invisible creatures.
+- **Or the attacker flanks the target** (melee only): the attack window's Flanking box, which Roll Bonuses ticks automatically if installed.
+
+It is not applied when:
+
+- a ranged attack is beyond 30 ft (Deadly Range adds 10 ft each time it is taken);
+- the target has concealment (Sniper's Eye allows ranged attacks within 30 ft against a target without total concealment);
+- the target is immune to precision damage: oozes, elementals, incorporeal creatures (unless the weapon has ghost touch), amorphous creatures, and creatures under gaseous form, elemental body III/IV or particulate form;
+- the target has Uncanny Dodge and is only flat-footed or facing an invisible attacker, or has Improved Uncanny Dodge and the attacker doesn't have at least four more levels in sneak attack classes;
+- there is no single target.
+
+The dice are added as their own part of the damage roll ("2d6[Sneak Attack]") and are not multiplied on a critical hit. The roll window lists sneak attack with the reason it applies; untick it if the GM rules that the attacker can't see or reach a vital spot. When it wasn't detected, it is listed under **Not Applied** with the reason and can be ticked by hand.
+
+Sneak attack talents, feats, items and fortification are not automated yet.
+
 ## Energy resistance
 
 ### Resistances never stack

@@ -21,6 +21,7 @@ import { registerSaveBonusTests } from "./save-bonuses.test.mjs";
 import { registerTraitTests } from "./traits.test.mjs";
 import { registerTalentTests } from "./talents.test.mjs";
 import { registerRollEffectsTests } from "./roll-effects.test.mjs";
+import { registerSneakAttackTests } from "./sneak-attack.test.mjs";
 
 export function registerTests(quench) {
   registerTwoWeaponTests(quench);
@@ -44,4 +45,5 @@ export function registerTests(quench) {
   registerTraitTests(quench);
   registerTalentTests(quench);
   registerRollEffectsTests(quench);
+  registerSneakAttackTests(quench);
 }

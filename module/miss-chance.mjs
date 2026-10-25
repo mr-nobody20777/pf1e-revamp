@@ -38,7 +38,7 @@ const activeMissBuffs = (actor) => (actor?.itemTypes?.buff ?? []).filter((b) => 
 const hasBuff = (actor, re) => (actor?.itemTypes?.buff ?? []).some((b) => b.isActive && re.test(b.name));
 
 const hasTruesight = (actor) => (actor?.system.traits?.senses?.tr?.total ?? 0) > 0 || hasBuff(actor, /^true seeing$/i);
-const seesInvisible = (actor) => hasTruesight(actor) || hasBuff(actor, /^see invisibility$/i);
+export const seesInvisible = (actor) => hasTruesight(actor) || hasBuff(actor, /^see invisibility$/i);
 const hasBlindFight = (actor) => (actor?.itemTypes?.feat ?? []).some((f) => /^blind-fight$/i.test(f.name));
 
 /** Can this attack strike ethereal creatures (ghost touch weapon, force effect)? */
@@ -63,7 +63,7 @@ function isTotalConcealment(actor) {
  * Best miss chance a defender has against this attack.
  * @returns {{ chance: number, label: string, concealment?: boolean, nevela?: boolean } | null}
  */
-function defenderMissChance(defender, attacker, item, actionType) {
+export function defenderMissChance(defender, attacker, item, actionType) {
   const melee = MELEE.includes(actionType);
   const candidates = [];
 

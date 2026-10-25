@@ -73,6 +73,7 @@
     "module/traits.mjs",
     "module/talents.mjs",
     "module/studied-target.mjs",
+    "module/sneak-attack.mjs",
     "module/raging-song.mjs",
     "module/quarry.mjs",
     "module/shield-trained.mjs",

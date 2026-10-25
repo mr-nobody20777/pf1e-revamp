@@ -74,8 +74,9 @@ export function registerSolarTests(quench) {
         it("deleting the bloodline removes its powers and unlinks them", async () => {
           await bloodline.delete();
           await waitFor(() => !powerNames.some((n) => sorc.items.getName(n) && n !== "Solar Ascension"));
-          const links = await Promise.all(sorcClass.system.links.classAssociations.map((l) => fromUuid(l.uuid)));
-          assert.isFalse(links.some((d) => ["Sunsight", "Friend of Fire", "Cleansing Flame"].includes(d?.name)));
+          // The class's links are updated after the items are removed
+          const linkedPower = async () => (await Promise.all(sorcClass.system.links.classAssociations.map((l) => fromUuid(l.uuid)))).some((d) => ["Sunsight", "Friend of Fire", "Cleansing Flame"].includes(d?.name));
+          await waitFor(async () => !(await linkedPower()), { what: "the powers to be unlinked" });
           assert.equal(fire(), 0);
         });
       });

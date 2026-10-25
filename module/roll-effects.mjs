@@ -45,10 +45,13 @@ const providers = [];
 
 /**
  * Register a situational bonus. `collect(actor, roll)` returns entries for this roll:
- *   { id, label, part, type, atk, dmg, roll, applies, reason, imposed, tooltip }
+ *   { id, label, part, type, atk, dmg, roll, dice, applies, reason, imposed, tooltip }
  * roll is { kind: "attack", action } | { kind: "save", saveId, reference } | { kind: "skill", skillId }
  * | { kind: "ability", abilityId }; `reference` is the UUID of the card the save was rolled from.
  * `part` labels the bonus in the roll formula; atk/dmg (attacks) or roll (other rolls) are its values.
+ * `dice` adds dice instead ({ dmg: "3d6" }): a damage part of their own that isn't multiplied on a
+ * critical hit (sneak attack and other precision damage).
+ * Attack rolls also carry `flanking`, the attack window's Flanking box.
  * Entries that don't apply right now are listed as Not Applied with `reason`. Imposed entries (penalties
  * from gear or rules) can only be turned off by the GM. Values should already allow for the roller's
  * own bonuses of the same type; between providers, only the highest of a type counts.
@@ -368,15 +371,16 @@ function rows(model, state) {
   }
   for (const p of model.provided) {
     const values = Object.fromEntries(model.parts.map((part) => [part, p[part] ?? 0]));
-    const parts = model.parts.filter((part) => p[part]);
+    const parts = model.parts.filter((part) => p[part] || p.dice?.[part]);
     const negative = parts.some((part) => p[part] < 0);
     out.push({
       section: p.applies || state.provided.get(p.id) ? sectionOf(parts) : "na",
       key: p.id,
       kind: "provided",
       label: p.label,
-      value: valueText(values, model.parts),
-      raw: Math.max(...parts.map((part) => Math.abs(p[part]))),
+      value: p.dice ? Object.values(p.dice).map((d) => `+${d}`).join(", ") : valueText(values, model.parts),
+      raw: p.dice ? 100 : Math.max(...parts.map((part) => Math.abs(p[part]))),
+      dice: p.dice ?? null,
       negative,
       imposed: !!p.imposed,
       type: p.type && p.type !== "untyped" ? p.type : "",
@@ -401,7 +405,8 @@ function checkbox(r, sub = false) {
 function summaryText(model, list) {
   const t = list.totals;
   const na = list.filter((r) => r.section === "na").length;
-  const parts = model.parts.map((p) => `<strong>${PART_LABEL[p] ? `${PART_LABEL[p]} ` : ""}${signed(t[p] ?? 0)}</strong>`);
+  const dice = (p) => list.filter((r) => r.kind === "provided" && r.checked && r.dice?.[p]).map((r) => ` +${r.dice[p]}`).join("");
+  const parts = model.parts.map((p) => `<strong>${PART_LABEL[p] ? `${PART_LABEL[p]} ` : ""}${signed(t[p] ?? 0)}${dice(p)}</strong>`);
   const counts = [`${list.length - na} effect${list.length - na === 1 ? "" : "s"}`, na ? `${na} not applied` : null].filter(Boolean).join(" · ");
   return `${parts.join(" · ")} <span class="${MODULE_ID}-muted">from ${counts}${list.changed ? " · changed for this roll" : ""}</span>`;
 }
@@ -541,8 +546,16 @@ Hooks.on("renderAttackDialog", (app, html) => {
   const actor = action?.actor;
   if (!actor || !ATTACK_ACTIONS.includes(action.actionType) || !app.rollData) return;
   let ctx = attackContexts.get(app);
+  const flanking = !!app.flags?.flanking;
+  // The Flanking box changes what applies (sneak attack): start again from that window state
+  if (ctx && ctx.model.roll.flanking !== flanking) {
+    ctx.close();
+    attackContexts.delete(app);
+    root.querySelector(`.${MODULE_ID}-effects`)?.remove();
+    ctx = null;
+  }
   if (!ctx) {
-    ctx = makeContext(actor, { kind: "attack", action }, {
+    ctx = makeContext(actor, { kind: "attack", action, flanking }, {
       owner: app,
       place: {
         root: () => app.element[0] ?? app.element,
@@ -567,7 +580,7 @@ Hooks.on("closeAttackDialog", (app) => attackContexts.get(app)?.close());
 Hooks.once("init", () => {
   Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
     if (!ATTACK_ACTIONS.includes(action.actionType)) return;
-    rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action });
+    rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action, flanking: !!(config?.flanking ?? rollData.flanking) });
     parts.push(...partsFor(rollData[KEY], "atk", rollData));
     delete rollData[TYPED]; // per attack roll: a full attack's next attack starts fresh (no typed damage bonuses yet)
   });
@@ -576,6 +589,12 @@ Hooks.once("init", () => {
     if (!ATTACK_ACTIONS.includes(action.actionType) || !parts[0]) return;
     const plan = (rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action }));
     parts[0].extra.push(...partsFor(plan, "dmg", rollData));
+    // Dice (sneak attack) aren't multiplied on a critical hit: only in the normal damage roll, whose
+    // total PF1 adds to the separate critical damage roll
+    if (rollData.critMult > 1) return;
+    for (const p of plan.provided) {
+      if (p.dice?.dmg) parts.push({ base: `${p.dice.dmg}[${p.part ?? p.label}]`, extra: [], damageType: parts[0].damageType, type: "normal" });
+    }
   });
 });
 
