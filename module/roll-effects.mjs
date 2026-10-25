@@ -18,7 +18,7 @@
 // own parts. Rolls without a window use the defaults: PF1's totals plus the bonuses that apply.
 
 import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
-import { esc } from "./util.mjs";
+import { esc, addSearch } from "./util.mjs";
 
 const KEY = "pf1eRevampRollEffects";
 /** rollData key where features that add their own typed bonus to an attack record it: [{ type, value }] */
@@ -50,9 +50,14 @@ const providers = [];
  * | { kind: "ability", abilityId }; `reference` is the UUID of the card the save was rolled from.
  * `part` labels the bonus in the roll formula; atk/dmg (attacks) or roll (other rolls) are its values.
  * `dice` adds dice instead ({ dmg: "3d6" }): a damage part of their own that isn't multiplied on a
- * critical hit (sneak attack and other precision damage), with `damageType` added to the weapon's types.
+ * critical hit (sneak attack and other precision damage), with `damageType` added to the weapon's types
+ * (or `damageTypes` instead of them); `extraDamage` [{ formula, types, label }] adds more such parts.
+ * `partLabel` ({ atk: "Powerful Sneak" }) labels a part's number in the formula instead of `part`.
  * Attack rolls also carry `flags`, the attack window's checkboxes ({ flanking, charge, highGround,
  * manyshot, rapidShot, pointBlankShot }); the window is rebuilt, keeping the player's choices, when they change.
+ * `choice` adds a dropdown to the entry: { label, options: [{ id, label, group }], default, apply(id) },
+ * where apply returns the entry's fields for that option (dice, atk, label…). The option chosen is
+ * `chosen` on the planned entry.
  * Entries that don't apply right now are listed as Not Applied with `reason`. Imposed entries (penalties
  * from gear or rules) can only be turned off by the GM. Values should already allow for the roller's
  * own bonuses of the same type; between providers, only the highest of a type counts.
@@ -196,8 +201,16 @@ const newState = (model, chosen = new Map()) => ({
   off: new Set(),
   on: new Set(),
   chosen, // provided ids → the player's tick, kept when the model is rebuilt
+  choices: new Map(), // provided ids → the option picked in its dropdown
   provided: new Map(model.provided.map((p) => [p.id, chosen.get(p.id) ?? !!p.applies])),
 });
+
+/** A provided entry as its dropdown's current option makes it. */
+function effective(p, state) {
+  if (!p.choice) return p;
+  const chosen = state.choices?.get(p.id) ?? p.choice.default;
+  return { ...p, ...p.choice.apply(chosen), chosen };
+}
 
 const isIncluded = (model, state, key, change) => !state.off.has(key) && (!model.losers.has(change) || state.on.has(key));
 
@@ -237,8 +250,9 @@ function compute(model, state) {
     for (const part of a.parts) out.totals[part] = (out.totals[part] ?? 0) + worth;
     a.worth = worth;
   }
-  for (const p of model.provided) {
-    if (!state.provided.get(p.id)) continue;
+  for (const entry of model.provided) {
+    if (!state.provided.get(entry.id)) continue;
+    const p = effective(entry, state);
     for (const part of model.parts) out.totals[part] = (out.totals[part] ?? 0) + (p[part] ?? 0);
   }
   // Turned off first, then switched on
@@ -261,7 +275,7 @@ function planFor(model, state) {
     const ability = model.abilities[0]?.ability;
     if (ability) abilities.roll = { ability, score: c.scoreDelta[ability] ?? 0 };
   }
-  const provided = model.provided.filter((p) => state.provided.get(p.id));
+  const provided = model.provided.filter((p) => state.provided.get(p.id)).map((p) => effective(p, state));
   return { delta: c.delta, abilities, label, provided };
 }
 
@@ -299,14 +313,14 @@ function partsFor(plan, part, rollData) {
       const other = Math.max(0, ...(rollData[TYPED] ?? []).filter((t) => t.type === p.type).map((t) => t.value));
       value = Math.max(0, value - other);
     }
-    if (value) out.push(`${value}[${p.part ?? p.label}]`);
+    if (value) out.push(`${value}[${p.partLabel?.[part] ?? p.part ?? p.label}]`);
   }
   return out;
 }
 
 /** The plan for a roll made without a window: PF1's totals plus the situational bonuses that apply. */
 const defaultPlan = (actor, roll) => {
-  const provided = collectProvided(actor, roll).filter((p) => p.applies);
+  const provided = collectProvided(actor, roll).filter((p) => p.applies).map((p) => effective(p, {}));
   return { delta: {}, abilities: {}, label: {}, provided };
 };
 
@@ -375,18 +389,21 @@ function rows(model, state) {
       sub: a.sources.map((s) => ({ key: s.key, label: `${s.label} ${signed(s.change.value)} ${typeLabel([s.change.type])}`.trim(), checked: !state.off.has(s.key), disabled: s.imposed && !gm, imposed: s.imposed })),
     });
   }
-  for (const p of model.provided) {
+  for (const entry of model.provided) {
+    const p = effective(entry, state);
     const values = Object.fromEntries(model.parts.map((part) => [part, p[part] ?? 0]));
-    const parts = model.parts.filter((part) => p[part] || p.dice?.[part]);
+    const parts = p.showIn ?? model.parts.filter((part) => p[part] || p.dice?.[part]);
     const negative = parts.some((part) => p[part] < 0);
     out.push({
       section: p.applies || state.provided.get(p.id) ? sectionOf(parts) : "na",
       key: p.id,
       kind: "provided",
       label: p.label,
-      value: p.dice ? Object.values(p.dice).map((d) => `+${d}`).join(", ") : valueText(values, model.parts),
-      raw: p.dice ? 100 : Math.max(...parts.map((part) => Math.abs(p[part]))),
+      value: p.valueText ?? (p.dice ? Object.values(p.dice).map((d) => `+${d}`).join(", ") : valueText(values, model.parts)),
+      raw: p.dice || p.choice ? 100 : Math.max(...parts.map((part) => Math.abs(p[part]))),
       dice: p.dice ?? null,
+      values,
+      choice: p.choice ? { label: p.choice.label, options: p.choice.options, value: p.chosen } : null,
       negative,
       imposed: !!p.imposed,
       type: p.type && p.type !== "untyped" ? p.type : "",
@@ -406,6 +423,15 @@ function rows(model, state) {
 
 function checkbox(r, sub = false) {
   return `<input type="checkbox" data-key="${esc(r.key)}" data-kind="${sub ? "source" : r.kind}" ${r.checked ? "checked" : ""} ${r.disabled ? "disabled" : ""}>`;
+}
+
+function choiceSelect(r) {
+  if (!r.choice) return "";
+  const groups = new Map();
+  for (const o of r.choice.options) (groups.get(o.group ?? "") ?? groups.set(o.group ?? "", []).get(o.group ?? "")).push(o);
+  const opt = (o) => `<option value="${esc(o.id)}" ${o.id === r.choice.value ? "selected" : ""}>${esc(o.label)}</option>`;
+  const body = [...groups].map(([g, list]) => (g ? `<optgroup label="${esc(g)}">${list.map(opt).join("")}</optgroup>` : list.map(opt).join(""))).join("");
+  return ` <span class="${MODULE_ID}-choice">${esc(r.choice.label)} <select data-choice="${esc(r.key)}">${body}</select></span>`;
 }
 
 function summaryText(model, list) {
@@ -430,11 +456,11 @@ function windowBlock(ctx) {
         const cls = [r.section === "na" ? "na" : "", r.negative ? "neg" : "", r.kind === "ability" ? "abl" : ""].join(" ");
         const tip = [r.type, r.note, r.tooltip].filter(Boolean).join(" · ");
         if (r.kind === "ability") return `<a class="${MODULE_ID}-chip ${cls}" data-action="manage" data-tooltip="${esc(r.sub.map((s) => s.label).join(" · "))}">${esc(r.label)} ▾</a>`;
-        return `<label class="${MODULE_ID}-chip ${cls}" data-tooltip="${esc(tip)}">${checkbox(r)}${r.imposed ? "🔒 " : ""}${esc(r.label)} ${esc(r.value)}</label>`;
+        return `<label class="${MODULE_ID}-chip ${cls}" data-tooltip="${esc(tip)}">${checkbox(r)}${r.imposed ? "🔒 " : ""}${esc(r.label)} ${esc(r.value)}</label>${choiceSelect(r)}`;
       })
       .join("")}</div>`;
   } else {
-    div.innerHTML = `${label}<div class="${MODULE_ID}-summary"><span>${summaryText(ctx.model, list)}</span><a class="${MODULE_ID}-manage" data-action="manage">Manage…</a></div>`;
+    div.innerHTML = `${label}<div class="${MODULE_ID}-summary"><span>${summaryText(ctx.model, list)}</span><a class="${MODULE_ID}-manage" data-action="manage">Manage…</a></div>${list.filter((r) => r.choice && r.checked).map((r) => `<div class="${MODULE_ID}-chips">${esc(r.label)}${choiceSelect(r)}</div>`).join("")}`;
   }
   bind(div, ctx);
   return div;
@@ -452,7 +478,7 @@ class EffectsManager extends foundry.applications.api.ApplicationV2 {
     const { model, state } = this.ctx;
     const list = rows(model, state);
     const row = (r) => {
-      const name = `${r.imposed ? "🔒 " : ""}${esc(r.label)}${r.note ? ` <span class="${MODULE_ID}-muted">· ${esc(r.note)}</span>` : ""}`;
+      const name = `${r.imposed ? "🔒 " : ""}${esc(r.label)}${r.note ? ` <span class="${MODULE_ID}-muted">· ${esc(r.note)}</span>` : ""}${choiceSelect(r)}`;
       const head = `<tr class="${r.section === "na" ? "na" : ""}" ${r.tooltip ? `data-tooltip="${esc(r.tooltip)}"` : ""}><td>${r.kind === "ability" ? `<a data-action="expand" data-key="${esc(r.key)}">${this.ctx.expanded?.has(r.key) ? "▾" : "▸"}</a>` : checkbox(r)}</td><td>${name}</td><td class="num">${esc(r.value)}</td><td class="${MODULE_ID}-muted">${esc(r.type)}</td></tr>`;
       if (r.kind !== "ability" || !this.ctx.expanded?.has(r.key)) return head;
       return head + r.sub.map((s) => `<tr class="sub" ${s.disabled ? `data-tooltip="A condition: only the GM can turn it off for this roll"` : ""}><td></td><td colspan="3"><label>${checkbox(s, true)} ${s.imposed ? "🔒 " : ""}${esc(s.label)}</label></td></tr>`).join("");
@@ -481,7 +507,7 @@ function valueOf(model, r, part) {
     const a = model.abilities.find((x) => `abl.${x.ability}` === r.key);
     return a?.parts.includes(part) ? a.worth : 0;
   }
-  if (r.kind === "provided") return model.provided.find((p) => p.id === r.key)?.[part] ?? 0;
+  if (r.kind === "provided") return r.values?.[part] ?? 0;
   return model.entries.get(r.key)?.values[part] ?? 0;
 }
 
@@ -503,6 +529,14 @@ function bind(root, ctx) {
       ctx.update();
     })
   );
+  root.querySelectorAll("select[data-choice]").forEach((select) => {
+    addSearch(select);
+    select.addEventListener("change", (event) => {
+      ctx.state.choices.set(select.dataset.choice, select.value);
+      event.stopPropagation();
+      ctx.update();
+    });
+  });
   root.querySelectorAll("[data-action=manage]").forEach((a) => a.addEventListener("click", () => ctx.openManager()));
   root.querySelectorAll("[data-action=expand]").forEach((a) =>
     a.addEventListener("click", () => {
@@ -617,10 +651,12 @@ Hooks.once("init", () => {
     // not on Manyshot's extra arrow.
     if (rollData.critMult > 1 || rollData[FLAGS]?.manyshotAttacks?.includes(rollData.attackCount)) return;
     for (const p of plan.provided) {
-      if (!p.dice?.dmg) continue;
-      const types = [...new Set([...(parts[0].damageType ?? []), ...(p.damageType ? [p.damageType] : [])])];
-      const formula = p.dice.dmg.includes("+") ? `(${p.dice.dmg})` : p.dice.dmg;
-      parts.push({ base: `${formula}[${p.part ?? p.label}]`, extra: [], damageType: types, type: "normal" });
+      if (p.dice?.dmg) {
+        const types = p.damageTypes ?? [...new Set([...(parts[0].damageType ?? []), ...(p.damageType ? [p.damageType] : [])])];
+        const formula = /[+-]/.test(p.dice.dmg) ? `(${p.dice.dmg})` : p.dice.dmg;
+        parts.push({ base: `${formula}[${p.part ?? p.label}]`, extra: [], damageType: types, type: "normal" });
+      }
+      for (const x of p.extraDamage ?? []) parts.push({ base: `${x.formula}[${x.label}]`, extra: [], damageType: x.types, type: "normal" });
     }
   });
 });
@@ -682,4 +718,7 @@ Hooks.on("renderDialogV2", (app, element) => {
 });
 
 // Exposed for tests
+/** The roll-window plan an attack was rolled with (its roll data), if any. */
+export const rollPlan = (rollData) => rollData?.[KEY] ?? null;
+
 export const _test = { buildModel, newState, compute, planFor, partsFor, rows };

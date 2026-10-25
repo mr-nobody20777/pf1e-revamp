@@ -85,7 +85,24 @@ It is not applied when:
 
 The dice are added as their own part of the damage roll ("2d6[Sneak Attack]"), typed as precision damage as well as the weapon's type, so a creature immune to precision damage takes none of it when the damage is applied. Immunity is deliberately not shown before the attack: the roll window offers sneak attack whenever its conditions are met, and the attacker finds out when the damage lands. Immune creatures are oozes, elementals, incorporeal creatures (unless the weapon has ghost touch), amorphous creatures, creatures under gaseous form, elemental body III/IV or particulate form, and any creature with a precision damage immunity. They are not multiplied on a critical hit and count only once per Manyshot volley; dice of different sizes are rolled separately ("3d6 + 1d8"). Attacks rolled without the attack window (shift-click) use PF1's own Flanking setting. The roll window lists sneak attack with the reason it applies; untick it if the GM rules that the attacker can't see or reach a vital spot. When it wasn't detected, it is listed under **Not Applied** with the reason and can be ticked by hand.
 
-Sneak attack talents, feats, items and fortification are not automated yet.
+### Sneak attack talents
+
+When the character has talents that change sneak attack, the attack window shows a **With:** dropdown next to the sneak attack entry. Per the rules, only one such talent applies to an attack and it is chosen before rolling; on a full attack the choice covers every sneak attack in it. The dropdown starts on the talent used last (once-a-day talents never become the default). Options are grouped:
+
+- **Adds an effect (one per attack):** Bleeding Attack, Crippling Strike, Petrifying Strike, Befuddling Strike, Slow Reactions, Confounding Blades, Entanglement of Blades, Slowing Strike, Ki Block, Offensive Defense, Emboldening Strike, Dispelling Attack, Extinguishing Strike, Focusing Attack, Shadow's Chill, Improved Shadow's Chill, Powerful Sneak.
+- **Instead of the dice:** Knock-Out Blow, Hamstring Strike, Obscuring Blow, Distracting Attack, Sever Alignment, Set-Up, Accurate Poisoner, Sneaky Maneuver, Harrow Strike, Stem the Flow and Resonating Rumbles (3 dice), Armor Piercer and Demand Attention (choose how many dice).
+
+Talents that change the dice do so in the roll: Powerful Sneak counts 1s as 2s and gives −2 on the attack (Deadly Sneak: 1s and 2s count as 3s; the unchained versions reroll them once), Shadow's Chill makes part of the damage cold and Improved Shadow's Chill all of it, Marksman's Shot doubles the dice and Mountainside Ambush deals maximum damage. Vicious Claws rolls d8s with claw attacks.
+
+The attack card shows the chosen talent's effect under each attack, with its save DC (10 + half the class level + the talent's ability modifier). Once the attack has hit, the GM clicks **Apply** (the attacker can apply effects on themselves, such as Offensive Defense). Where the talent allows a save, Apply rolls the target's save and applies the right result. Effects that need the GM's judgment (Dispelling Attack, Set-Up, Sever Alignment and the like) are shown as text. Talents that add an effect do nothing against a creature immune to precision damage, since no sneak attack damage was dealt.
+
+**Assassinate** is its own entry in the roll window: tick it once the target has been studied for a round; the card then offers the target's Fortitude save. **Hunter's Surprise** has a **Designate prey** button on the talent: target the adjacent enemy and click it.
+
+### Bleed
+
+Bleeding Attack's bleed is tracked with its amount (PF1's Bleed condition has none). The bleeding creature takes the damage at the start of each of its turns, ignoring damage reduction. Any healing stops it, as does a DC 15 Heal check (a button on the bleed message) or removing the Bleed condition. Bleed doesn't stack: a higher bleed replaces a lower one, a lower one is ignored.
+
+Sneak attack feats, items and fortification are not automated yet.
 
 ## Energy resistance
 

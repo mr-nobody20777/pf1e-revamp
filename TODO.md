@@ -13,7 +13,7 @@ The roll-window buff manager ("Buffs on a roll") is released in the Unreleased s
 
 
 ### Next priorities
-After sneak attack phase 2, the focus moves to:
+Next, the focus moves to:
 - **Ranged combat**: automate the rules that apply to ranged attacks (range increments, firing into melee, cover, Point-Blank Shot, Precise Shot and related feats, ammunition).
 - **Cantrips and 1st-level spells**: automate their effects across the spell lists, starting with the most commonly used.
 
@@ -25,7 +25,6 @@ After sneak attack phase 2, the focus moves to:
 - **A unified rules layer.** Several features keep their own rule tables (archetype rules, next-roll effects, buff grants, trait rules, save-bonus keywords). Merging them into one data format ("this item grants X when Y") would let new features be added as data rather than code, and would give the roll window a single source for every situational bonus.
 
 ### Combat
-- **Sneak attack, phase 2: talents.** Support the rogue and slayer talents that add riders or trade dice for effects (Bleeding Attack, Slowing Strike, Crippling Strike, Powerful Sneak, Knockout Blow, Assassinate and others in `docs/SNEAK-ATTACK-RESEARCH.md`), with one asterisk talent per attack chosen in the roll window.
 - **Sneak attack, phase 3: feats, items, traits and fortification.** Extra dice and range from feats, items and traits (Accomplished Sneak Attacker, Sniper Goggles, Blade of the Society), and roll fortification chances to negate the precision damage.
 - **Skald Damage Reduction (9th level).** PF1's item has no mechanics. "Subtract 1 from the damage ... from a weapon or a natural attack. At 14th and 19th levels ... increases by 1 ... the skald grants this DR to all allies affected by his inspired rage." Grant scaling DR/— to the skald and share it through Inspired Rage.
 - **Extra Channel.** "You can channel energy two additional times per day." PF1's feat has no mechanics; add two uses of Channel Energy per instance of the feat.

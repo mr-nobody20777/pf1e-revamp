@@ -25,3 +25,5 @@
 
 /* Save cards: reminder notes whose bonus the module already added to the roll (save-bonuses.mjs) */
 .general-notes .tag.pf1e-revamp-applied { opacity: 0.6; }
+.pf1e-revamp-choice { display: inline-flex; align-items: center; gap: 0.3em; margin-left: 0.3em; }
+.pf1e-revamp-choice select { width: auto; height: auto; min-height: 1.6em; font-size: inherit; padding: 0 0.2em; }

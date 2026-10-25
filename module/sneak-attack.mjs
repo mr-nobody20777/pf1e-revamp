@@ -21,12 +21,13 @@
 //     attacks within 30 ft against a target with concealment (not total concealment).
 // The GM still judges "must be able to see the target ... and reach such a spot": untick it when not.
 
-import { RANGED_ATTACKS } from "./const.mjs";
+import { MODULE_ID, RANGED_ATTACKS } from "./const.mjs";
 import { evaluate, classLevel } from "./util.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 import { missChances, seesInvisible } from "./miss-chance.mjs";
 import { isIncorporeal } from "./resistance.mjs";
-import { registerFootnote } from "./footnote.mjs";
+import { registerFootnote, footnoteButton } from "./footnote.mjs";
+import { riderChoice } from "./sneak-talents.mjs";
 
 const SNEAK_TAG = /^sneakAttack/;
 // Dice progressions for Sneak Attack features without their own roll formula (archetype versions)
@@ -52,12 +53,23 @@ function sources(actor) {
     .filter((s) => s.dice > 0);
 }
 
-/** The dice of all sources, each die size on its own: "3d6", "3d6 + 1d8". */
-function diceText(srcs) {
+/** The dice of all sources by die size: [{ n, size }]. */
+function termsOf(srcs) {
   const bySize = new Map();
   for (const s of srcs) bySize.set(s.size, (bySize.get(s.size) ?? 0) + s.dice);
-  return [...bySize].sort((a, b) => a[0] - b[0]).map(([size, n]) => `${n}d${size}`).join(" + ");
+  return [...bySize].sort((a, b) => a[0] - b[0]).map(([size, n]) => ({ n, size }));
 }
+
+/** The dice of all sources, each die size on its own: "3d6", "3d6 + 1d8". */
+const diceText = (srcs) => termsOf(srcs).map((t) => `${t.n}d${t.size}`).join(" + ");
+
+// Vicious Claws (catfolk): d8s instead of d6s when the sneak attack is made with claws
+const viciousClaws = (actor, item) => item?.subType === "natural" && /claw/i.test(item.name) && hasFeat(actor, /^vicious claws/i).length > 0;
+
+// Hunter's Surprise: once a day, an adjacent enemy designated as prey takes sneak attack damage from
+// all of the character's attacks until the end of her next turn, flanked or not
+const HUNTER = "Hunter's Surprise";
+const preyOf = (actor) => actor.itemTypes.buff.find((b) => b.isActive && b.getFlag(MODULE_ID, "hunterPrey"))?.getFlag(MODULE_ID, "hunterPrey") ?? null;
 
 /** How the target is denied its Dexterity bonus against this attacker ("the target is stunned"), or null. */
 function deniedDex(target, attacker) {
@@ -96,17 +108,24 @@ function distance(a, b) {
 registerRollEffect({
   collect(actor, roll) {
     if (roll.kind !== "attack") return [];
-    const srcs = sources(actor);
+    let srcs = sources(actor);
     if (!srcs.length) return [];
-    const base = { id: "sneak-attack", label: "Sneak Attack", type: "untyped", dice: { dmg: diceText(srcs) }, damageType: "precision" };
-    const not = (reason) => [{ ...base, applies: false, reason }];
+    const { action } = roll;
+    if (viciousClaws(actor, action.item)) srcs = srcs.map((s) => ({ ...s, size: 8 }));
+    const base = { id: "sneak-attack", label: "Sneak Attack", type: "untyped", dice: { dmg: diceText(srcs) }, damageType: "precision", showIn: ["dmg"] };
+    const choice = riderChoice(actor, termsOf(srcs), action, srcs);
+    if (choice) base.choice = choice;
+    // Assassinate: ticked by the player once the target has been studied for 1 round
+    const assassinate = hasFeat(actor, /^assassinate/i)[0];
+    const extra = assassinate ? [{ id: "assassinate", label: "Assassinate", type: "untyped", showIn: ["dmg"], valueText: "Fortitude or die", applies: false, reason: "tick it after studying the target for 1 round (a standard action)", assassinate: assassinate.uuid }] : [];
+    const not = (reason) => [{ ...base, applies: false, reason }, ...extra];
+    const yes = (tooltip) => [{ ...base, applies: true, tooltip }, ...extra];
 
     const targets = [...game.user.targets];
     if (targets.length !== 1) return not(targets.length ? "more than one target" : "no target selected");
     const targetToken = targets[0];
     const target = targetToken.actor;
     if (!target) return not("no target selected");
-    const { action } = roll;
     const ranged = RANGED_ATTACKS.includes(action.actionType);
 
     // A ghost touch weapon deals precision damage to an incorporeal creature: not typed precision then
@@ -128,10 +147,11 @@ registerRollEffect({
       if (!snipersEye) return not(`${worst.label}: concealment`);
     }
 
+    if (preyOf(actor) === targetToken.document.uuid) return yes(`${base.dice.dmg}: ${HUNTER} (your prey)`);
     const denied = deniedDex(target, actor);
-    if (denied) return [{ ...base, applies: true, tooltip: `${base.dice.dmg}: ${denied}` }];
+    if (denied) return yes(`${base.dice.dmg}: ${denied}`);
     if (!ranged && roll.flags?.flanking) {
-      if (canFlank(target, actor, srcs)) return [{ ...base, applies: true, tooltip: `${base.dice.dmg}: you flank the target` }];
+      if (canFlank(target, actor, srcs)) return yes(`${base.dice.dmg}: you flank the target`);
       return not("Improved Uncanny Dodge: can't be flanked by you");
     }
     return not("the target isn't flanked or denied its Dexterity bonus");
@@ -143,4 +163,33 @@ registerFootnote((item) =>
   isSneakAttack(item) ? ["Added to attack damage automatically when it applies (see the attack window). No need to roll it from here as well."] : null
 );
 
-export const _test = { sources, diceText, deniedDex, canFlank, distance };
+// Hunter's Surprise: designate the targeted adjacent enemy as prey (once a day, until the end of your next turn)
+async function designatePrey(item) {
+  const actor = item.actor;
+  const targets = [...game.user.targets];
+  const mine = actor?.getActiveTokens()[0];
+  if (targets.length !== 1) return ui.notifications.warn(`${HUNTER}: target the one enemy to designate as prey.`);
+  const dist = distance(mine, targets[0]);
+  if (dist != null && dist > 5) return ui.notifications.warn(`${HUNTER}: your prey must be adjacent to you.`);
+  // Daily uses, when tracked (PF1 leaves them empty until the first rest)
+  const uses = item.system.uses;
+  if (uses?.per && uses.maxFormula && uses.value != null) {
+    if (!(uses.value > 0)) return ui.notifications.warn(`${HUNTER}: no uses left today.`);
+    await item.update({ "system.uses.value": uses.value - 1 });
+  }
+  const old = actor.itemTypes.buff.filter((b) => b.getFlag(MODULE_ID, "hunterPrey"));
+  if (old.length) await actor.deleteEmbeddedDocuments("Item", old.map((b) => b.id));
+  await actor.createEmbeddedDocuments("Item", [{
+    type: "buff", name: `${HUNTER}: ${targets[0].name}`, img: item.img,
+    system: { subType: "temp", active: true, duration: { value: "2", units: "round" }, description: { value: `<p>Sneak attack damage on every attack against ${targets[0].name}, flanked or not, until the end of your next turn.</p>` } },
+    flags: { [MODULE_ID]: { hunterPrey: targets[0].document.uuid } },
+  }]);
+}
+
+registerFootnote((item) =>
+  item?.type === "feat" && /^hunter'?s surprise/i.test(item.name) && item.actor?.isOwner
+    ? ["Target the adjacent enemy, then: ", footnoteButton("Designate prey", "Once a day: sneak attack applies to all your attacks against it until the end of your next turn", () => designatePrey(item))]
+    : null
+);
+
+export const _test = { sources, diceText, termsOf, deniedDex, canFlank, distance, designatePrey };
