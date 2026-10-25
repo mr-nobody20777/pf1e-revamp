@@ -33,10 +33,29 @@ Hooks.once("init", () => {
 const isModifier = (type) => !!pf1.registry.damageTypes.get(type)?.isModifier;
 const isImmune = (types, immunities) => types.every((t) => immunities.has(t)) || types.some((t) => isModifier(t) && immunities.has(t));
 
+// Creatures immune to precision damage by their nature, usually not listed as a damage immunity:
+// oozes, elementals, incorporeal and amorphous creatures, and some shape-changing spells. Checked when
+// the damage is applied, so the attacker doesn't learn it before attacking.
+const PRECISION_IMMUNE_FORMS = /^(gaseous form|elemental body (iii|iv)|particulate form)$/i;
+function creatureTypes(actor) {
+  const race = actor?.race?.system;
+  const set = (field) => new Set([...(race?.[field]?.base ?? []), ...(race?.[field]?.total ?? [])].map((t) => String(t).toLowerCase()));
+  return { types: set("creatureTypes"), subtypes: set("creatureSubtypes") };
+}
+export const isIncorporeal = (actor) => !!actor?.statuses?.has("incorporeal") || creatureTypes(actor).subtypes.has("incorporeal");
+export function precisionImmune(actor) {
+  if (!actor) return false;
+  const { types, subtypes } = creatureTypes(actor);
+  if (types.has("ooze") || subtypes.has("elemental") || isIncorporeal(actor)) return true;
+  if ((actor.itemTypes?.feat ?? []).some((f) => f.isActive !== false && /^amorphous$/i.test(f.name))) return true;
+  return (actor.itemTypes?.buff ?? []).some((b) => b.isActive && PRECISION_IMMUNE_FORMS.test(b.name));
+}
+
 Hooks.once("setup", () => {
   wrapMethod("pf1.applications.ApplyDamage.prototype._processImmunities", function (wrapped, target) {
     let immunized = wrapped(target);
-    for (const di of target.di ?? []) {
+    const innate = precisionImmune(target.actor) && !target.di?.some((di) => di.id === "precision") ? [{ id: "precision", active: true }] : [];
+    for (const di of [...(target.di ?? []), ...innate]) {
       if (!di.active || !di.id || !isModifier(di.id)) continue;
       for (const instance of target.instances) {
         if (instance.immune || !instance.typeIds?.has(di.id)) continue;
@@ -125,7 +144,8 @@ Hooks.on("pf1ApplyDamage", (actor, options) => {
 
   const traits = actor.system.traits ?? {};
   const resistances = traits.eres?.value ?? [];
-  const immunities = traits.di?.total ?? traits.di?.standard ?? new Set();
+  const immunities = new Set(traits.di?.total ?? traits.di?.standard ?? []);
+  if (precisionImmune(actor)) immunities.add("precision");
 
   // Halve first (minimum 1, like any halved damage), then split the halved total across the instances
   const ratio = options.ratio ?? 1;
@@ -152,7 +172,8 @@ Hooks.on("pf1ApplyDamage", (actor, options) => {
     if (!types.length || share <= 0) return;
     if (isImmune(types, immunities)) {
       reduced += share;
-      notes.push(`immune to ${types.join("/")} (${share})`);
+      const modifier = types.find((t) => isModifier(t) && immunities.has(t));
+      notes.push(`immune to ${modifier ?? types.join("/")} (${share})`);
       return;
     }
     let best = 0;

@@ -45,7 +45,7 @@ const providers = [];
 
 /**
  * Register a situational bonus. `collect(actor, roll)` returns entries for this roll:
- *   { id, label, part, type, atk, dmg, roll, dice, damageType, applies, blocked, reason, imposed, tooltip }
+ *   { id, label, part, type, atk, dmg, roll, dice, damageType, applies, reason, imposed, tooltip }
  * roll is { kind: "attack", action } | { kind: "save", saveId, reference } | { kind: "skill", skillId }
  * | { kind: "ability", abilityId }; `reference` is the UUID of the card the save was rolled from.
  * `part` labels the bonus in the roll formula; atk/dmg (attacks) or roll (other rolls) are its values.
@@ -53,8 +53,7 @@ const providers = [];
  * critical hit (sneak attack and other precision damage), with `damageType` added to the weapon's types.
  * Attack rolls also carry `flags`, the attack window's checkboxes ({ flanking, charge, highGround,
  * manyshot, rapidShot, pointBlankShot }); the window is rebuilt, keeping the player's choices, when they change.
- * Entries that don't apply right now are listed as Not Applied with `reason`; `blocked` ones can't be
- * ticked by anyone (a target immune to the bonus). Imposed entries (penalties
+ * Entries that don't apply right now are listed as Not Applied with `reason`. Imposed entries (penalties
  * from gear or rules) can only be turned off by the GM. Values should already allow for the roller's
  * own bonuses of the same type; between providers, only the highest of a type counts.
  */
@@ -197,7 +196,7 @@ const newState = (model, chosen = new Map()) => ({
   off: new Set(),
   on: new Set(),
   chosen, // provided ids → the player's tick, kept when the model is rebuilt
-  provided: new Map(model.provided.map((p) => [p.id, !p.blocked && (chosen.get(p.id) ?? !!p.applies)])),
+  provided: new Map(model.provided.map((p) => [p.id, chosen.get(p.id) ?? !!p.applies])),
 });
 
 const isIncluded = (model, state, key, change) => !state.off.has(key) && (!model.losers.has(change) || state.on.has(key));
@@ -392,9 +391,9 @@ function rows(model, state) {
       imposed: !!p.imposed,
       type: p.type && p.type !== "untyped" ? p.type : "",
       checked: !!state.provided.get(p.id),
-      disabled: !!p.blocked || (p.imposed && !gm) || (!!p.beatenBy && !!state.provided.get(p.beatenBy) && !state.provided.get(p.id)),
+      disabled: (p.imposed && !gm) || (!!p.beatenBy && !!state.provided.get(p.beatenBy) && !state.provided.get(p.id)),
       note: p.applies ? "" : state.provided.get(p.id) ? "ticked for this roll" : p.reason ?? "",
-      tooltip: p.blocked ? `Can't apply: ${p.reason}` : p.imposed && !gm ? "Only the GM can turn this off for this roll" : p.tooltip ?? "",
+      tooltip: p.imposed && !gm ? "Only the GM can turn this off for this roll" : p.tooltip ?? "",
     });
   }
   // Bonuses biggest first, then ability rows, then chosen penalties, then imposed ones; Not Applied last

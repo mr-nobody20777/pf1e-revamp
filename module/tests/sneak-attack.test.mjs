@@ -135,28 +135,20 @@ export function registerSneakAttackTests(quench) {
           }
         });
 
-        it("immune creatures (oozes, precision immunity): blocked, nobody can tick it", async () => {
+        it("immune creatures: not revealed before the attack; the precision dice are left out when the damage is applied", async () => {
           await goblin.setCondition("flatFooted", true);
           const [race] = await addItems(goblin, [["pf1.races", "Human"]]);
           await race.update({ "system.creatureTypes.base": ["ooze"] });
           try {
-            const e = sneakEntry(slayer);
-            assert.match(e.reason, /oozes/);
-            assert.isTrue(e.blocked);
+            assert.isTrue(sneakEntry(slayer).applies, "the roll window doesn't tell the player");
+            const hp = () => goblin.system.attributes.hp.value;
+            await goblin.update({ "system.attributes.hp.value": goblin.system.attributes.hp.max });
+            const start = hp();
+            const part = (types, value) => Object.assign(new pf1.models.action.DamagePartModel({ formula: "0", types }), { value });
+            await goblin.applyDamage(10, { instances: [part(["slashing"], 6), part(["slashing", "precision"], 4)] });
+            assert.equal(hp(), start - 6, "only the weapon damage");
           } finally {
             await race.delete();
-          }
-          await goblin.update({ "system.traits.di": ["precision"] });
-          try {
-            const action = slayer.items.getName("Longsword").defaultAction;
-            const model = effects.buildModel(slayer, { kind: "attack", action, flags: {} });
-            const state = effects.newState(model, new Map([["sneak-attack", true]]));
-            assert.isFalse(state.provided.get("sneak-attack"), "a tick doesn't override the block");
-            const row = effects.rows(model, state).find((r) => r.key === "sneak-attack");
-            assert.isTrue(row.disabled);
-            assert.match(row.tooltip, /immune to precision damage/);
-          } finally {
-            await goblin.update({ "system.traits.di": [] });
           }
         });
 

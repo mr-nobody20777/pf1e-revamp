@@ -12,6 +12,11 @@ The roll-window buff manager ("Buffs on a roll") is released in the Unreleased s
 - **Cleaner chat-card labels.** When a buff is turned off for a roll, the card shows both PF1's "+1 [Haste]" and the correction "−1 [Buffs: Haste off]". Both are correct, but a single line would read better.
 
 
+### Next priorities
+After sneak attack phase 2, the focus moves to:
+- **Ranged combat**: automate the rules that apply to ranged attacks (range increments, firing into melee, cover, Point-Blank Shot, Precise Shot and related feats, ammunition).
+- **Cantrips and 1st-level spells**: automate their effects across the spell lists, starting with the most commonly used.
+
 ## Planned
 
 ### Interface (from the PF2e design study, `docs/PF2E-UX-STUDY.md`)

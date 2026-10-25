@@ -14,24 +14,24 @@
 //     and keeps Dex against an invisible attacker. Improved Uncanny Dodge: can't be flanked except by
 //     a character with at least four more levels in classes that grant sneak attack.
 //   - Immune: oozes, elementals, incorporeal creatures (no ghost touch), amorphous creatures, and
-//     creatures in gaseous form, elemental body III/IV or particulate form.
+//     creatures in gaseous form, elemental body III/IV or particulate form. Not checked here: the roll
+//     window would tell the player before the attack. The dice are typed precision and the immunity
+//     takes them out when the damage is applied (resistance.mjs).
 //   - Deadly Range: +10 ft of sneak attack range each time it's taken. Sniper's Eye: ranged sneak
 //     attacks within 30 ft against a target with concealment (not total concealment).
 // The GM still judges "must be able to see the target ... and reach such a spot": untick it when not.
-// Immunity to precision damage is a hard block (it can't be ticked); the dice are typed precision so
-// damage application leaves them out for immune targets too (resistance.mjs).
 
 import { RANGED_ATTACKS } from "./const.mjs";
 import { evaluate, classLevel } from "./util.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 import { missChances, seesInvisible } from "./miss-chance.mjs";
+import { isIncorporeal } from "./resistance.mjs";
 import { registerFootnote } from "./footnote.mjs";
 
 const SNEAK_TAG = /^sneakAttack/;
 // Dice progressions for Sneak Attack features without their own roll formula (archetype versions)
 const PROGRESSION = { rogue: (l) => Math.ceil(l / 2), rogueUnchained: (l) => Math.ceil(l / 2), ninja: (l) => Math.ceil(l / 2), slayer: (l) => Math.floor(l / 3) };
 const DENIES_DEX = ["flatFooted", "blind", "cowering", "helpless", "paralyzed", "pinned", "stunned", "unconscious", "sleep", "petrified"];
-const IMMUNE_FORMS = /^(gaseous form|elemental body (iii|iv)|particulate form)$/i;
 
 const hasFeat = (actor, re) => (actor?.itemTypes?.feat ?? []).filter((f) => f.isActive !== false && re.test(f.name));
 const isSneakAttack = (item) => item?.type === "feat" && SNEAK_TAG.test(item.system.tag ?? "");
@@ -57,23 +57,6 @@ function diceText(srcs) {
   const bySize = new Map();
   for (const s of srcs) bySize.set(s.size, (bySize.get(s.size) ?? 0) + s.dice);
   return [...bySize].sort((a, b) => a[0] - b[0]).map(([size, n]) => `${n}d${size}`).join(" + ");
-}
-
-function creatureTypes(actor) {
-  const race = actor?.race?.system;
-  const set = (field) => new Set([...(race?.[field]?.base ?? []), ...(race?.[field]?.total ?? [])].map((t) => String(t).toLowerCase()));
-  return { types: set("creatureTypes"), subtypes: set("creatureSubtypes") };
-}
-
-/** Why the target can't take precision damage, or null. */
-function immunity(target, item) {
-  const { types, subtypes } = creatureTypes(target);
-  if (types.has("ooze")) return "oozes are immune to precision damage";
-  if (subtypes.has("elemental")) return "elementals are immune to precision damage";
-  if ((target.statuses?.has("incorporeal") || subtypes.has("incorporeal")) && !/ghost touch/i.test(item?.name ?? "")) return "incorporeal (ghost touch weapons only)";
-  if (hasFeat(target, /^amorphous$/i).length || (target.system.traits?.di?.total ?? new Set()).has?.("precision")) return "the target is immune to precision damage";
-  const form = (target.itemTypes?.buff ?? []).find((b) => b.isActive && IMMUNE_FORMS.test(b.name));
-  return form ? `${form.name} makes it immune` : null;
 }
 
 /** How the target is denied its Dexterity bonus against this attacker ("the target is stunned"), or null. */
@@ -126,8 +109,8 @@ registerRollEffect({
     const { action } = roll;
     const ranged = RANGED_ATTACKS.includes(action.actionType);
 
-    const immune = immunity(target, action.item);
-    if (immune) return [{ ...base, applies: false, blocked: true, reason: immune }];
+    // A ghost touch weapon deals precision damage to an incorporeal creature: not typed precision then
+    if (isIncorporeal(target) && /ghost touch/i.test(action.item?.name ?? "")) delete base.damageType;
 
     // Range: 30 ft for ranged attacks, +10 ft per Deadly Range
     const attackerToken = actor.getActiveTokens()[0];
@@ -160,4 +143,4 @@ registerFootnote((item) =>
   isSneakAttack(item) ? ["Added to attack damage automatically when it applies (see the attack window). No need to roll it from here as well."] : null
 );
 
-export const _test = { sources, diceText, deniedDex, immunity, canFlank, distance };
+export const _test = { sources, diceText, deniedDex, canFlank, distance };

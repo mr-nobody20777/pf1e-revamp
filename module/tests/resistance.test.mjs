@@ -88,6 +88,9 @@ export function registerResistanceTests(quench) {
             const target = { di: [{ id: "precision", active: true }], instances: [{ total: 4, typeIds: new Set(["piercing", "precision"]) }, { total: 6, typeIds: new Set(["slashing"]) }] };
             assert.equal(pf1.applications.ApplyDamage.prototype._processImmunities.call({}, target), 4, "dialog");
             assert.equal(target.instances[1].total, 6);
+            // Innate immunity (an incorporeal creature, no damage immunity listed) in the dialog too
+            const ghost = { actor: { statuses: new Set(["incorporeal"]) }, di: [], instances: [{ total: 4, typeIds: new Set(["piercing", "precision"]) }] };
+            assert.equal(pf1.applications.ApplyDamage.prototype._processImmunities.call({}, ghost), 4, "incorporeal");
           } finally {
             await actor.update({ "system.traits.di": [] });
           }

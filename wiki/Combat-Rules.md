@@ -80,11 +80,10 @@ It is not applied when:
 
 - a ranged attack is beyond 30 ft (Deadly Range adds 10 ft each time it is taken);
 - the target has concealment (Sniper's Eye allows ranged attacks within 30 ft against a target without total concealment);
-- the target is immune to precision damage: oozes, elementals, incorporeal creatures (unless the weapon has ghost touch), amorphous creatures, creatures under gaseous form, elemental body III/IV or particulate form, and any creature given a precision damage immunity. This can't be overridden in the roll window;
 - the target has Uncanny Dodge and is only flat-footed or facing an invisible attacker, or has Improved Uncanny Dodge and the attacker doesn't have at least four more levels in sneak attack classes;
 - there is no single target.
 
-The dice are added as their own part of the damage roll ("2d6[Sneak Attack]"), typed as precision damage as well as the weapon's type, so an immune creature takes none of it when the damage is applied. They are not multiplied on a critical hit and count only once per Manyshot volley; dice of different sizes are rolled separately ("3d6 + 1d8"). Attacks rolled without the attack window (shift-click) use PF1's own Flanking setting. The roll window lists sneak attack with the reason it applies; untick it if the GM rules that the attacker can't see or reach a vital spot. When it wasn't detected, it is listed under **Not Applied** with the reason and can be ticked by hand.
+The dice are added as their own part of the damage roll ("2d6[Sneak Attack]"), typed as precision damage as well as the weapon's type, so a creature immune to precision damage takes none of it when the damage is applied. Immunity is deliberately not shown before the attack: the roll window offers sneak attack whenever its conditions are met, and the attacker finds out when the damage lands. Immune creatures are oozes, elementals, incorporeal creatures (unless the weapon has ghost touch), amorphous creatures, creatures under gaseous form, elemental body III/IV or particulate form, and any creature with a precision damage immunity. They are not multiplied on a critical hit and count only once per Manyshot volley; dice of different sizes are rolled separately ("3d6 + 1d8"). Attacks rolled without the attack window (shift-click) use PF1's own Flanking setting. The roll window lists sneak attack with the reason it applies; untick it if the GM rules that the attacker can't see or reach a vital spot. When it wasn't detected, it is listed under **Not Applied** with the reason and can be ticked by hand.
 
 Sneak attack talents, feats, items and fortification are not automated yet.
 
@@ -102,7 +101,7 @@ Several resistances against the same energy don't add up. Only the highest count
 The rules don't say whether a saving throw for half damage or energy resistance applies first, and there's no official ruling. PF1e Revamp halves first, then applies resistance, which is the most common reading and the order most favorable to the creature. For example, 20 fire damage, saved for half, against fire resistance 10 is fully resisted (20 → 10 → 0), rather than leaving 5. Doubled damage (the ×2 button) keeps resistance first, for the same reason.
 
 ### Precision and nonlethal immunity
-Precision and nonlethal damage usually come with another type (sneak attack is "piercing, precision"). A creature immune to precision or nonlethal damage takes none of such damage, in PF1's Apply Damage dialog and on quick-applied damage; PF1 alone only counts damage as immune when all of its types match.
+Precision and nonlethal damage usually come with another type (sneak attack is "piercing, precision"). A creature immune to precision or nonlethal damage takes none of such damage, in PF1's Apply Damage dialog and on quick-applied damage; PF1 alone only counts damage as immune when all of its types match. Oozes, elementals, and incorporeal and amorphous creatures are immune to precision damage without needing it listed.
 
 ### Where resistance comes from
 Racial traits (*"you have fire resistance 5"*), bloodline powers (Solar), and anything PF1 already tracks. With **Nevela's Automation Suite**, its *Resist Energy* and *Protection from Energy* buffs are handled by Nevela and work alongside this.
