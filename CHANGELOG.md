@@ -18,6 +18,7 @@
 - **Bleed.** Bleeding Attack's bleed is tracked with its amount: the creature takes it at the start of each of its turns, and any healing, a Heal check (button on the bleed message) or removing the Bleed condition stops it. A lower bleed doesn't replace a higher one.
 
 ### Fixed
+- **A spell's row for a hidden token is shown to the GM only**, so a spell that catches a hidden creature doesn't give it away to the players.
 - **Several tokens of the same creature rolling at once** (unlinked tokens share their actor's id): the roll window's bonuses and one-roll buffs such as Guidance are now kept per token, so one goblin's save window no longer takes over another's.
 - **Monsters with racial Hit Dice and no race now have a creature type.** PF1's bestiary builds many monsters this way (a Human Skeleton has "Undead" class levels), and PF1 doesn't read the type from the class, so they counted as living creatures of no type: channel energy didn't treat skeletons and zombies as undead, undead and constructs weren't immune to Fortitude spells, and oozes, elementals and other creatures with racial Hit Dice weren't immune to precision damage. The type now comes from the racial class when there's no race.
 - **Stepping the combat tracker back and forward again** no longer bleeds a creature twice in the same round, offers a new save twice, or replaces a wizard's stored Prescience roll.

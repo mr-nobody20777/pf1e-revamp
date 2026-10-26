@@ -606,7 +606,10 @@ Hooks.on("renderChatMessagePF", (message, html) => {
   const head = document.createElement("div");
   head.innerHTML = `<strong>${esc(data.name)}</strong>${data.save ? `: ${SAVE_NAMES[data.save.type]} DC ${data.save.dc}` : ""}${data.pool != null && game.user.isGM ? ` · ${data.pool} HD` : ""}`;
   box.append(head);
-  data.rows.forEach((row, index) => box.append(rowElement(message, data, row, index)));
+  // A hidden token's row is for the GM only: its name would give it away
+  data.rows.forEach((row, index) => {
+    if (game.user.isGM || !tokenOf(row.uuid)?.hidden) box.append(rowElement(message, data, row, index));
+  });
   // Under the targets and the save button, above the card's info tags
   const footer = html.querySelector(".chat-card .card-footer");
   if (footer) footer.before(box);
