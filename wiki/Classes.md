@@ -42,7 +42,7 @@ Removing the bloodline, domain or school removes the powers it added. The item's
 - With **Selective Channeling**, you can also uncheck up to your Charisma modifier in other creatures.
 - **Healing** is applied to everyone checked, never above their maximum HP.
 - **Harm**: each creature rolls its Will save (DC 10 + ½ cleric level + Cha) and takes full or half damage.
-- Chat stays clean: PF1's own channel card shows the amount, and harmed creatures' Will saves get their own cards. (Behind the scenes, the request to the GM is whispered and removed once applied.)
+- PF1's own channel card shows the amount, and each harmed creature's Will save gets its own card.
 - Cancelling the checklist gives the use back.
 
 The cleric's token must be on the scene. Applying the results needs a GM logged in (see [Compatibility](Compatibility#multiplayer)).
@@ -63,7 +63,7 @@ The choice shows on the character sheet as a **Variant Channeling (Luck)** class
 - **Heal:** every creature healed gets **Luck Channel (+1)**, rising to +2 at cleric level 5 and +1 per 5 levels after that (max +5). The rules let each creature pick which roll (attack, CMB check, save or skill check) gets it, so every roll window shows a ticked **Luck channel +1 (one roll)** box: leave it ticked to use it, untick it to save it for a later roll. It counts as a sacred bonus; a button on the buff switches it to a luck bonus, since the rules let the creature choose. It lasts until the end of the cleric's next turn.
 - **Harm** (negative energy): a penalty of the same size on all d20 rolls until the end of the cleric's next turn, negated by the save.
 
-The other portfolios' effects are shown in the target list for the table to apply by hand. They'll be automated as players pick them.
+The other portfolios' effects are shown in the target list for the GM to apply by hand.
 
 ### Spontaneous Casting
 **Before:** losing a prepared spell to cast a cure spell meant adjusting the spellbook by hand.

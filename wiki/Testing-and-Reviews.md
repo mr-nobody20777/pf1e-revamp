@@ -9,7 +9,7 @@ PF1e Revamp is written by **Claude**, Anthropic's AI, working in Claude Code. Cl
 Every automation starts from the **full rules text** of the ability, feat, trait or spell, and the rule is quoted at the top of the code that implements it. When PF1's or Pathfinder 1e Content's data disagrees with the rules, the rules win and the item's note says so. Examples: the auras' always-on bonuses, and Magical Knack's missing Hit Dice cap.
 
 ## Automated tests
-The module includes a test suite of **149 tests in 21 groups**, run with the **Quench** module. Each group:
+The module includes a test suite of **over 240 tests in 29 groups**, run with the **Quench** module. Each group:
 1. creates throwaway characters, tokens and combats on a dedicated test scene;
 2. uses features through PF1's real actions and rolls, the same way a player would;
 3. checks the results on the chat cards and character sheets;
@@ -20,7 +20,7 @@ New features ship with their tests, and the **whole suite runs before every rele
 To run it yourself: install and enable **Quench**, open it from the sidebar, select the *PF1e Revamp* groups and click **Run**. Use a test world, since tests briefly create and delete characters, tokens and chat messages.
 
 ## Playing as a player
-Most automated tests run as a GM, and a GM can change anything, so permission problems would never show up there. Before release, every feature that touches another character was also played through **logged in as a regular player**, with a separate GM connected. That covered buffs on allies, channel energy, spontaneous casting, Prescience, Rewind, Forewarned, raging songs, Studied Target and miss chances. All worked. See [Compatibility](Compatibility#multiplayer) for how the GM's client handles those changes.
+Most automated tests run as a GM, and a GM can change anything, so permission problems would never show up there. Before release, every feature that touches another character was also played through **logged in as a regular player**, with a separate GM connected. That covered buffs on allies, channel energy, spontaneous casting, Prescience, Rewind, Forewarned, raging songs, Studied Target, miss chances, sneak attack talents, and spells cast by and at a player (saves rolled from the card, templates placed on the map). All worked. See [Compatibility](Compatibility#multiplayer) for how the GM's client handles those changes.
 
 ## Performance reviews
 After every **ten new features**, the code gets a review aimed at keeping games running smoothly, without the slowdowns that make people refresh Foundry mid-session:

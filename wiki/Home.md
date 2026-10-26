@@ -1,35 +1,32 @@
 # PF1e Revamp
 
-PF1e Revamp makes Pathfinder 1e content in Foundry VTT work the way its rules text reads. This wiki explains, feature by feature and in plain language, **what changes when the module is enabled**: what you'll see, what happens automatically, and what's still up to you.
+PF1e Revamp makes Pathfinder 1e content in Foundry VTT work the way its rules text reads. This wiki explains each feature in plain language: what you'll see, what happens automatically, and what is still up to you.
 
-## Where to look
+## Pages
 
-| Page | What's in it |
+| Page | Covers |
 |---|---|
-| [Classes](Classes) | Cleric, Skald, Slayer, Sorcerer and Wizard features, plus bloodlines, domains and arcane schools |
-| [Archetypes](Archetypes) | How applying an archetype changes a class, and which archetypes have full mechanics |
-| [Races](Races) | Choosing racial traits, alternate traits, ability choices and racial resistances |
+| [Spells and Buffs](Spells-and-Buffs) | Spells on their targets (saves, spell resistance, effects), miss chances, alignment wards, one-roll buffs |
+| [Combat Rules](Combat-Rules) | Sneak attack, ranged combat, fortification, bleed, save bonuses, energy resistance |
+| [Classes](Classes) | Cleric, skald, slayer, sorcerer, wizard and their options |
+| [Archetypes](Archetypes) | How an archetype changes its class |
+| [Races](Races) | Racial traits, alternate traits and ability choices |
 | [Traits](Traits) | Character traits and drawbacks |
 | [Feats](Feats) | Two-weapon fighting, shield bashes, Blind-Fight, Selective Channeling and others |
-| [Spells and Buffs](Spells-and-Buffs) | Miss chances, alignment wards, one-roll buffs and other spells |
-| [Combat Rules](Combat-Rules) | Save bonuses against effects, energy resistance, damage |
-| [Compatibility](Compatibility) | Recommended modules, how PF1e Revamp works alongside them, and multiplayer |
-| [Settings](Settings) | The module's world settings |
+| [Compatibility](Compatibility) | Recommended modules, how PF1e Revamp works alongside them, multiplayer |
+| [Settings](Settings) | The module's settings |
 | [Known Issues](Known-Issues) | Current limitations |
-| [Testing and Reviews](Testing-and-Reviews) | How the module is tested and reviewed |
+| [Testing and Reviews](Testing-and-Reviews) | How the module is tested |
 
-## How automation shows up
+## How automation appears
 
-**The note on items.** Anything PF1e Revamp automates gets a short **"PF1e Revamp: …"** note under its description, on the item sheet and on its chat cards. The note says what's automated, and often has buttons: *Choose…*, *Review racial traits…*, *Use 17 on my next roll*, *Stop studying*.
+- **A note on the item.** Everything PF1e Revamp automates has a short **PF1e Revamp** note on its sheet and chat card. It says what is automated and often has buttons, such as *Choose…*, *Review racial traits…* or *Stop studying*.
+- **PF1's Use button starts it.** Using Channel Energy opens the list of creatures in the burst; using Raging Song asks which song.
+- **Ongoing effects are buffs.** Studied Target puts *Studied Target: Goblin* on the slayer and *Studied by Valeros* on the goblin. Turning off or deleting either ends both.
+- **Results appear on the chat card.** Miss chances under each attack, a spell's saves and effects in a row per creature, channel energy's healing and saves in its summary.
 
-**The Use button.** Features start from PF1's normal **Use** button. Using Channel Energy opens the burst checklist, and using Raging Song asks which song.
+## Good to know
 
-**Buffs you can see.** Ongoing effects appear as buffs on the characters involved. For example, *Studied Target: Goblin* sits on the slayer and *Studied by Valeros* on the goblin. Turning off or deleting either one ends the effect for both.
-
-**Chat cards.** Results show on the chat card where they happened: the miss-chance roll under each attack, the "with Int" total under a Diplomacy roll, and the healing and saves in a Channel Energy summary.
-
-## A few things to know
-
-- **The GM stays in charge.** Every automation follows the rules text, but anything can still be adjusted by hand afterwards. Turning off a buff, editing a value or deleting an item works as normal.
-- **A GM needs to be logged in** for anything that changes another character: buffs on allies, channel energy healing, initiative changes. Players can't change what they don't own, so those changes go through the GM's client. See [Compatibility](Compatibility#multiplayer).
-- **It uses your existing items.** There's no special version of a class feature, trait or spell to swap in. PF1e Revamp recognizes the ones from PF1 and Pathfinder 1e Content.
+- **The GM stays in charge.** Anything the module does can be changed by hand afterwards: turn off a buff, edit a value, delete an item.
+- **A GM must be logged in** for anything that changes another character, such as buffs on allies, healing, or a spell's effects. Players can't change what they don't own, so the GM's client makes those changes. See [Compatibility](Compatibility#multiplayer).
+- **It uses the items you already have.** PF1e Revamp recognizes the class features, traits and spells from PF1 and Pathfinder 1e Content; there is nothing to swap in.
