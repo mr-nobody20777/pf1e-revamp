@@ -69,6 +69,66 @@ A wizard-hat button next to the level badge on the sheet opens one window for th
 - **Item-row action buttons** (#19, #20): Raging Song, Studied Target, Channel Energy could get a small inline "Use" button on the attack/feature row that does everything and posts one short narrative line.
 - **Typed modifier tooltips with inline add** (#16): hovering AC/saves in PF1 to see each bonus with its type would make stacking visible.
 
+## Round 5: spells and abilities (2026-10-26)
+
+Read-only this time: the game's sheets and existing chat cards were inspected and spell cards were rendered without posting them, and the PF2e system and PF2e Toolbelt source code was read (local clones in `reference/`, outside this repository). Game: PF2e 8.6.1 on Foundry v14.
+
+**The spellcasting tab**
+
+33. **Each spell row carries what you need to pick it**: action-cost glyphs (a range for variable spells: "Harm ⯁–⯁⯁⯁"), a **Defense** column ("basic Will", "AC", "Fortitude"), range, and a **Cast** button. The entry's header shows the spell DC and attack bonus, the tradition and proficiency, and a Spell Preparation button; expended prepared slots are toggled in place.
+
+**Spell cards**
+
+34. **Outcomes are laid out by degree of success** (Critical Success / Success / Failure / Critical Failure), each with its condition as an **inline, draggable link carrying its value** ("Frightened 2", "Stunned 1"). Traits are tags with tooltips; Range / Targets / Defense / Duration are one line each; heightening is its own line.
+35. **Buttons name what they roll**: "Save DC 17 basic Will"; for spell attacks, "Attack / MAP −5 / MAP −10" then "Roll Damage".
+
+**Per-target rows (PF2e Toolbelt's target helper)**
+
+36. **A row per target** under the card: a PC or NPC icon, the save as an icon with a d20 button for the token's owner, the **degree of success color-coded**, and a tooltip with the DC, "Success by 3" and every modifier. A ping button finds the token on the map.
+37. **Players don't see NPC save results**: they see a "?" where the GM sees the number.
+38. **"Roll NPC Saves"**: one GM button rolls every NPC row's save at once (each still a real roll). **"Set targets"** lets the card's author change the targets after posting.
+39. **Rerolls from the row** (hero points, fortune effects), and the row keeps both results.
+40. **Damage per target**: the damage card repeats PF2e's Damage / Half / Double / Block buttons on each target's row; the one matching the save (a basic save's success = half) is highlighted, and a row greys out once applied. Shift-click adjusts the amount. The card's own buttons hide behind a toggle.
+41. **Template Helper**: after placing a template, a small dialog targets the tokens inside it: Enemies / Allies / All, include self, include neutral, remove the template.
+42. **Damage cards** show the modifiers as chips ("1d6 Slashing", "Strength +2"), a **range bar colored by damage type** showing where the roll fell between minimum and maximum, and the outcome in the header ("Critical Hit").
+
+**Abilities**
+
+43. **The Actions tab** splits Encounter / Exploration / Downtime, puts **toggles** at the top as checkboxes, and lists Strikes with **MAP built into the buttons** ("+6 / +1 (MAP −5) / −4 (MAP −10)"), then Damage / Critical, then **weapon handling chips with their action cost** (Change Grip ⯁, Sheathe ⯁, Reload ⯁).
+44. **"Use" appears only where it does something**: on actions with a self-effect or a frequency. Using one posts a card with an **Apply Effect** button; the effect records its origin (actor, token, item, roll options), and the button turns into "applied". Per-day uses count down on use.
+
+**Effects**
+
+45. **The effects panel** lists the selected token's effects and conditions: left-click raises a value (Frightened 1 → 2), right-click lowers or removes it; each shows its time left in words ("3 rounds", "Until encounter ends", "Expired"); the tooltip has the description, an Edit button and, for persistent damage, a recovery button.
+46. **Durations can end at the start or end of the caster's turn**, or at the end of the round (`turn-start` / `turn-end` / `round-end`), and every effect knows who applied it and from what, so its DC and roll options come from the caster.
+
+**Modules around spells and abilities in this game**
+
+- **Modifiers Matter**: highlights when a buff, debuff or condition changed a roll's outcome ("Frightened turned a hit into a miss").
+- **Sustain Reminder**: reminds the caster each turn about spells that need sustaining.
+- **Extempore Effects**: makes a temporary effect from any chat card, for spells that have none.
+- **Ctrl-click Effects**: Ctrl-clicking a condition link in chat applies it to the selected tokens.
+- **Afflictioner**: poisons and diseases with onset, stages, saves on schedule and treatment.
+- **Summons Assistant**: places summoned creatures.
+
+**Compared with PF1e Revamp's spell rows**: our rows already do what Toolbelt does for saves (a row per creature, saves rolled against the card, spell resistance, immunities found at resolution), and go further on effects (applied automatically, durations, Hit Dice pools, new saves each turn). Missing are the conveniences (a GM button for NPC saves, retargeting, a template dialog, pings), the **hidden NPC results**, and the **save margin**.
+
+### Ideas from round 5 (ranked by value/effort)
+
+| Idea | PF2e pattern | Where it fits in PF1e Revamp |
+|---|---|---|
+| **Hide NPC save totals from players** | #37 | Spell rows: players see "saved / failed", the GM sees the total. Matches our rule that enemy statistics stay hidden (a save total reveals the bonus). |
+| **"Roll NPC saves" for the GM** | #38 | One button on the spell card rolls every NPC row's save; still a click, as the saves ruling requires. |
+| **Save margin in the row** | #36 | "Will 14: failed by 1" (the DC is on the card already). |
+| **Modifiers that mattered** | Modifiers Matter | Our roll window knows each ticked bonus: note on the card when one changed the result ("Bless made this hit", "the +2 vs fear made the save"), for the GM where AC is involved. |
+| **Template helper** | #41 | After placing a spell's template: Enemies / Allies / All, include self, then remove the template. |
+| **Retarget a posted card** | #38 | "Set targets" on our spell card rebuilds its rows from the current targets. |
+| **Condition links on our cards** | #34, Ctrl-click Effects | Write the effect line with draggable condition links ("Shaken 1 round"); Ctrl-click applies to selected tokens. |
+| **Concentration reminder** | Sustain Reminder | PF1 spells with a concentration duration (Detect Magic, Silent Image, Lullaby): at the caster's turn, a reminder that maintaining it is a standard action, with an End button. |
+| **Effects panel for PF1** | #45 | A strip of the selected token's buffs and conditions with time left, click to change a value, right-click to remove, tooltip with source and description. |
+| **Poisons and diseases** | Afflictioner | PF1 afflictions: onset, frequency, saves on schedule, cure after N consecutive saves, ability damage per failed save. |
+| **Effect ends on the caster's turn** | #46 | Spell buffs that last "until your next turn" end at the start of the caster's turn, not the target's. |
+
 ## What PF1e Revamp could borrow (ranked by value/effort)
 
 | Idea | PF2e pattern | Where it fits in PF1e Revamp |

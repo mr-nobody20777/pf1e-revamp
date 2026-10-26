@@ -27,6 +27,11 @@ Next, the focus moves to:
 ## Planned
 
 ### Interface (from the PF2e design study, `docs/PF2E-UX-STUDY.md`)
+- **Spell cards (round 5 of the study).** Hide NPC save totals from players (they see saved or failed); a GM button that rolls every NPC row's save; the save margin in each row; a template helper (target enemies, allies or all inside a placed template, then remove it); retargeting a posted card; draggable condition links in the effect line.
+- **Modifiers that mattered.** Note on the card when a ticked bonus changed the outcome ("Bless made this hit", "the +2 against fear made the save").
+- **An effects panel.** The selected token's buffs and conditions with time left, click to change a value, right-click to remove, and a tooltip with the source.
+- **Concentration reminders.** For spells with a concentration duration, a reminder on the caster's turn that maintaining it is a standard action, with an End button.
+- **Poisons and diseases.** Onset, frequency, saves on schedule, cure after consecutive saves, and ability damage per failed save.
 - **Richer chat cards.** Show the margin on saves against a DC ("Success by 3"), include a draggable buff link in channel energy and spell notes, and color damage by type.
 - **Empty-slot rows and pending-choice highlights.** Show open choices on the character sheet (talent slots, combat style feats, unmade selections) rather than opening dialogs.
 - **A unified rules layer.** Several features keep their own rule tables (archetype rules, next-roll effects, buff grants, trait rules, save-bonus keywords). Merging them into one data format ("this item grants X when Y") would let new features be added as data rather than code, and would give the roll window a single source for every situational bonus.
@@ -73,7 +78,7 @@ Next, the focus moves to:
 - **Foundry vs. Archives of Nethys.** Compare the number of entries per category in Foundry's compendiums with Archives of Nethys to find published content missing from Foundry; content must exist as an item before it can be automated. Reference counts (2026-10-23, about 45,000 entries including about 32,000 items): class features 11,598; feats 3,644; spells 3,111; traits 2,045; racial traits 1,677; archetypes 1,268; prestige classes 119; races 85; base classes 49; equipment about 7,000; monster rules about 2,350; buffs 344; monster and NPC stat blocks 10,387 (journals), 427 actors and 92 traps and haunts.
 
 ### Interface research
-- **Continue the PF2e comparison.** The first study (`docs/PF2E-UX-STUDY.md`) covers the character sheet, level-up, roll windows and chat cards. Remaining areas: the effects panel, targeting, and how item sheets present their rules.
+- **Continue the PF2e comparison.** The study (`docs/PF2E-UX-STUDY.md`) covers the character sheet, level-up, roll windows, chat cards, spells and abilities, and the effects panel. Remaining: how item sheets present their rules.
 
 ## Quality and release
 
