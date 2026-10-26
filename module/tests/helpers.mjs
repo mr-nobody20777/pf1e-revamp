@@ -94,6 +94,9 @@ export async function useTestScene() {
     await ready;
   };
   await view(scene);
+  // Tokens left by a run that was cut off (their test actors are already deleted)
+  const orphans = scene.tokens.filter((t) => !game.actors.has(t.actorId)).map((t) => t.id);
+  if (orphans.length) await scene.deleteEmbeddedDocuments("Token", orphans);
   return { scene, restore: () => previous && view(previous) };
 }
 
