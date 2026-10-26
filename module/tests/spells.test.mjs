@@ -6,6 +6,7 @@ import { _test as spells } from "../spells.mjs";
 import { settled } from "../util.mjs";
 import { SPELLS } from "../spell-data.mjs";
 import { _test as effects } from "../roll-effects.mjs";
+import { nevelaAppliesBuff } from "../buff-grants.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -18,7 +19,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -118,6 +119,11 @@ export function registerSpellTests(quench) {
           assert.match(card.systemRolls.attacks[0].damage[0].formula, /^3d4 \+ 3/, "CL 5: three missiles");
           assert.isUndefined(row(card, human).attack);
           assert.equal(row(card, human).state, "done");
+        });
+
+        it("Cure Light Wounds on an ally: the row says healing, not damage", async () => {
+          const card = await cast("Cure Light Wounds", [friendToken]);
+          assert.deepEqual(row(card, friend).applied, ["healing"]);
         });
 
         it("Cure Light Wounds harms undead (the card's healing button deals damage)", async () => {
@@ -292,6 +298,137 @@ export function registerSpellTests(quench) {
             await waitFor(() => !human.statuses.has("blind"), { what: "the mud wiped off" });
           } finally {
             await combat.delete();
+          }
+        });
+
+        it("conditions expire on time in combat, whatever other combat is running (seconds of world time)", async () => {
+          const card = await cast("Daze", [humanToken]);
+          dice(0.99);
+          await save(card, human);
+          const effect = human.effects.find((e) => e.statuses.has("dazed"));
+          assert.equal(effect.duration.seconds, 6);
+          const combat = await Combat.create({ scene: canvas.scene.id, active: true, flags: { [MODULE_ID]: { quench: true } } });
+          try {
+            await combat.createEmbeddedDocuments("Combatant", [
+              { tokenId: wizardToken.id, sceneId: canvas.scene.id, actorId: wizard.id, initiative: 20 },
+              { tokenId: humanToken.id, sceneId: canvas.scene.id, actorId: human.id, initiative: 10 },
+            ]);
+            await combat.startCombat();
+            await combat.nextTurn();
+            await combat.nextTurn(); // round 2: a round has passed
+            await waitFor(() => !human.statuses.has("dazed"), { what: "dazed to expire" });
+          } finally {
+            await combat.delete();
+          }
+        });
+
+        it("fear stacks: shaken and shaken again is frightened, frightened and more fear is panicked", async () => {
+          await human.setCondition("shaken", true);
+          const card = await cast("Cause Fear", [humanToken]);
+          dice(0.01); // a successful save: shaken 1 round, on top of shaken
+          await save(card, human);
+          assert.isTrue(human.statuses.has("frightened"), "shaken + shaken");
+          assert.include(row(card, human).applied.join(), "frightened 1 round");
+          const again = await cast("Cause Fear", [humanToken]);
+          dice(0.99);
+          await save(again, human);
+          assert.isTrue(human.statuses.has("panicked"), "frightened + frightened");
+        });
+
+        it("a condition already on with a longer duration isn't shortened", async () => {
+          const doom = await cast("Doom", [humanToken]);
+          dice(0.99);
+          await save(doom, human);
+          const before = human.effects.find((e) => e.statuses.has("shaken")).duration.seconds;
+          await human.setCondition("frightened", false);
+          assert.isAbove(before, 6);
+        });
+
+        it("a wand casts the spell: rows, its effect, and the spell's descriptors from the compendium", async () => {
+          // As PF1's "create wand" dialog makes it: with the spell level, caster level and ability modifier
+          const data = await pf1.documents.item.ItemSpellPF.toConsumable({ ...wizard.items.getName("Daze").toObject(), sl: 0, cl: 1, ablMod: 0 }, "wand");
+          const [wand] = await wizard.createEmbeddedDocuments("Item", [data]);
+          try {
+            setTargets([humanToken, zombieToken]);
+            const before = new Set(game.messages.keys());
+            await wand.use({ skipDialog: true });
+            const card = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.type === "action"));
+            await waitFor(() => card.getFlag(MODULE_ID, spells.FLAG)?.resolved, { what: "the rows" });
+            assert.equal(card.getFlag(MODULE_ID, spells.FLAG).name, "Daze");
+            assert.equal(row(card, human).state, "save");
+            assert.deepInclude(row(card, zombie), { state: "unaffected" });
+            dice(0.99);
+            await save(card, human);
+            assert.isTrue(human.statuses.has("dazed"));
+          } finally {
+            await wand.delete();
+          }
+        });
+
+        it("buffs: left to Nevela's Automation Suite when it applies them; otherwise a recast doesn't lower the caster level", async () => {
+          const first = await cast("Bless", [friendToken]);
+          const bless = () => friend.itemTypes.buff.find((b) => b.name === "Bless");
+          await waitFor(() => bless());
+          if (nevelaAppliesBuff(wizard.items.getName("Bless"), wizard.items.getName("Bless").defaultAction.id, "Bless")) {
+            assert.include(row(first, friend).applied.join(), "applied by Nevela's Automation Suite");
+            return;
+          }
+          await bless().update({ "system.level": 9 });
+          const card = await cast("Bless", [friendToken]);
+          assert.include(row(card, friend).applied.join(), "already at caster level 9");
+          assert.equal(bless().system.level, 9);
+        });
+
+        it("stepping the combat tracker back doesn't offer a new save again", async () => {
+          const card = await cast("Hideous Laughter", [humanToken]);
+          dice(0.99);
+          await save(card, human);
+          const combat = await Combat.create({ scene: canvas.scene.id, active: true, flags: { [MODULE_ID]: { quench: true } } });
+          const offers = () => game.messages.contents.filter((m) => m.getFlag(MODULE_ID, spells.FLAG)?.ends && m.timestamp >= combat._stats.createdTime).length;
+          try {
+            await combat.createEmbeddedDocuments("Combatant", [
+              { tokenId: humanToken.id, sceneId: canvas.scene.id, actorId: human.id, initiative: 20 },
+              { tokenId: wizardToken.id, sceneId: canvas.scene.id, actorId: wizard.id, initiative: 10 },
+            ]);
+            await combat.startCombat();
+            await combat.nextTurn(); // the wizard
+            await combat.nextTurn(); // round 2, the human: offered
+            await waitFor(() => offers() === 1, { what: "the offer" });
+            await human.itemTypes.buff.find((b) => b.name === "Hideous Laughter").setFlag(MODULE_ID, "resave", { save: { type: "will", dc: 15 }, cl: 5 });
+            await combat.previousTurn();
+            await combat.previousTurn(); // back to the human in round 1
+            await new Promise((r) => setTimeout(r, 500));
+            assert.equal(offers(), 1, "no second offer going backwards");
+          } finally {
+            await combat.delete();
+          }
+        });
+
+        it("unlinked tokens of the same creature: each save goes to its own row", async () => {
+          const size = canvas.grid.size;
+          const unlinked = async (col) => {
+            const data = await ogre.getTokenDocument({ x: canvas.dimensions.sceneX + col * size, y: canvas.dimensions.sceneY + 4 * size, disposition: CONST.TOKEN_DISPOSITIONS.HOSTILE, actorLink: false });
+            const [doc] = await canvas.scene.createEmbeddedDocuments("Token", [data.toObject()]);
+            await waitFor(() => doc.object);
+            return doc;
+          };
+          const a = await unlinked(4), b = await unlinked(5);
+          try {
+            const card = await cast("Color Spray", [a, b]);
+            const rowOf = (t) => rows(card).find((r) => r.uuid === t.uuid);
+            dice(0.99); // b fails first
+            await b.actor.rollSavingThrow("will", { skipDialog: true, dc: card.getFlag(MODULE_ID, spells.FLAG).save.dc, reference: card.uuid, token: b });
+            await waitFor(() => rowOf(b).state === "done", { what: "b's save" });
+            assert.isFalse(rowOf(b).save.passed);
+            assert.equal(rowOf(a).state, "save", "a's row still waits for a's save");
+            dice(0.01);
+            await a.actor.rollSavingThrow("will", { skipDialog: true, dc: card.getFlag(MODULE_ID, spells.FLAG).save.dc, reference: card.uuid, token: a });
+            await waitFor(() => rowOf(a).state === "done", { what: "a's save" });
+            assert.isTrue(rowOf(a).save.passed);
+            assert.isTrue(b.actor.statuses.has("stunned"));
+            assert.isFalse(a.actor.statuses.has("stunned"));
+          } finally {
+            await deleteTokens([a, b]);
           }
         });
 

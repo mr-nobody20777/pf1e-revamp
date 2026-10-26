@@ -11,7 +11,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { esc, onGmRequest, classLevel, titleFor } from "./util.mjs";
+import { esc, onGmRequest, classLevel, titleFor, saveResult } from "./util.mjs";
 import { variantEffect, variantOf, variantsAllowed, chooseVariant, clearVariant, applyVariant, channelBonus, isVariantFeature, VARIANTS } from "./variant-channeling.mjs";
 
 const RADIUS = 30;
@@ -180,8 +180,8 @@ onGmRequest("channel", async (message, data) => {
       text = healed === 0 ? "already full" : `+${healed}${healed < data.amount ? " (to max)" : ""}`;
     } else {
       const save = await actor.rollSavingThrow("will", { skipDialog: true, reference: data.card ?? undefined, dc: data.dc });
-      const total = save?.rolls?.[0]?.total;
-      saved = Number.isFinite(total) && total >= data.dc;
+      const { total, passed } = saveResult(save, data.dc);
+      saved = passed;
       // A variant's damage is already halved: the save negates the extra effect, not more damage
       const damage = saved && !variant ? Math.max(1, Math.floor(data.amount / 2)) : data.amount; // half, minimum 1
       await actor.applyDamage(damage, { forceDialog: false });

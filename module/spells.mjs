@@ -47,8 +47,8 @@
 import { MODULE_ID } from "./const.mjs";
 import { SPELLS } from "./spell-data.mjs";
 import { creatureTypes } from "./resistance.mjs";
-import { compendiumBuff, nevelaApplies } from "./buff-grants.mjs";
-import { esc, evaluate, isActiveGM, onGmRequest, createQueue, tokenDistance } from "./util.mjs";
+import { compendiumBuff, nevelaAppliesBuff } from "./buff-grants.mjs";
+import { esc, evaluate, isActiveGM, onGmRequest, createQueue, tokenDistance, timed, saveResult } from "./util.mjs";
 import { isUndead } from "./channel-energy.mjs";
 import { registerFootnote } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
@@ -59,10 +59,24 @@ const queue = createQueue("spell results");
 // Spells another feature already puts on their targets (buff-grants.mjs)
 const HANDLED_ELSEWHERE = new Set(["guidance"]);
 
+/** The spell an item casts: the spell itself, or a scroll, wand or potion of it ("Wand of Daze"). */
+function spellNameOf(item) {
+  if (item?.type === "spell") return item.name;
+  if (item?.type === "consumable" && ["scroll", "wand", "potion"].includes(item.system.subType)) return item.name.replace(/^(scroll|wand|potion) of /i, "");
+  return null;
+}
+
 /** The spell's entry, or null. */
 export function spellDef(item) {
-  if (item?.type !== "spell") return null;
-  return SPELLS[item.name.toLowerCase().replace(/\s*\((?:mythic|communal)\)$/, "")] ?? null;
+  const name = spellNameOf(item);
+  return name ? (SPELLS[name.toLowerCase().replace(/\s*\((?:mythic|communal)\)$/, "")] ?? null) : null;
+}
+
+/** The compendium spell a scroll, wand or potion was made from (its descriptors and spell resistance). */
+async function sourceSpell(name) {
+  const pack = game.packs.get("pf1.spells");
+  const entry = pack?.index.find((e) => e.name === name);
+  return entry ? pack.getDocument(entry._id) : null;
 }
 
 /** The entry as it applies to this row's creature (Chill Touch on undead has its own effect). */
@@ -87,12 +101,16 @@ const tokenOf = (uuid) => {
 Hooks.on("preCreateChatMessage", (message) => {
   if (message.type !== "action") return;
   const item = message.itemSource;
-  if (item?.type !== "spell" || HANDLED_ELSEWHERE.has(item.name.toLowerCase())) return;
+  const spellName = spellNameOf(item);
+  if (!spellName || HANDLED_ELSEWHERE.has(spellName.toLowerCase())) return;
   const def = spellDef(item);
   const action = item.actions?.get(message.system.action?.id);
   const save = message.system.save?.type ? { type: message.system.save.type, dc: message.system.save.dc } : null;
+  // The spell allows a save but PF1 couldn't work out its DC (a broken item): no rows, so nothing lands unsaved
+  if (action?.save?.type && !save) return;
   const harmless = !!action?.save?.harmless;
-  const sr = !!item.system.sr;
+  // A scroll, wand or potion doesn't carry the spell's spell resistance: found when the card resolves
+  const sr = item.type === "spell" ? !!item.system.sr : null;
   if (!def && !save && !sr) return;
   const caster = ChatMessage.implementation.getSpeakerActor(message.speaker);
   const casterToken = caster?.getActiveTokens()[0]?.document ?? null;
@@ -106,7 +124,9 @@ Hooks.on("preCreateChatMessage", (message) => {
   if (!targets.length) return;
   message.updateSource({
     [`flags.${MODULE_ID}.${FLAG}`]: {
-      name: item.name,
+      name: spellName,
+      itemId: item.id,
+      actionId: action?.id ?? null,
       save,
       harmless,
       sr,
@@ -114,7 +134,10 @@ Hooks.on("preCreateChatMessage", (message) => {
       // A touch spell without an attack roll of its own: the melee touch attack is rolled for it
       touch: (def?.touchAttack ?? (range === "touch" && !["msak", "rsak"].includes(action?.actionType))) || false,
       damage: !!action?.damage?.parts?.length,
-      cl: message.system.config?.cl ?? 0,
+      heal: action?.actionType === "heal",
+      cl: message.system.config?.cl ?? item.system.cl ?? 0,
+      // A save that also works on objects isn't one undead and constructs are immune to
+      objectSave: /object/i.test(action?.save?.description ?? ""),
       casterDisposition: casterToken?.disposition ?? null,
       rows: targets.map((uuid) => ({ uuid, name: tokenOf(uuid)?.name ?? actorOf(uuid)?.name ?? "?" })),
     },
@@ -142,10 +165,11 @@ function unaffectedBy(def, actor, spell) {
   const ci = actor.system.traits?.ci?.total ?? new Set();
   const descriptors = new Set(spell.descriptors);
   const mindless = actor.system.abilities?.int?.value == null || actor.system.abilities.int.value === 0;
-  if (descriptors.has("mindAffecting") && (ci.has("mindAffecting") || undeadOrConstruct || mindless || types.has("vermin") || types.has("ooze") || types.has("plant"))) return "immune to mind-affecting effects";
+  // Plants are immune whatever their Intelligence; vermin and oozes because they're mindless
+  if (descriptors.has("mindAffecting") && (ci.has("mindAffecting") || undeadOrConstruct || mindless || types.has("plant"))) return "immune to mind-affecting effects";
   if (descriptors.has("fear") && ci.has("fear")) return "immune to fear";
   if (descriptors.has("death") && ci.has("deathEffects")) return "immune to death effects";
-  if (spell.save === "fort" && !spell.harmless && undeadOrConstruct) return "undead and constructs ignore Fortitude effects";
+  if (spell.save === "fort" && !spell.harmless && !spell.objectSave && undeadOrConstruct) return "undead and constructs ignore Fortitude effects";
   return null;
 }
 
@@ -175,7 +199,9 @@ async function resolveCard(message) {
   const caster = ChatMessage.implementation.getSpeakerActor(message.speaker);
   const item = caster?.items.get(message.system.item?.id) ?? message.itemSource;
   const def = spellDef(item);
-  const spell = { name: data.name, descriptors: [...(item?.system.descriptors?.total ?? item?.system.descriptors?.base ?? [])], save: data.save?.type, harmless: data.harmless };
+  const source = item?.type === "spell" ? item : await sourceSpell(data.name);
+  if (data.sr === null) data.sr = !!source?.system.sr;
+  const spell = { name: data.name, descriptors: [...(source?.system.descriptors?.total ?? source?.system.descriptors?.base ?? [])], save: data.save?.type, harmless: data.harmless, objectSave: data.objectSave };
   let attack = message.systemRolls?.attacks?.[0]?.attack ?? null;
   // PF1's data for some touch spells has no attack roll (Chill Touch): roll it here
   const needsTouch = data.touch && data.rows.some((r) => !accepts(data, r, caster));
@@ -202,17 +228,7 @@ async function resolveCard(message) {
       Object.assign(row, { state: "unaffected", why });
       continue;
     }
-    // Spell resistance
-    const sr = actor.system.attributes?.sr?.total ?? 0;
-    if (data.sr && sr > 0 && !willing) {
-      const roll = await new Roll(`1d20 + ${data.cl} + ${penetration(caster)}`).evaluate();
-      row.sr = { total: roll.total, value: sr, passed: roll.total >= sr };
-      if (!row.sr.passed) {
-        row.state = "resisted";
-        continue;
-      }
-    }
-    // Touch and ray attacks (an ally accepting a harmless touch needs no roll)
+    // Touch and ray attacks first (an ally accepting a touch needs no roll), then spell resistance
     const touchAccepted = data.touch && !data.attack && accepts(data, row, caster);
     if ((data.attack || data.touch) && attack && !willing && !touchAccepted) {
       const ac = actor.system.attributes?.ac?.touch?.total ?? 10;
@@ -221,6 +237,15 @@ async function resolveCard(message) {
       row.attack = { total, ac, intoMelee: !!intoMelee, hit: natural === 20 || (natural !== 1 && total >= ac) };
       if (!row.attack.hit) {
         row.state = "missed";
+        continue;
+      }
+    }
+    const sr = actor.system.attributes?.sr?.total ?? 0;
+    if (data.sr && sr > 0 && !willing) {
+      const roll = await new Roll(`1d20 + ${data.cl} + ${penetration(caster)}`).evaluate();
+      row.sr = { total: roll.total, value: sr, passed: roll.total >= sr };
+      if (!row.sr.passed) {
+        row.state = "resisted";
         continue;
       }
     }
@@ -268,13 +293,12 @@ Hooks.on("createChatMessage", (save) => {
     const data = foundry.utils.deepClone(card?.getFlag?.(MODULE_ID, FLAG));
     if (!data?.resolved || !data.save) return;
     const { token: tokenId, actor: actorId } = save.speaker;
-    const mine = (r) => (tokenId && r.uuid.endsWith(`Token.${tokenId}`)) || actorOf(r.uuid)?.id === actorId;
+    // By token when the save has one: unlinked tokens of the same creature share its actor id
+    const mine = (r) => (tokenId ? r.uuid.endsWith(`Token.${tokenId}`) || (!tokenOf(r.uuid) && actorOf(r.uuid)?.id === actorId) : actorOf(r.uuid)?.id === actorId && tokenOf(r.uuid)?.actorLink !== false);
     const row = data.rows.find((r) => r.state === "save" && mine(r) && saveOf(data, r).type === save.system.subject.save);
     if (!row) return;
-    const roll = save.rolls?.[0];
-    const natural = roll?.dice?.[0]?.total;
-    const passed = natural === 20 || (natural !== 1 && roll?.total >= data.save.dc);
-    row.save = { total: roll?.total, passed };
+    const { total, passed } = saveResult(save, data.save.dc);
+    row.save = { total, passed };
     if (data.ends) await endEffect(row, data, passed);
     else {
       const caster = ChatMessage.implementation.getSpeakerActor(card.speaker);
@@ -326,7 +350,7 @@ registerRollEffect({
   },
 });
 
-const inCombat = (actor) => !!game.combat?.started && game.combat.combatants.some((c) => c.actor === actor || c.actorId === actor.id);
+const inCombat = (actor) => !!game.combat?.started && game.combat.combatants.some((c) => c.actor === actor || (c.token?.actorLink && c.actorId === actor.id));
 function sameType(a, b) {
   const ta = creatureTypes(a).types;
   return [...creatureTypes(b).types].some((t) => ta.has(t));
@@ -338,8 +362,9 @@ function sameType(a, b) {
 
 // On the creature's turn in combat, a card with its save to end the effect: once (Hideous Laughter) or
 // every turn until it succeeds (Mudball, Shadow Trap, Unlock Flesh)
-Hooks.on("combatTurnChange", (combat) => {
+Hooks.on("combatTurnChange", (combat, prior, current) => {
   if (!isActiveGM()) return;
+  if (prior && current && (current.round < prior.round || (current.round === prior.round && current.turn < prior.turn))) return;
   const actor = combat.combatant?.actor;
   const token = combat.combatant?.token;
   for (const buff of actor?.itemTypes.buff.filter((b) => b.isActive && b.getFlag(MODULE_ID, "resave")) ?? []) queue(() => offerResave(actor, token, buff));
@@ -388,7 +413,9 @@ async function applyRow(row, def, data, caster, { saved }) {
   const actor = actorOf(row.uuid);
   const effect = !def ? null : saved ? def.onSave : def.tiers ? tierFor(def, actor) : def.effect;
   const applied = [];
-  if (saved && data.damage) applied.push("half damage");
+  // A healing spell heals the living; undead take it as damage (half on a save)
+  if (data.heal && actor && !isUndead(actor)) applied.push("healing");
+  else if (saved && data.damage) applied.push("half damage");
   else if (data.damage) applied.push("full damage");
   if (saved && def && !def.onSave && !data.damage) applied.push(row.hitDamage ? "no further effect" : "no effect");
   if (effect && actor) applied.push(...(await applyEffect(actor, effect, data, caster)));
@@ -410,8 +437,9 @@ async function applyEffect(actor, effect, data, caster) {
 
   // Conditions, each with its own duration
   const conditions = {};
-  for (const [id, formula] of effect.conditions ?? []) {
+  for (let [id, formula] of effect.conditions ?? []) {
     if (effect.livingOnly?.includes(id) && !living) continue;
+    id = stackedFear(actor, id);
     const condition = pf1.registry.conditions.get(id);
     if (!condition) continue;
     if (immune.has(id) || (id === "sleep" && actor.system.traits?.ci?.total?.has("sleep"))) {
@@ -424,7 +452,14 @@ async function applyEffect(actor, effect, data, caster) {
       continue;
     }
     const rounds = Math.max(1, (await new Roll(String(formula), rollData).evaluate()).total);
-    conditions[id] = { duration: { rounds, startTime: game.time.worldTime } };
+    // Already under it: PF1 keeps the old effect, so a longer new duration replaces it
+    const left = remainingSeconds(actor, id);
+    if (left === Infinity || left >= rounds * (CONFIG.time.roundTime || 6)) {
+      out.push(`already ${condition.name.toLowerCase()}`);
+      continue;
+    }
+    if (left != null) await actor.setConditions({ [id]: false });
+    conditions[id] = { duration: timed(rounds) };
     out.push(`${condition.name.toLowerCase()} ${rounds} round${rounds === 1 ? "" : "s"}`);
   }
   if (Object.keys(conditions).length) await actor.setConditions(conditions);
@@ -437,16 +472,21 @@ async function applyEffect(actor, effect, data, caster) {
   }
 
   // The spell's buff, at the caster's level and for the spell's duration (unless Nevela applies it)
-  const item = caster?.items.find((i) => i.type === "spell" && i.name === data.name);
-  if (effect.buff && !(item && nevelaApplies(item, item.defaultAction?.id))) {
+  const item = caster?.items.get(data.itemId) ?? caster?.items.find((i) => i.type === "spell" && i.name === data.name);
+  if (effect.buff && item && nevelaAppliesBuff(item, data.actionId ?? item.defaultAction?.id, effect.buff)) out.push(`${effect.buff} (applied by Nevela's Automation Suite)`);
+  else if (effect.buff) {
     const buff = await compendiumBuff(effect.buff);
     buff.system.level = data.cl;
     const duration = spellDuration(item, data.cl);
     if (duration) buff.system.duration = duration;
     const existing = actor.itemTypes.buff.find((b) => b.name === buff.name);
-    if (existing) await existing.update({ "system.active": true, "system.level": data.cl, ...(duration ? { "system.duration": duration } : {}) });
-    else await actor.createEmbeddedDocuments("Item", [buff]);
-    out.push(buff.name);
+    // Recast by a lower-level caster: the stronger one stays
+    if (existing?.isActive && (existing.system.level ?? 0) > data.cl) out.push(`${buff.name} (already at caster level ${existing.system.level})`);
+    else {
+      if (existing) await existing.update({ "system.active": true, "system.level": data.cl, ...(duration ? { "system.duration": duration } : {}) });
+      else await actor.createEmbeddedDocuments("Item", [buff]);
+      out.push(buff.name);
+    }
   }
   if (effect.changes) {
     const duration = spellDuration(item, data.cl);
@@ -496,6 +536,27 @@ async function applyEffect(actor, effect, data, caster) {
   }
   if (effect.note) out.push(effect.note);
   return out;
+}
+
+/**
+ * Fear effects stack (Core Rulebook, Conditions): "A shaken character who is made shaken again becomes
+ * frightened, and a shaken character who is made frightened becomes panicked instead. A frightened
+ * character who is made shaken or frightened becomes panicked instead."
+ */
+function stackedFear(actor, id) {
+  if (!["shaken", "frightened"].includes(id)) return id;
+  if (actor.statuses.has("panicked") || actor.statuses.has("frightened")) return "panicked";
+  if (actor.statuses.has("shaken")) return id === "shaken" ? "frightened" : "panicked";
+  return id;
+}
+
+/** Seconds left on a condition the creature already has: null if it hasn't, Infinity if it doesn't end. */
+function remainingSeconds(actor, id) {
+  if (!actor.statuses.has(id)) return null;
+  const effect = actor.effects.find((e) => e.statuses.has(id));
+  const { seconds, startTime } = effect?.duration ?? {};
+  if (!Number.isFinite(seconds)) return Infinity;
+  return seconds - (game.time.worldTime - (startTime ?? 0));
 }
 
 /** The spell's duration as a buff duration ({ value, units }), when it's a plain one. */
@@ -584,7 +645,7 @@ function rowElement(message, data, row, index) {
 }
 
 registerFootnote((item) => {
-  if (!spellDef(item)) return null;
+  if (item?.type !== "spell" || !spellDef(item)) return null;
   return ["Automated: the card lists each creature it affects (your targets, or those in the template). Spell resistance is checked for you; each creature's save is rolled from its row, and the result is applied (conditions and buffs with their duration)."];
 });
 

@@ -27,7 +27,7 @@
 //     slings). A warning, not a block.
 
 import { MODULE_ID, RANGED_ATTACKS } from "./const.mjs";
-import { esc, onGmRequest, requestedByOwner, equippedItem, tokenDistance } from "./util.mjs";
+import { esc, onGmRequest, requestedByOwner, equippedItem, tokenDistance, saveResult } from "./util.mjs";
 import { rollPlan } from "./roll-effects.mjs";
 import { rangeChanges } from "./ranged.mjs";
 import { loading } from "./ranged-actions.mjs";
@@ -202,8 +202,7 @@ export async function deflect(message, k, index) {
   const d = t.deflector;
   if (d.save) {
     const save = await actor.rollSavingThrow("ref", { skipDialog: true, dc: d.save, reference: message.uuid });
-    const total = save?.rolls?.[0]?.total ?? save?.total;
-    if (!(Number.isFinite(total) && total >= d.save)) {
+    if (!saveResult(save, d.save).passed) {
       await countUse(actor);
       return "failed";
     }

@@ -113,10 +113,30 @@ Hooks.on("deleteItem", restoreResistance);
 /*  Applying                                    */
 /* -------------------------------------------- */
 
-/** Is Nevela's Automation Suite set to apply a buff for this action itself? */
+/**
+ * Will Nevela's Automation Suite apply a buff for this action itself? With its automatic buffs on, an action
+ * set up in its buff automation follows that setting; otherwise it handles every spell and consumable (unless
+ * flagged "nobuff") and other items flagged "buff" (Nevela's shouldHandleBuffAutomation).
+ */
 export function nevelaApplies(item, actionId) {
-  if (!game.modules.get(NEVELA)?.active || !game.settings.get(NEVELA, "automaticBuffs")) return false;
-  return item.flags[NEVELA]?.buffAutomationByAction?.[actionId]?.enabled === true;
+  if (!item || !game.modules.get(NEVELA)?.active || !game.settings.get(NEVELA, "automaticBuffs")) return false;
+  const config = item.flags[NEVELA]?.buffAutomationByAction?.[actionId];
+  if (config) return config.enabled === true;
+  if (["spell", "consumable"].includes(item.type)) return item.hasItemBooleanFlag?.("nobuff") !== true;
+  return item.hasItemBooleanFlag?.("buff") === true;
+}
+
+/**
+ * Will Nevela apply this buff for this action? Only if it handles the action and finds a buff of that name in
+ * the compendiums chosen in its settings (pf1.buffs and its own by default, not pf-content's), or among the
+ * world's items when that's chosen (Nevela's findMatchingBuffs).
+ */
+export function nevelaAppliesBuff(item, actionId, buffName) {
+  if (!nevelaApplies(item, actionId)) return false;
+  const name = buffName.toLowerCase();
+  const chosen = game.settings.get(NEVELA, "customBuffCompendia") ?? [];
+  if (chosen.includes("__world__") && game.items.some((i) => i.type === "buff" && i.name.toLowerCase() === name)) return true;
+  return chosen.some((id) => game.packs.get(id)?.index.some((e) => e.type === "buff" && e.name.toLowerCase() === name));
 }
 
 // The user's card records who gets the buff...
@@ -124,7 +144,7 @@ Hooks.on("preCreateChatMessage", (message) => {
   if (message.type !== "action") return;
   const item = message.itemSource;
   const grant = grantFor(item);
-  if (!grant || nevelaApplies(item, message.system.action?.id)) return;
+  if (!grant || nevelaAppliesBuff(item, message.system.action?.id, item.name)) return;
   if (grant.allyOnly && !message.system.targets?.length) return ui.notifications.warn(`${item.name}: target the ally you touch.`);
   const targets = message.system.targets?.length ? message.system.targets : [ChatMessage.implementation.getSpeakerActor(message.speaker)?.uuid];
   message.updateSource({ [`flags.${MODULE_ID}.grant`]: { targets: targets.filter(Boolean) } });

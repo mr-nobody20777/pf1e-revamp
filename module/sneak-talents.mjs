@@ -12,7 +12,7 @@
 //   - Same-source bonuses (Offensive Defense, Emboldening Strike) don't stack: a new hit refreshes them.
 
 import { MODULE_ID, MELEE_ATTACKS } from "./const.mjs";
-import { esc, classLevel, onGmRequest, equippedItem, requestedByOwner } from "./util.mjs";
+import { esc, classLevel, onGmRequest, equippedItem, requestedByOwner, timed, saveResult } from "./util.mjs";
 import { rollPlan } from "./roll-effects.mjs";
 import { precisionImmune } from "./resistance.mjs";
 import { setBleed } from "./bleed.mjs";
@@ -81,9 +81,9 @@ const RIDERS = [
   { id: "powerful", card: false, re: /^powerful sneak/i, text: () => "full attack only: −2 on attack rolls until your next turn", fields: (terms, n, actor) => powerfulSneak(terms, actor) },
   // Instead of the dice
   { id: "knockOut", re: /^knock-?out blow/i, instead: true, daily: true, save: "fort", text: (n, dc) => `unconscious for 1d4 rounds (Fortitude DC ${dc}: staggered for 1 round instead)`, apply: async ({ target, saved }) => {
-      if (saved) return (await target.setCondition("staggered", { duration: { rounds: 1 } }), "staggered for 1 round");
+      if (saved) return (await target.setCondition("staggered", { duration: timed(1) }), "staggered for 1 round");
       const rounds = await roll("1d4");
-      await target.setCondition("unconscious", { duration: { rounds } });
+      await target.setCondition("unconscious", { duration: timed(rounds) });
       return `unconscious for ${rounds} round${rounds === 1 ? "" : "s"}`;
     } },
   { id: "hamstring", re: /^hamstring strike/i, instead: true, save: "fort", ability: "dex", text: (n, dc) => `knocked prone and no move actions on its next turn (Fortitude DC ${dc} negates)`, apply: async ({ target, saved }) => {
@@ -108,7 +108,7 @@ const RIDERS = [
   // effect comes with every sneak attack it deals)
   { id: "obliviating", hidden: true, save: "fort", text: (n, dc) => `loses all memory of the previous 1d6 minutes and is flat-footed until its next turn (Fortitude DC ${dc} negates)`, apply: async ({ target, saved }) => {
       if (saved) return "no effect";
-      await target.setCondition("flatFooted", { duration: { rounds: 1 } });
+      await target.setCondition("flatFooted", { duration: timed(1) });
       return `flat-footed, and loses ${await roll("1d6")} minutes of memory`;
     } },
   { id: "assassinate", re: /^assassinate/i, save: "fort", hidden: true, text: (n, dc) => `dies on a failed Fortitude save (DC ${dc}); otherwise immune to your assassinate for 24 hours`, apply: async ({ target, saved }) => {
@@ -229,7 +229,7 @@ Hooks.on("pf1PreDisplayActionUse", (use) => {
   // unless it's once a day (whose use is spent instead)
   if (entry.rider) {
     const item = fromUuidSync(entry.rider.item);
-    if (!entry.rider.daily) actor.setFlag(MODULE_ID, LAST, entry.chosen);
+    if (!entry.rider.daily && actor.getFlag(MODULE_ID, LAST) !== entry.chosen) actor.setFlag(MODULE_ID, LAST, entry.chosen);
     else if (item && usesLeft(item) > 0) item.update({ "system.uses.value": usesLeft(item) - 1 });
   } else if (actor.getFlag(MODULE_ID, LAST) && entry.choice) actor.unsetFlag(MODULE_ID, LAST);
   if (!riders.length) return;
@@ -299,8 +299,7 @@ export async function applyRider(message, r, index) {
     let saved = false;
     if (rider.save) {
       const save = await target.rollSavingThrow(rider.save, { skipDialog: true, dc: info.dc, reference: message.uuid });
-      const total = save?.rolls?.[0]?.total ?? save?.total;
-      saved = Number.isFinite(total) && total >= info.dc;
+      saved = saveResult(save, info.dc).passed;
     }
     result = await rider.apply({ attacker, target, n: info.n, saved, level: info.level, given: info.given });
     if (rider.save) result = `${saved ? "saved" : "failed"}: ${result}`;

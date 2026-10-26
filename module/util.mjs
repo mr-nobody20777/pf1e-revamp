@@ -97,6 +97,25 @@ Hooks.on("canvasReady", () => {
   for (const actor of allActors()) for (const item of actor.items) for (const handler of catchUps) handler(item);
 });
 
+/**
+ * A condition's duration in rounds, as PF1 expires it: in seconds of world time from now. PF1 counts a
+ * `rounds` duration from the round of whichever combat was current when the effect was created (another
+ * scene's or a stale combat's round), so it can outlast its rounds by far; world time advances 6 seconds a
+ * round in every combat, and outside combat too.
+ */
+export const timed = (rounds) => ({ seconds: rounds * (CONFIG.time.roundTime || 6), startTime: game.time.worldTime });
+
+/**
+ * A saving throw's result against a DC (from rollSavingThrow's message or roll): "a natural 1 is always a
+ * failure, and a natural 20 is always a success."
+ */
+export function saveResult(save, dc) {
+  const roll = save?.rolls?.[0] ?? save;
+  const total = roll?.total;
+  const natural = roll?.dice?.[0]?.total;
+  return { total, passed: natural === 20 || (natural !== 1 && Number.isFinite(total) && total >= dc) };
+}
+
 /** Only the active GM writes to actors other players don't own. */
 export function isActiveGM() {
   return game.users.activeGM?.isSelf ?? false;
