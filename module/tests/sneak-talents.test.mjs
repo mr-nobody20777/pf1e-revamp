@@ -115,6 +115,10 @@ export function registerSneakTalentTests(quench) {
             const start = goblin.system.attributes.hp.value;
             await combat.nextTurn(); // the goblin's turn starts
             await waitFor(() => goblin.system.attributes.hp.value === start - 5, { what: "bleed damage" });
+            await combat.previousTurn();
+            await combat.nextTurn(); // the same turn again
+            await new Promise((r) => setTimeout(r, 600));
+            assert.equal(goblin.system.attributes.hp.value, start - 5, "once a round, not again when the tracker steps back and forward");
           } finally {
             await combat.delete();
           }

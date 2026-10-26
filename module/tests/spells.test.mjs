@@ -7,6 +7,8 @@ import { settled } from "../util.mjs";
 import { SPELLS } from "../spell-data.mjs";
 import { _test as effects } from "../roll-effects.mjs";
 import { nevelaAppliesBuff } from "../buff-grants.mjs";
+import { creatureTypes } from "../resistance.mjs";
+import { isUndead } from "../channel-energy.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -429,6 +431,27 @@ export function registerSpellTests(quench) {
             assert.isFalse(a.actor.statuses.has("stunned"));
           } finally {
             await deleteTokens([a, b]);
+          }
+        });
+
+        it("bestiary monsters with racial Hit Dice and no race: their type comes from the class (a Human Skeleton is undead)", async () => {
+          const pack = game.packs.get("pf1.basic-monsters");
+          const folder = game.folders.find((f) => f.name === "PF1e Revamp Tests" && f.type === "Actor");
+          const load = async (name) => {
+            const data = game.actors.fromCompendium(await pack.getDocument(pack.index.find((e) => e.name === name)._id));
+            return (await Actor.createDocuments([{ ...data, name: `Quench ${name}`, folder: folder?.id }]))[0];
+          };
+          const skeleton = await load("Human Skeleton");
+          const homunculus = await load("Homunculus");
+          try {
+            assert.isTrue(creatureTypes(skeleton).types.has("undead"));
+            assert.isTrue(isUndead(skeleton), "channel energy sees it as undead");
+            assert.isTrue(creatureTypes(homunculus).types.has("construct"));
+            const fort = { name: "Touch of Fatigue", descriptors: [], save: "fort", harmless: false };
+            assert.equal(spells.unaffectedBy(SPELLS["touch of fatigue"], skeleton, fort), "undead and constructs ignore Fortitude effects");
+            assert.equal(spells.unaffectedBy(SPELLS["cause fear"], skeleton, { ...fort, save: "will" }), "living creatures only");
+          } finally {
+            await Actor.deleteDocuments([skeleton.id, homunculus.id]);
           }
         });
 

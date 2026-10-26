@@ -367,12 +367,16 @@ Hooks.on("combatTurnChange", (combat, prior, current) => {
   if (prior && current && (current.round < prior.round || (current.round === prior.round && current.turn < prior.turn))) return;
   const actor = combat.combatant?.actor;
   const token = combat.combatant?.token;
-  for (const buff of actor?.itemTypes.buff.filter((b) => b.isActive && b.getFlag(MODULE_ID, "resave")) ?? []) queue(() => offerResave(actor, token, buff));
+  for (const buff of actor?.itemTypes.buff.filter((b) => b.isActive && b.getFlag(MODULE_ID, "resave")) ?? []) queue(() => offerResave(actor, token, buff, combat));
 });
 
-async function offerResave(actor, token, buff) {
+async function offerResave(actor, token, buff, combat) {
   const resave = buff.getFlag(MODULE_ID, "resave");
   if (!resave) return;
+  // Once a round: stepping the tracker back and forward again doesn't offer it twice
+  const offered = `${combat.id}.${combat.round}`;
+  if (resave.offered === offered) return;
+  if (resave.every) await buff.setFlag(MODULE_ID, "resave", { ...resave, offered });
   // Once (Hideous Laughter): used up when offered. Every turn: stays until a save succeeds, so a save
   // that's never rolled doesn't end the chance to save next turn
   if (!resave.every) await buff.unsetFlag(MODULE_ID, "resave");

@@ -12,6 +12,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { esc, onGmRequest, classLevel, titleFor, saveResult } from "./util.mjs";
+import { creatureTypes } from "./resistance.mjs";
 import { variantEffect, variantOf, variantsAllowed, chooseVariant, clearVariant, applyVariant, channelBonus, isVariantFeature, VARIANTS } from "./variant-channeling.mjs";
 
 const RADIUS = 30;
@@ -25,7 +26,7 @@ function modeOf(action) {
 
 /** Undead by the creature type on its race (PCs and most NPCs carry one); anything else is living. */
 export function isUndead(actor) {
-  return (actor?.race?._source.system.creatureTypes ?? []).includes("undead");
+  return creatureTypes(actor).types.has("undead");
 }
 
 const hasSelectiveChanneling = (actor) => actor.itemTypes.feat.some((f) => /^selective channeling$/i.test(f.name));
@@ -42,8 +43,8 @@ function isBlossomingLight(cleric) {
 
 function harmedAsUndead(actor) {
   const alignment = actor.system.details?.alignment ?? "";
-  const types = actor.race?._source.system.creatureTypes ?? [];
-  if (types.includes("outsider") && alignment === "ce") return true;
+  const { types } = creatureTypes(actor);
+  if (types.has("outsider") && alignment === "ce") return true;
   return alignment[1] === "e" && actor.items.some((i) => /^light (sensitivity|blindness)\b/i.test(i.name));
 }
 

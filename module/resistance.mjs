@@ -37,10 +37,24 @@ const isImmune = (types, immunities) => types.every((t) => immunities.has(t)) ||
 // oozes, elementals, incorporeal and amorphous creatures, and some shape-changing spells. Checked when
 // the damage is applied, so the attacker doesn't learn it before attacking.
 const PRECISION_IMMUNE_FORMS = /^(gaseous form|elemental body (iii|iv)|particulate form)$/i;
+/**
+ * A creature's types and subtypes, lower case. From its race (and PF1's traits built from it); a monster with
+ * racial Hit Dice and no race (PF1's bestiary: a Human Skeleton is "Undead" class levels) has its type only
+ * in that class's name, which PF1 doesn't read, so it's taken from there.
+ */
 export function creatureTypes(actor) {
   const race = actor?.race?.system;
-  const set = (field) => new Set([...(race?.[field]?.base ?? []), ...(race?.[field]?.total ?? [])].map((t) => String(t).toLowerCase()));
-  return { types: set("creatureTypes"), subtypes: set("creatureSubtypes") };
+  const traits = actor?.system?.traits;
+  const set = (field) => new Set([...(race?.[field]?.base ?? []), ...(race?.[field]?.total ?? []), ...(traits?.[field]?.total ?? [])].map((t) => String(t).toLowerCase()));
+  const types = set("creatureTypes");
+  if (!types.size) {
+    for (const cls of actor?.itemTypes?.class ?? []) {
+      if (cls.system.subType !== "racial") continue;
+      const key = Object.entries(pf1.config.creatureTypes ?? {}).find(([, v]) => String(v?.label ?? v).toLowerCase() === cls.name.toLowerCase())?.[0];
+      if (key) types.add(key.toLowerCase());
+    }
+  }
+  return { types, subtypes: set("creatureSubtypes") };
 }
 export const isIncorporeal = (actor) => !!actor?.statuses?.has("incorporeal") || creatureTypes(actor).subtypes.has("incorporeal");
 export function precisionImmune(actor) {

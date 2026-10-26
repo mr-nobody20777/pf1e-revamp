@@ -36,6 +36,10 @@ Hooks.on("updateCombat", async (combat, changes, options) => {
   const actor = combat.combatant?.actor;
   const bleed = bleedOf(actor);
   if (!bleed) return;
+  // Once a round: stepping the tracker back and forward again doesn't bleed it twice
+  const tick = `${combat.id}.${combat.round}`;
+  if (bleed.tick === tick) return;
+  await actor.setFlag(MODULE_ID, FLAG, { ...bleed, tick });
   await actor.applyDamage(bleed.amount, { forceDialog: false });
   await ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),

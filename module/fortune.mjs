@@ -244,9 +244,14 @@ async function arm(actor) {
 // previous turn's offer is removed so the chat log doesn't fill with them.
 Hooks.on("combatTurnChange", async (combat, prior, current) => {
   if (!isActiveGM()) return;
+  // Stepping the tracker back (or forward again to a turn already offered) keeps the roll already stored
+  if (prior && (current.round < prior.round || (current.round === prior.round && current.turn < prior.turn))) return;
   const actor = combat.combatants.get(current.combatantId)?.actor;
   const item = actor?.items.find(isPrescience);
   if (!item) return;
+  const offered = `${combat.id}.${current.round}`;
+  if (item.getFlag(MODULE_ID, "prescienceOffered") === offered) return;
+  await item.setFlag(MODULE_ID, "prescienceOffered", offered);
   for (const old of prescienceBuffs(actor)) await old.delete();
   const staleOffers = game.messages.contents.slice(-100).filter((m) => m.flags[MODULE_ID]?.prescienceOffer === item.uuid);
   if (staleOffers.length) await ChatMessage.implementation.deleteDocuments(staleOffers.map((m) => m.id));

@@ -176,6 +176,11 @@ export function registerFortuneTests(quench) {
               await combat.nextTurn(); // ally
               await combat.nextTurn(); // wizard, round 2: a fresh offer replaces the old one
               await waitFor(() => offers().length === 1 && offers()[0].id !== first.id);
+              const second = offers()[0];
+              await combat.previousTurn();
+              await combat.nextTurn(); // the wizard's turn again: no new offer
+              await new Promise((r) => setTimeout(r, 600));
+              assert.equal(offers()[0]?.id, second.id, "stepping back and forward keeps the offer");
             } finally {
               await combat.delete();
               await deleteTokens([wizardToken]);
