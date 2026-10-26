@@ -18,6 +18,7 @@
 - **Bleed.** Bleeding Attack's bleed is tracked with its amount: the creature takes it at the start of each of its turns, and any healing, a Heal check (button on the bleed message) or removing the Bleed condition stops it. A lower bleed doesn't replace a higher one.
 
 ### Fixed
+- **Spell rows:** a harmless touch spell (Cure Light Wounds) cast on an unwilling creature now needs its touch attack, and a touch spell on an ally needs none; every effect with a new save each turn gets its card (two at once no longer hide one), an unrolled every-turn save is offered again next turn, and a save that ends an effect lifts its condition even if the effect's buff was already removed; Mudball takes the −4 for shooting into melee; Ironbeard's bonus is an armor bonus (it no longer raises touch AC).
 - **Magic Missile** rolls a missile for every two caster levels beyond 1st (maximum five) and hits automatically; **cure spells harm undead and inflict spells heal them** when applied from the card; **Disrupt Undead** only affects undead.
 - **A load error in the loaded-weapons code** stopped the module's ranged action economy (the loaded-weapons setting, reloading and the shooting-while-threatened note) from starting in some worlds.
 - **Slings aren't thrown weapons** for range feats and items (PF1 marks sling attacks as thrown because they add Strength to damage): Distance Thrower and the Belt of Mighty Hurling no longer apply to slings, while Roving Range and other non-thrown range bonuses now do.

@@ -48,7 +48,7 @@ import { MODULE_ID } from "./const.mjs";
 import { SPELLS } from "./spell-data.mjs";
 import { creatureTypes } from "./resistance.mjs";
 import { compendiumBuff, nevelaApplies } from "./buff-grants.mjs";
-import { esc, evaluate, isActiveGM, onGmRequest, createQueue } from "./util.mjs";
+import { esc, evaluate, isActiveGM, onGmRequest, createQueue, tokenDistance } from "./util.mjs";
 import { isUndead } from "./channel-energy.mjs";
 import { registerFootnote } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
@@ -112,7 +112,7 @@ Hooks.on("preCreateChatMessage", (message) => {
       sr,
       attack: ["msak", "rsak"].includes(action?.actionType) && !def?.autoHit,
       // A touch spell without an attack roll of its own: the melee touch attack is rolled for it
-      touch: (def?.touchAttack ?? (range === "touch" && !["msak", "rsak"].includes(action?.actionType) && !harmless)) || false,
+      touch: (def?.touchAttack ?? (range === "touch" && !["msak", "rsak"].includes(action?.actionType))) || false,
       damage: !!action?.damage?.parts?.length,
       cl: message.system.config?.cl ?? 0,
       casterDisposition: casterToken?.disposition ?? null,
@@ -160,6 +160,8 @@ function penetration(caster) {
 }
 
 const isAlly = (data, token) => data.casterDisposition != null && token?.disposition === data.casterDisposition;
+/** An ally (or the caster) accepts the touch; it also gives up the save and spell resistance of a harmless spell. */
+const accepts = (data, row, caster) => isAlly(data, tokenOf(row.uuid)) || actorOf(row.uuid) === caster;
 
 // The active GM resolves the card: filters, spell resistance, attacks, pools; effects that need no save
 onGmRequest(FLAG, (message, data) => {
@@ -176,7 +178,7 @@ async function resolveCard(message) {
   const spell = { name: data.name, descriptors: [...(item?.system.descriptors?.total ?? item?.system.descriptors?.base ?? [])], save: data.save?.type, harmless: data.harmless };
   let attack = message.systemRolls?.attacks?.[0]?.attack ?? null;
   // PF1's data for some touch spells has no attack roll (Chill Touch): roll it here
-  const needsTouch = data.touch && data.rows.some((r) => !(data.harmless && (isAlly(data, tokenOf(r.uuid)) || actorOf(r.uuid) === caster)));
+  const needsTouch = data.touch && data.rows.some((r) => !accepts(data, r, caster));
   if (needsTouch && !attack && caster) {
     attack = await new Roll(`1d20 + ${touchBonus(caster, data.touch === "ranged")}`).evaluate();
     data.touchRoll = { total: attack.total, ranged: data.touch === "ranged" };
@@ -190,7 +192,7 @@ async function resolveCard(message) {
       row.state = "unaffected";
       continue;
     }
-    const willing = data.harmless && (isAlly(data, token) || actor === caster);
+    const willing = data.harmless && accepts(data, row, caster);
     if (def?.undead && creatureTypes(actor).types.has("undead")) {
       row.variant = "undead";
       if (def.undead.save) row.saveType = def.undead.save;
@@ -211,9 +213,12 @@ async function resolveCard(message) {
       }
     }
     // Touch and ray attacks (an ally accepting a harmless touch needs no roll)
-    if ((data.attack || data.touch) && attack && !willing) {
+    const touchAccepted = data.touch && !data.attack && accepts(data, row, caster);
+    if ((data.attack || data.touch) && attack && !willing && !touchAccepted) {
       const ac = actor.system.attributes?.ac?.touch?.total ?? 10;
-      row.attack = { total: attack.total, ac, hit: natural === 20 || (natural !== 1 && attack.total >= ac) };
+      const intoMelee = data.touchRoll?.ranged && engaged(token, data, caster) ? -4 : 0;
+      const total = attack.total + intoMelee;
+      row.attack = { total, ac, intoMelee: !!intoMelee, hit: natural === 20 || (natural !== 1 && total >= ac) };
       if (!row.attack.hit) {
         row.state = "missed";
         continue;
@@ -288,6 +293,12 @@ async function rollSave(message, index) {
   await actor.rollSavingThrow(saveOf(data, data.rows[index]).type, { dc: data.save.dc, reference: message.uuid });
 }
 
+/** Shooting into melee (a ranged touch rolled here): -4 when the target is next to one of the caster's allies, unless Precise Shot. */
+function engaged(token, data, caster) {
+  if (!token?.object || caster?.items.some((i) => i.type === "feat" && /^precise shot$/i.test(i.name))) return false;
+  return canvas.tokens.placeables.some((t) => t.document !== token && t.actor && t.actor !== caster && isAlly(data, t.document) && (tokenDistance(t, token.object) ?? 99) <= 5);
+}
+
 /** Bonus on touch attacks: base attack, Strength (Dexterity with Weapon Finesse, or for a ranged touch), size, attack bonuses. */
 function touchBonus(caster, ranged = false) {
   const rd = caster.getRollData();
@@ -330,36 +341,41 @@ function sameType(a, b) {
 Hooks.on("combatTurnChange", (combat) => {
   if (!isActiveGM()) return;
   const actor = combat.combatant?.actor;
-  const buff = actor?.itemTypes.buff.find((b) => b.isActive && b.getFlag(MODULE_ID, "resave"));
-  if (!buff) return;
-  queue(async () => {
-    const resave = buff.getFlag(MODULE_ID, "resave");
-    await buff.unsetFlag(MODULE_ID, "resave");
-    const token = combat.combatant.token;
-    await ChatMessage.implementation.create({
-      speaker: ChatMessage.implementation.getSpeaker({ actor, token }),
-      whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
-      content: `<p><strong>${esc(buff.name)}</strong>: ${esc(actor.name)} may make a new save to end it${resave.action ? ` (${esc(resave.action)})` : ""}.${resave.every ? "" : " On a failure it lasts the full duration."}</p>`,
-      flags: { [MODULE_ID]: { [FLAG]: { name: buff.name, save: resave.save, cl: resave.cl, ends: buff.uuid, resave, resolved: true, rows: [{ uuid: token?.uuid ?? actor.uuid, name: token?.name ?? actor.name, state: "save" }] } } },
-    });
-  });
+  const token = combat.combatant?.token;
+  for (const buff of actor?.itemTypes.buff.filter((b) => b.isActive && b.getFlag(MODULE_ID, "resave")) ?? []) queue(() => offerResave(actor, token, buff));
 });
+
+async function offerResave(actor, token, buff) {
+  const resave = buff.getFlag(MODULE_ID, "resave");
+  if (!resave) return;
+  // Once (Hideous Laughter): used up when offered. Every turn: stays until a save succeeds, so a save
+  // that's never rolled doesn't end the chance to save next turn
+  if (!resave.every) await buff.unsetFlag(MODULE_ID, "resave");
+  await ChatMessage.implementation.create({
+    speaker: ChatMessage.implementation.getSpeaker({ actor, token }),
+    whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
+    content: `<p><strong>${esc(buff.name)}</strong>: ${esc(actor.name)} may make a new save to end it${resave.action ? ` (${esc(resave.action)})` : ""}.${resave.every ? "" : " On a failure it lasts the full duration."}</p>`,
+    flags: { [MODULE_ID]: { [FLAG]: { name: buff.name, save: resave.save, cl: resave.cl, ends: buff.uuid, resave, resolved: true, rows: [{ uuid: token?.uuid ?? actor.uuid, name: token?.name ?? actor.name, state: "save" }] } } },
+  });
+}
 
 /** The new save's result: the effect ends, or continues. */
 async function endEffect(row, data, passed) {
   row.state = "done";
   const buff = fromUuidSync(data.ends);
   const actor = actorOf(row.uuid);
-  if (passed && buff) {
-    await buff.delete();
+  const removeConditions = async () => {
     const removes = (data.resave?.removes ?? []).filter((id) => actor?.statuses.has(id));
     if (removes.length) await actor.setConditions(Object.fromEntries(removes.map((id) => [id, false])));
+  };
+  if (!buff) {
+    await removeConditions();
+    row.applied = [`${data.name} already ended`];
+  } else if (passed) {
+    await buff.delete();
+    await removeConditions();
     row.applied = [`${data.name} ends`];
-  } else if (!buff) row.applied = [`${data.name} already ended`];
-  else if (data.resave?.every) {
-    await buff.setFlag(MODULE_ID, "resave", data.resave);
-    row.applied = ["still affected; another save next turn"];
-  } else row.applied = ["lasts the full duration"];
+  } else row.applied = [data.resave?.every ? "still affected; another save next turn" : "lasts the full duration"];
 }
 
 /* -------------------------------------------- */
@@ -541,7 +557,7 @@ function rowElement(message, data, row, index) {
   div.style.cssText = `margin: 0.2em 0; padding: 0 4px; border-left: 3px solid ${!row.state || row.state === "save" ? "#888" : good ? "#5a5" : "#b33"};`;
   const parts = [];
   if (row.sr) parts.push(`SR check ${row.sr.total}${gm ? ` vs SR ${row.sr.value}` : ""}: ${row.sr.passed ? "overcome" : "resisted"}`);
-  if (row.attack) parts.push(`${data.touchRoll ? (data.touchRoll.ranged ? "ranged touch " : "melee touch ") : ""}${row.attack.total}${gm ? ` vs touch AC ${row.attack.ac}` : ""}: ${row.attack.hit ? "hits" : "misses"}`);
+  if (row.attack) parts.push(`${data.touchRoll ? (data.touchRoll.ranged ? "ranged touch " : "melee touch ") : ""}${row.attack.total}${row.attack.intoMelee ? " (−4 into melee)" : ""}${gm ? ` vs touch AC ${row.attack.ac}` : ""}: ${row.attack.hit ? "hits" : "misses"}`);
   if (row.hitDamage) parts.push(esc(row.hitDamage));
   if (row.state === "unaffected") parts.push(`unaffected${gm && row.why ? ` (${esc(row.why)})` : ""}`);
   const save = saveOf(data, row);

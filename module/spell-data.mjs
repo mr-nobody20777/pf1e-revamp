@@ -198,7 +198,7 @@ export const SPELLS = {
   "itching curse": {
     effect: { changes: [{ target: "attack", formula: "-1", type: "untyped" }, { target: "allSavingThrows", formula: "-1", type: "untyped" }, { target: "skills", formula: "-1", type: "untyped" }, { target: "allChecks", formula: "-1", type: "untyped" }], note: "none of it on a turn it scratches (a move action)" },
   },
-  ironbeard: { effect: { changes: [{ target: "ac", formula: "1", type: "untyped" }], note: "+1 armor bonus that stacks with worn armor; 20% spell failure for verbal components" } },
+  ironbeard: { effect: { changes: [{ target: "aac", formula: "1", type: "untyped" }], note: "an armor bonus that stacks with worn armor (not against touch attacks); 20% spell failure for verbal components" } },
   "nauseating dart": { effect: { conditions: [["nauseated", "1"]], note: "only if the dart hit (a ranged attack, 1d2 piercing)" } },
   "touch of bloodletting": { wounded: true, effect: { conditions: [["exhausted", "@cl"]], note: "1 bleed each round; a DC 15 Heal check or any healing spell ends it" } },
   "hairline fractures": { types: ["earth"], effect: { changes: [{ target: "ac", formula: "-2", type: "untyped" }] } },

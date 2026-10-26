@@ -18,7 +18,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -199,6 +199,61 @@ export function registerSpellTests(quench) {
           assert.isFalse(card.getFlag(MODULE_ID, spells.FLAG).touchRoll.ranged);
           assert.deepInclude(row(card, human), { state: "missed" });
           assert.match((await card.renderHTML()).textContent, /melee touch \d+ vs touch AC \d+: misses/);
+        });
+
+        it("touch attacks: an ally accepts the touch; a harmless touch spell on an enemy still needs one", async () => {
+          dice(0.99);
+          const ally = await cast("Touch of Fatigue", [friendToken]);
+          assert.isUndefined(row(ally, friend).attack, "no attack against an ally");
+          assert.equal(row(ally, friend).state, "save", "not harmless: the ally still saves");
+          const undead = await cast("Cure Light Wounds", [zombieToken]);
+          assert.isOk(undead.getFlag(MODULE_ID, spells.FLAG).touchRoll, "an unwilling zombie");
+          assert.equal(row(undead, zombie).state, "missed");
+        });
+
+        it("a ranged touch into melee: -4 unless Precise Shot", async () => {
+          await friendToken.update({ x: humanToken.x - canvas.grid.size, y: humanToken.y }, { animate: false });
+          try {
+            dice(0.5);
+            const card = await cast("Mudball", [humanToken]);
+            assert.isTrue(row(card, human).attack.intoMelee);
+            assert.equal(row(card, human).attack.total, card.getFlag(MODULE_ID, spells.FLAG).touchRoll.total - 4);
+          } finally {
+            await friendToken.update({ x: wizardToken.x + canvas.grid.size, y: wizardToken.y }, { animate: false });
+          }
+        });
+
+        it("new saves: every effect gets its card; an unrolled every-turn save comes back; a gone buff still lifts its condition", async () => {
+          dice(0.01);
+          await cast("Mudball", [humanToken]);
+          const trap = await cast("Shadow Trap", [humanToken]);
+          dice(0.99);
+          await save(trap, human);
+          assert.isTrue(human.statuses.has("entangled"));
+          const combat = await Combat.create({ scene: canvas.scene.id, active: true, flags: { [MODULE_ID]: { quench: true } } });
+          const cards = async () => {
+            const before = new Set(game.messages.keys());
+            await combat.nextTurn();
+            await waitFor(() => game.messages.contents.filter((m) => !before.has(m.id) && m.getFlag(MODULE_ID, spells.FLAG)?.ends).length === 2, { what: "two new saves" });
+            return game.messages.contents.filter((m) => !before.has(m.id) && m.getFlag(MODULE_ID, spells.FLAG)?.ends);
+          };
+          try {
+            await combat.createEmbeddedDocuments("Combatant", [
+              { tokenId: wizardToken.id, sceneId: canvas.scene.id, actorId: wizard.id, initiative: 20 },
+              { tokenId: humanToken.id, sceneId: canvas.scene.id, actorId: human.id, initiative: 10 },
+            ]);
+            await combat.startCombat();
+            await cards(); // neither rolled
+            await combat.nextTurn();
+            const again = await cards();
+            const mud = again.find((m) => m.getFlag(MODULE_ID, spells.FLAG).name === "Mudball");
+            await human.itemTypes.buff.find((b) => b.name === "Mudball").delete();
+            dice(0.99);
+            await human.rollSavingThrow("ref", { skipDialog: true, dc: mud.getFlag(MODULE_ID, spells.FLAG).save.dc, reference: mud.uuid });
+            await waitFor(() => !human.statuses.has("blind"), { what: "the blindness lifted" });
+          } finally {
+            await combat.delete();
+          }
         });
 
         it("a personal spell goes on the caster", async () => {
