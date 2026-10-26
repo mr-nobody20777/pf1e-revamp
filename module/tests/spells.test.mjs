@@ -6,7 +6,7 @@ import { _test as spells } from "../spells.mjs";
 import { settled } from "../util.mjs";
 import { SPELLS } from "../spell-data.mjs";
 import { _test as effects } from "../roll-effects.mjs";
-import { nevelaAppliesBuff } from "../buff-grants.mjs";
+import { nevelaApplies, nevelaAppliesBuff } from "../buff-grants.mjs";
 import { creatureTypes } from "../resistance.mjs";
 import { isUndead } from "../channel-energy.mjs";
 
@@ -21,7 +21,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -33,6 +33,20 @@ export function registerSpellTests(quench) {
           const before = new Set(game.messages.keys());
           Hooks.once("pf1CreateActionUse", (use) => (use.shared.useMeasureTemplate = false));
           await wizard.items.getName(name).use({ skipDialog: true });
+          const card = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.type === "action"));
+          await waitFor(() => !card.getFlag(MODULE_ID, spells.FLAG) || card.getFlag(MODULE_ID, spells.FLAG).resolved, { what: "the rows" });
+          return card;
+        }
+        /** A wand of one of the wizard's spells, as PF1's "create wand" dialog makes it, under another name if given. */
+        async function wandOf(spellName, name) {
+          const data = await pf1.documents.item.ItemSpellPF.toConsumable({ ...wizard.items.getName(spellName).toObject(), sl: 1, cl: 1, ablMod: 0 }, "wand");
+          if (name) data.name = name;
+          return (await wizard.createEmbeddedDocuments("Item", [data]))[0];
+        }
+        async function useWand(wand, targets) {
+          setTargets(targets);
+          const before = new Set(game.messages.keys());
+          await wand.use({ skipDialog: true });
           const card = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.type === "action"));
           await waitFor(() => !card.getFlag(MODULE_ID, spells.FLAG) || card.getFlag(MODULE_ID, spells.FLAG).resolved, { what: "the rows" });
           return card;
@@ -49,7 +63,7 @@ export function registerSpellTests(quench) {
           uniform = CONFIG.Dice.randomUniform;
           sceneCtl = await useTestScene();
           wizard = await createTestActor("Quench Spell Wizard", { abilities: { int: 18 }, items: [["pf1.races", "Human"], ["pf1.classes", "Wizard", { system: { level: 5 } }]] });
-          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue"].includes(n) ? 0 : 1)]));
+          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light"].includes(n) ? 0 : 1)]));
           human = await createTestActor("Quench Spell Human", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
           ogre = await createTestActor("Quench Spell Ogre", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 6 } }]] });
           friend = await createTestActor("Quench Spell Friend", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
@@ -346,6 +360,62 @@ export function registerSpellTests(quench) {
           assert.isAbove(before, 6);
         });
 
+        it("a condition timed in rounds (by PF1 or another module) is replaced by a longer one", async () => {
+          await human.setCondition("stunned", { duration: { rounds: 1 } });
+          const card = await cast("Color Spray", [humanToken]);
+          dice(0.99);
+          await save(card, human);
+          assert.include(row(card, human).applied.join(), "stunned");
+          assert.isAbove(human.effects.find((e) => e.statuses.has("stunned")).duration.seconds, 6);
+        });
+
+        it("a wand of a spell with spell resistance and no save: found in the compendium whatever the name's case, and checked", async () => {
+          await human.update({ "system.attributes.sr.formula": "40" });
+          const wand = await wandOf("Ray of Frost", "Wand of ray of frost");
+          try {
+            dice(0.01); // the ray hits
+            const card = await useWand(wand, [humanToken]);
+            assert.isTrue(card.getFlag(MODULE_ID, spells.FLAG).sr);
+            assert.equal(row(card, human).state, "resisted");
+          } finally {
+            await wand.delete();
+          }
+        });
+
+        it("a wand of a spell with no save, no spell resistance and no effect here: no rows", async () => {
+          const wand = await wandOf("Light");
+          try {
+            const card = await useWand(wand, [humanToken]);
+            assert.isUndefined(card.getFlag(MODULE_ID, spells.FLAG));
+          } finally {
+            await wand.delete();
+          }
+        });
+
+        it("cure and inflict: a wand of Cure Light Wounds harms undead; Inflict Light Wounds' row on undead says healing", async () => {
+          const wand = await wandOf("Cure Light Wounds");
+          try {
+            const card = await useWand(wand, [zombieToken]);
+            const hp = zombie.system.attributes.hp.value;
+            await zombie.applyDamage(-4, { message: card, forceDialog: false });
+            assert.equal(zombie.system.attributes.hp.value, hp - 4);
+            await zombie.applyDamage(4, { forceDialog: false });
+          } finally {
+            await wand.delete();
+          }
+          // Its melee touch attack needs the zombie in reach
+          const { x, y } = zombieToken;
+          await zombieToken.update({ x: wizardToken.x + canvas.grid.size, y: wizardToken.y }, { animate: false });
+          try {
+            dice(0.01); // the touch attack hits
+            const inflict = await cast("Inflict Light Wounds", [zombieToken]);
+            await save(inflict, zombie);
+            assert.deepEqual(row(inflict, zombie).applied, ["healing"]);
+          } finally {
+            await zombieToken.update({ x, y }, { animate: false });
+          }
+        });
+
         it("a wand casts the spell: rows, its effect, and the spell's descriptors from the compendium", async () => {
           // As PF1's "create wand" dialog makes it: with the spell level, caster level and ability modifier
           const data = await pf1.documents.item.ItemSpellPF.toConsumable({ ...wizard.items.getName("Daze").toObject(), sl: 0, cl: 1, ablMod: 0 }, "wand");
@@ -404,6 +474,29 @@ export function registerSpellTests(quench) {
           } finally {
             await combat.delete();
           }
+        });
+
+        it("a linked creature's save counts when rolled from another of its tokens", async () => {
+          assert.isTrue(friendToken.actorLink);
+          const other = await placeToken(friend, 3, 3);
+          try {
+            const card = await cast("Daze", [friendToken]);
+            assert.equal(row(card, friend).state, "save");
+            await friend.rollSavingThrow("will", { skipDialog: true, dc: card.getFlag(MODULE_ID, spells.FLAG).save.dc, reference: card.uuid, token: other });
+            await waitFor(() => row(card, friend).state === "done", { what: "the save from the other token" });
+          } finally {
+            await deleteTokens([other]);
+          }
+        });
+
+        it("Nevela: a buff it applies is left to it, whether chosen for the action or named in another word order", async function () {
+          const bless = wizard.items.getName("Bless");
+          const actionId = bless.defaultAction.id;
+          if (!nevelaApplies(bless, actionId)) return this.skip();
+          const chosen = bless.clone({ flags: { "nevelas-automation-suite": { buffAutomationByAction: { [actionId]: { enabled: true, buffUuid: "Item.quenchChosenBuff" } } } } });
+          assert.isFalse(nevelaAppliesBuff(bless, actionId, "Quench No Such Buff"));
+          assert.isTrue(nevelaAppliesBuff(chosen, actionId, "Quench No Such Buff"));
+          assert.isTrue(nevelaAppliesBuff(bless, actionId, "Armor Mage"));
         });
 
         it("unlinked tokens of the same creature: each save goes to its own row", async () => {

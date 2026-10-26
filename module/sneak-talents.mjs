@@ -229,8 +229,9 @@ Hooks.on("pf1PreDisplayActionUse", (use) => {
   // unless it's once a day (whose use is spent instead)
   if (entry.rider) {
     const item = fromUuidSync(entry.rider.item);
-    if (!entry.rider.daily && actor.getFlag(MODULE_ID, LAST) !== entry.chosen) actor.setFlag(MODULE_ID, LAST, entry.chosen);
-    else if (item && usesLeft(item) > 0) item.update({ "system.uses.value": usesLeft(item) - 1 });
+    if (!entry.rider.daily) {
+      if (actor.getFlag(MODULE_ID, LAST) !== entry.chosen) actor.setFlag(MODULE_ID, LAST, entry.chosen);
+    } else if (item && usesLeft(item) > 0) item.update({ "system.uses.value": usesLeft(item) - 1 });
   } else if (actor.getFlag(MODULE_ID, LAST) && entry.choice) actor.unsetFlag(MODULE_ID, LAST);
   if (!riders.length) return;
   // Not Manyshot's extra arrow (precision damage once per volley), nor an attack whose sneak attack

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- **A sneak attack talent that isn't once a day no longer uses up a charge** when it was already the talent chosen last time.
+- **A longer condition now replaces a shorter one timed in rounds.** A condition applied by PF1 or another module in rounds was treated as permanent, so the spell's longer duration was dropped.
+- **Players see their own hidden token's row** on a spell card and can roll its save; other players still don't see it.
+- **Scrolls, wands and potions of spells with spell resistance and no save** now get their rows and spell resistance check.
+- **A linked character's save counts when rolled from another token or scene** than the one that was targeted.
+- **No more duplicate buffs with Nevela's Automation Suite** when Nevela applies a buff chosen for the action, or a buff whose name only partly matches the spell's ("Bless (Mythic)").
+- **Scrolls, wands and potions find their spell in any compendium** (pf-content, homebrew) and whatever the capitalization of the item's name, so spell resistance and immunities apply.
+- **Cure and inflict wands, scrolls and potions are reversed on undead** like the spells, and an inflict spell's row on an undead creature says "healing".
+
 ## 0.20.0: spells on their targets, sneak attack, ranged combat
 
 ### New

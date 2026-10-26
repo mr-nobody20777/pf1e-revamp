@@ -127,16 +127,26 @@ export function nevelaApplies(item, actionId) {
 }
 
 /**
- * Will Nevela apply this buff for this action? Only if it handles the action and finds a buff of that name in
- * the compendiums chosen in its settings (pf1.buffs and its own by default, not pf-content's), or among the
- * world's items when that's chosen (Nevela's findMatchingBuffs).
+ * Will Nevela apply this buff for this action? Only if it handles the action and either has a buff selected for
+ * it, or finds a matching buff in the compendiums chosen in its settings (pf1.buffs and its own by default, not
+ * pf-content's), or among the world's items when that's chosen (Nevela's findMatchingBuffs): the same name,
+ * the name followed by "(" or "," ("Bless (Mythic)"), or the same words in another order.
  */
 export function nevelaAppliesBuff(item, actionId, buffName) {
   if (!nevelaApplies(item, actionId)) return false;
+  if (item.flags[NEVELA]?.buffAutomationByAction?.[actionId]?.buffUuid) return true;
   const name = buffName.toLowerCase();
+  const words = (s) => s.toLowerCase().replace(/[,()]/g, "").split(/\s+/).filter(Boolean).sort().join(" ");
+  const sameWords = words(buffName);
+  const matches = (candidate) => {
+    const lower = candidate.toLowerCase();
+    if (lower === name || words(lower) === sameWords) return true;
+    const rest = lower.startsWith(name) ? lower.slice(name.length).trimStart() : "";
+    return rest.startsWith("(") || rest.startsWith(",");
+  };
   const chosen = game.settings.get(NEVELA, "customBuffCompendia") ?? [];
-  if (chosen.includes("__world__") && game.items.some((i) => i.type === "buff" && i.name.toLowerCase() === name)) return true;
-  return chosen.some((id) => game.packs.get(id)?.index.some((e) => e.type === "buff" && e.name.toLowerCase() === name));
+  if (chosen.includes("__world__") && game.items.some((i) => i.type === "buff" && matches(i.name))) return true;
+  return chosen.some((id) => game.packs.get(id)?.index.some((e) => e.type === "buff" && matches(e.name)));
 }
 
 // The user's card records who gets the buff...

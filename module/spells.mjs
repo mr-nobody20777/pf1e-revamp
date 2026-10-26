@@ -74,9 +74,14 @@ export function spellDef(item) {
 
 /** The compendium spell a scroll, wand or potion was made from (its descriptors and spell resistance). */
 async function sourceSpell(name) {
-  const pack = game.packs.get("pf1.spells");
-  const entry = pack?.index.find((e) => e.name === name);
-  return entry ? pack.getDocument(entry._id) : null;
+  const lower = name.toLowerCase();
+  // PF1's spells first, then any other compendium of items (pf-content, homebrew)
+  const packs = [game.packs.get("pf1.spells"), ...game.packs.filter((p) => p.documentName === "Item" && p.collection !== "pf1.spells")];
+  for (const pack of packs) {
+    const entry = pack?.index.find((e) => e.type === "spell" && e.name.toLowerCase() === lower);
+    if (entry) return pack.getDocument(entry._id);
+  }
+  return null;
 }
 
 /** The entry as it applies to this row's creature (Chill Touch on undead has its own effect). */
@@ -111,7 +116,7 @@ Hooks.on("preCreateChatMessage", (message) => {
   const harmless = !!action?.save?.harmless;
   // A scroll, wand or potion doesn't carry the spell's spell resistance: found when the card resolves
   const sr = item.type === "spell" ? !!item.system.sr : null;
-  if (!def && !save && !sr) return;
+  if (!def && !save && sr === false) return;
   const caster = ChatMessage.implementation.getSpeakerActor(message.speaker);
   const casterToken = caster?.getActiveTokens()[0]?.document ?? null;
   let targets = [...(message.system.targets ?? [])];
@@ -146,9 +151,8 @@ Hooks.on("preCreateChatMessage", (message) => {
 
 /** Why the creature can't be affected (GM-only text), or null. */
 function unaffectedBy(def, actor, spell) {
-  const { types } = creatureTypes(actor);
+  const { types, subtypes } = creatureTypes(actor);
   const hd = actor.system.attributes?.hd?.total ?? 0;
-  const { subtypes } = creatureTypes(actor);
   if (def?.types && !def.types.some((t) => types.has(t) || subtypes.has(t))) return `only ${def.types.join(" or ")} creatures`;
   if (def?.hdMax != null && hd > def.hdMax) return `${def.hdMax} HD or less only`;
   const undeadOrConstruct = types.has("undead") || types.has("construct");
@@ -201,6 +205,8 @@ async function resolveCard(message) {
   const def = spellDef(item);
   const source = item?.type === "spell" ? item : await sourceSpell(data.name);
   if (data.sr === null) data.sr = !!source?.system.sr;
+  // A scroll, wand or potion of a spell with no save, no entry and no spell resistance: nothing to show
+  if (!def && !data.save && !data.sr) return message.unsetFlag(MODULE_ID, FLAG);
   const spell = { name: data.name, descriptors: [...(source?.system.descriptors?.total ?? source?.system.descriptors?.base ?? [])], save: data.save?.type, harmless: data.harmless, objectSave: data.objectSave };
   let attack = message.systemRolls?.attacks?.[0]?.attack ?? null;
   // PF1's data for some touch spells has no attack roll (Chill Touch): roll it here
@@ -293,8 +299,8 @@ Hooks.on("createChatMessage", (save) => {
     const data = foundry.utils.deepClone(card?.getFlag?.(MODULE_ID, FLAG));
     if (!data?.resolved || !data.save) return;
     const { token: tokenId, actor: actorId } = save.speaker;
-    // By token when the save has one: unlinked tokens of the same creature share its actor id
-    const mine = (r) => (tokenId ? r.uuid.endsWith(`Token.${tokenId}`) || (!tokenOf(r.uuid) && actorOf(r.uuid)?.id === actorId) : actorOf(r.uuid)?.id === actorId && tokenOf(r.uuid)?.actorLink !== false);
+    // By token when the save has one; else by actor, except for unlinked tokens (they share their actor's id)
+    const mine = (r) => (tokenId && r.uuid.endsWith(`Token.${tokenId}`)) || (actorOf(r.uuid)?.id === actorId && tokenOf(r.uuid)?.actorLink !== false);
     const row = data.rows.find((r) => r.state === "save" && mine(r) && saveOf(data, r).type === save.system.subject.save);
     if (!row) return;
     const { total, passed } = saveResult(save, data.save.dc);
@@ -417,8 +423,9 @@ async function applyRow(row, def, data, caster, { saved }) {
   const actor = actorOf(row.uuid);
   const effect = !def ? null : saved ? def.onSave : def.tiers ? tierFor(def, actor) : def.effect;
   const applied = [];
-  // A healing spell heals the living; undead take it as damage (half on a save)
-  if (data.heal && actor && !isUndead(actor)) applied.push("healing");
+  // A healing spell heals the living; undead take it as damage (half on a save), and inflict spells heal them
+  const reversed = !!actor && isUndead(actor) && REVERSED.test(data.name);
+  if (actor && data.heal !== reversed) applied.push("healing");
   else if (saved && data.damage) applied.push("half damage");
   else if (data.damage) applied.push("full damage");
   if (saved && def && !def.onSave && !data.damage) applied.push(row.hitDamage ? "no further effect" : "no effect");
@@ -436,7 +443,8 @@ async function applyEffect(actor, effect, data, caster) {
   const out = [];
   const rollData = { cl: data.cl };
   for (const [key, formula] of Object.entries(effect.roll ?? {})) rollData[key] = (await new Roll(formula).evaluate()).total;
-  const living = !creatureTypes(actor).types.has("undead") && !creatureTypes(actor).types.has("construct");
+  const { types } = creatureTypes(actor);
+  const living = !types.has("undead") && !types.has("construct");
   const immune = actor.getConditionImmunities?.() ?? new Set();
 
   // Conditions, each with its own duration
@@ -558,9 +566,11 @@ function stackedFear(actor, id) {
 function remainingSeconds(actor, id) {
   if (!actor.statuses.has(id)) return null;
   const effect = actor.effects.find((e) => e.statuses.has(id));
-  const { seconds, startTime } = effect?.duration ?? {};
-  if (!Number.isFinite(seconds)) return Infinity;
-  return seconds - (game.time.worldTime - (startTime ?? 0));
+  const { seconds, startTime, rounds, turns } = effect?.duration ?? {};
+  if (Number.isFinite(seconds)) return seconds - (game.time.worldTime - (startTime ?? 0));
+  // Timed in rounds or turns (PF1 or another module made it): Foundry's rounds left (all of them out of combat)
+  if (rounds || turns) return (effect.duration.remaining ?? rounds ?? 0) * (CONFIG.time.roundTime || 6);
+  return Infinity;
 }
 
 /** The spell's duration as a buff duration ({ value, units }), when it's a plain one. */
@@ -588,7 +598,7 @@ Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
 const REVERSED = /^(mass )?(cure|inflict) \w+ wounds\b/i;
 Hooks.on("pf1ApplyDamage", (actor, options) => {
   const item = options.action?.item ?? options.message?.itemSource;
-  if (item?.type !== "spell" || !REVERSED.test(item.name) || !isUndead(actor) || options[`${MODULE_ID}Reversed`]) return;
+  if (!REVERSED.test(spellNameOf(item) ?? "") || !isUndead(actor) || options[`${MODULE_ID}Reversed`]) return;
   options[`${MODULE_ID}Reversed`] = true;
   options.value = -options.value;
 });
@@ -606,9 +616,10 @@ Hooks.on("renderChatMessagePF", (message, html) => {
   const head = document.createElement("div");
   head.innerHTML = `<strong>${esc(data.name)}</strong>${data.save ? `: ${SAVE_NAMES[data.save.type]} DC ${data.save.dc}` : ""}${data.pool != null && game.user.isGM ? ` · ${data.pool} HD` : ""}`;
   box.append(head);
-  // A hidden token's row is for the GM only: its name would give it away
+  // A hidden token's row is for the GM and its owner only: its name would give it away
   data.rows.forEach((row, index) => {
-    if (game.user.isGM || !tokenOf(row.uuid)?.hidden) box.append(rowElement(message, data, row, index));
+    const token = tokenOf(row.uuid);
+    if (game.user.isGM || !token?.hidden || token.isOwner) box.append(rowElement(message, data, row, index));
   });
   // Under the targets and the save button, above the card's info tags
   const footer = html.querySelector(".chat-card .card-footer");

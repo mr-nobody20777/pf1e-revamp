@@ -98,6 +98,19 @@ export function registerSneakTalentTests(quench) {
           assert.isNull(await applyRider(card, 0, 0), "once per attack");
         });
 
+        it("a rider that isn't once a day uses up nothing, even when it was already the last one chosen", async () => {
+          const bleeding = rogue.items.getName("Bleeding Attack");
+          const uses = foundry.utils.deepClone(bleeding._source.system.uses ?? {});
+          await bleeding.update({ "system.uses": { per: "day", maxFormula: "3", value: 3 } });
+          try {
+            await attack("bleeding");
+            await new Promise((r) => setTimeout(r, 300));
+            assert.equal(bleeding.system.uses.value, 3);
+          } finally {
+            await bleeding.update({ "system.uses": uses });
+          }
+        });
+
         it("bleed: a lower one doesn't replace a higher one; start of turn damage; healing stops it", async () => {
           await setBleed(goblin, 3, "test");
           assert.match(await setBleed(goblin, 2, "test"), /doesn't stack/);
