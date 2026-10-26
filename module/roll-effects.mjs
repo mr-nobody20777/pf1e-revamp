@@ -685,7 +685,7 @@ Hooks.once("init", () => {
 /*  Saves and skill checks                      */
 /* -------------------------------------------- */
 
-const pending = new Map(); // actor id → { roll, ctx? } waiting for its roll window
+const pending = new Map(); // actor uuid (unlinked tokens share an id) → { roll, ctx? } waiting for its roll window
 const splitBonus = (text) => (text ?? "").split(/\s*\+\s*/).map((t) => t.trim()).filter(Boolean);
 
 function preActorRoll(kind, idKey) {
@@ -697,7 +697,7 @@ function preActorRoll(kind, idKey) {
       (rollOptions.parts ??= []).push(...partsFor(defaultPlan(actor, roll), "roll", {}));
       return;
     }
-    pending.set(actor.id, { roll, name: actor.name, actor });
+    pending.set(actor.uuid, { roll, name: actor.name, actor });
   };
 }
 
@@ -706,8 +706,8 @@ Hooks.on("pf1PreActorRollSkill", preActorRoll("skill", "skillId"));
 Hooks.on("pf1PreActorRollAbility", preActorRoll("ability", "abilityId"));
 for (const kind of ["Save", "Skill", "Ability"]) {
   Hooks.on(`pf1ActorRoll${kind}`, (actor) => {
-    pending.get(actor.id)?.ctx?.manager?.close();
-    pending.delete(actor.id);
+    pending.get(actor.uuid)?.ctx?.manager?.close();
+    pending.delete(actor.uuid);
   });
 }
 

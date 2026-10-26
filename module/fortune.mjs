@@ -133,7 +133,7 @@ Hooks.on("pf1PostActionUse", async (actionUse) => {
 /*  concentration checks                        */
 /* -------------------------------------------- */
 
-const pending = new Map(); // actor id → { ids: always used up once rolled, toggles: one-roll bonuses, name }
+const pending = new Map(); // actor uuid (unlinked tokens share an id) → { ids: always used up once rolled, toggles: one-roll bonuses, name }
 
 // With a roll window, one-roll bonuses go in its Situational Bonus field, where a ticked box can take them
 // out again; without one (shift-click), they're added to the roll directly. Either way a bonus is used up
@@ -161,7 +161,7 @@ function preActorRoll(kind) {
       if (!windowed) (rollOptions.parts ??= []).push(part); // with a window, the field gets it when it opens
       toggles.push({ def, buff, value, part });
     }
-    if (ids.length || toggles.length) pending.set(actor.id, { ids, toggles, name: actor.name });
+    if (ids.length || toggles.length) pending.set(actor.uuid, { ids, toggles, name: actor.name });
   };
 }
 
@@ -187,9 +187,9 @@ Hooks.on("renderDialogV2", (app, element) => {
 });
 
 function postActorRoll(actor, result) {
-  const entry = pending.get(actor.id);
+  const entry = pending.get(actor.uuid);
   if (!entry) return;
-  pending.delete(actor.id);
+  pending.delete(actor.uuid);
   if (!result) return; // the roll window was cancelled: keep everything
   // A one-roll bonus is used up only if it was in the roll (it may have been unticked or deleted)
   const formula = result.rolls?.[0]?.formula ?? "";

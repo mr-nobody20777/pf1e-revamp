@@ -22,7 +22,7 @@
 //     Mastery, Protective Line (firearms).
 
 import { MODULE_ID, RANGED_ATTACKS } from "./const.mjs";
-import { esc, wrapMethod, tokenDistance } from "./util.mjs";
+import { esc, wrapMethod, tokenDistance, isActiveGM } from "./util.mjs";
 import { registerFootnote, footnoteButton } from "./footnote.mjs";
 
 const SETTING = "trackLoadedWeapons";
@@ -169,7 +169,7 @@ registerFootnote((item) => {
 
 // When combat ends, there's time to reload everything
 Hooks.on("deleteCombat", (combat) => {
-  if (!game.user.isGM || !tracking()) return;
+  if (!isActiveGM() || !tracking()) return;
   for (const c of combat.combatants) {
     for (const item of c.actor?.items ?? []) if (item.getFlag(MODULE_ID, LOADED) != null) item.unsetFlag(MODULE_ID, LOADED);
   }
