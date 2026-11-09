@@ -97,6 +97,12 @@ export const SPELLS = {
   "faerie fire": { effect: { buff: "Faerie Fire" } },
   "ray of enfeeblement": { effect: { penalty: { target: "str", formula: "1d6 + min(5, floor(@cl / 2))" } }, onSave: { penalty: { target: "str", formula: "1d6 + min(5, floor(@cl / 2))", half: true } } },
   "shield of faith": { effect: { buff: "Shield of Faith" } },
+  // "giving it fast healing 1" (greater: 4), for the spell's duration: a buff named after the spell that
+  // fast-healing.mjs reads
+  "infernal healing": { effect: { marker: true } },
+  "infernal healing, greater": { effect: { marker: true } },
+  "celestial healing": { effect: { marker: true } },
+  "celestial healing, greater": { effect: { marker: true } },
   "mage armor": { effect: { buff: "Mage Armor" } },
   shield: { self: true, effect: { buff: "Shield" } },
   "divine favor": { self: true, effect: { buff: "Divine Favor" } },

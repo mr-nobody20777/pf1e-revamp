@@ -180,6 +180,11 @@ Spells that affect only certain creatures, channel energy, immunity to precision
 - **Monsters with racial Hit Dice and no race** (many of PF1's bestiary monsters) take their type from the racial Hit Dice class.
 - **Subtypes typed by hand** match regardless of capitals, spaces and hyphens; PF1's misspelled "Reptillian" on kobolds and lizardfolk counts as reptilian.
 
+## Fast healing and regeneration
+A creature with fast healing or regeneration heals at the start of each of its turns in combat, once a round (stepping the tracker back and forward doesn't heal it twice). The amount comes from the sheet's Fast Healing and Regeneration fields, items named for them ("Fast Healing 5", "Regeneration 10 (fire)"), and the buffs of Infernal Healing and Celestial Healing. Nonlethal damage heals too if PF1's dual-heal setting is on.
+- **Regeneration** is stopped for the creature's next turn by damage of a type in its entry ("5 (acid, fire)"), when that damage is applied with its type through PF1. Its line says when it can die normally.
+- **A dead creature** doesn't heal. Out of combat, healing over time is left to the GM.
+
 ## Energy resistance
 
 - **Resistances never stack.** Against the same energy, only the highest counts: racial fire resistance 5 and fire resistance 10 from a bloodline give **fire resistance 10**.
