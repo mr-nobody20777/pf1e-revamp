@@ -70,6 +70,13 @@ Not automated: Entangle's saves while a creature stays in the area, Grease's Acr
 
 With **Nevela's Automation Suite**, a spell buff that Nevela applies itself is left to Nevela, and the row says so. PF1e Revamp applies the buffs Nevela doesn't have. See [Compatibility](Compatibility).
 
+## Saves against abilities
+Abilities that aren't spells but have a saving throw (class abilities and hexes, monster and template abilities, racial traits, alchemical items and technology) get the same rows when used with targets: each creature rolls its save from its row, and a failed save applies what the ability's text describes.
+- **Read from the text**: the condition and its duration ("Fortitude save or be paralyzed for 1d4 rounds", "staggers creatures for 1 round and deafens them for 1d4 rounds"), permanent effects, and what a successful save leaves ("reduces this to dazzled for 1d4 rounds"). The item's note shows what its rows will apply.
+- **Delivered by an attack**: only the creatures the attack hit get a row (against full AC, or touch AC for touch attacks).
+- **What isn't read**: when the text gives a condition without a duration, or nothing the module recognizes, the save is still rolled and the row says to apply the effect by hand.
+- **Not included**: channel energy (it has its own window), auras that act on creatures coming near, and poisons and diseases.
+
 ## Miss chances
 
 When someone attacks a creature with one of these effects, the miss chance is **rolled for every attack** and shown under it on the card: red means a miss, green a hit.

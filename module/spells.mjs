@@ -1,5 +1,8 @@
 // Spells on the creatures they affect. A spell's card gets a row per affected creature: its spell
-// resistance check, its saving throw and what happened to it.
+// resistance check, its saving throw and what happened to it. Abilities that aren't spells (class
+// abilities, hexes, monster and template abilities, racial traits, items) get the same rows when their
+// action has a save and targets; what a failed save does is read from their text (ability-effects.mjs).
+// Delivered by an attack (Spit Venom, a lich's touch), only the creatures the attack hit are affected.
 //
 // Rules (Core Rulebook, Magic):
 //   - Spell resistance: "the caster must make a caster level check (1d20 + caster level) at least equal
@@ -46,6 +49,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { SPELLS } from "./spell-data.mjs";
+import { abilityDef } from "./ability-effects.mjs";
 import { creatureTypes, energyAsUndead } from "./creature-types.mjs";
 import { compendiumBuff, nevelaAppliesBuff } from "./buff-grants.mjs";
 import { esc, evaluate, isActiveGM, onGmRequest, createQueue, tokenDistance, timed, saveResult } from "./util.mjs";
@@ -53,6 +57,8 @@ import { registerFootnote } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 
 const FLAG = "spell";
+const ATTACKS = ["mwak", "rwak", "twak", "msak", "rsak", "mcman", "rcman"];
+const isChannel = (item) => item?.type === "feat" && item.system?.tag === "classFeat_channelEnergy"; // channel-energy.mjs
 const SAVE_NAMES = { fort: "Fortitude", ref: "Reflex", will: "Will" };
 const queue = createQueue("spell results");
 // Spells another feature already puts on their targets (buff-grants.mjs)
@@ -106,15 +112,19 @@ Hooks.on("preCreateChatMessage", (message) => {
   if (message.type !== "action") return;
   const item = message.itemSource;
   const spellName = spellNameOf(item);
-  if (!spellName || HANDLED_ELSEWHERE.has(spellName.toLowerCase())) return;
-  const def = spellDef(item);
-  const action = item.actions?.get(message.system.action?.id);
+  if (spellName && HANDLED_ELSEWHERE.has(spellName.toLowerCase())) return;
+  const action = item?.actions?.get(message.system.action?.id);
   const save = message.system.save?.type ? { type: message.system.save.type, dc: message.system.save.dc } : null;
+  // An ability that isn't a spell: only with a save PF1 worked out, and not channel energy (its own flow)
+  const ability = !spellName && !!item && !!save && !!action?.save?.type && !isChannel(item);
+  if (!spellName && !ability) return;
+  const def = ability ? abilityDef(item, save.type) : spellDef(item);
+  if (ability && !def) return; // a correction says its save isn't against the targets
   // The spell allows a save but PF1 couldn't work out its DC (a broken item): no rows, so nothing lands unsaved
   if (action?.save?.type && !save) return;
   const harmless = !!action?.save?.harmless;
   // A scroll, wand or potion doesn't carry the spell's spell resistance: found when the card resolves
-  const sr = item.type === "spell" ? !!item.system.sr : null;
+  const sr = ability ? false : item.type === "spell" ? !!item.system.sr : null;
   if (!def && !save && sr === false) return;
   const caster = ChatMessage.implementation.getSpeakerActor(message.speaker);
   const casterToken = caster?.getActiveTokens()[0]?.document ?? null;
@@ -128,16 +138,18 @@ Hooks.on("preCreateChatMessage", (message) => {
   if (!targets.length) return;
   message.updateSource({
     [`flags.${MODULE_ID}.${FLAG}`]: {
-      name: spellName,
+      name: spellName ?? item.name,
+      ability,
       itemId: item.id,
       actionId: action?.id ?? null,
       save,
       harmless,
       sr,
-      attack: ["msak", "rsak"].includes(action?.actionType) && !def?.autoHit,
+      // An ability delivered by an attack affects only what it hit: full AC, touch AC for touch attacks
+      attack: ability ? ATTACKS.includes(action?.actionType) && !!message.systemRolls?.attacks?.length : ["msak", "rsak"].includes(action?.actionType) && !def?.autoHit,
       // A touch spell without an attack roll of its own: the melee touch attack is rolled for it
       touch: (def?.touchAttack ?? (range === "touch" && !["msak", "rsak"].includes(action?.actionType))) || false,
-      fullAC: !!def?.fullAC,
+      fullAC: ability ? !["msak", "rsak"].includes(action?.actionType) && !/\btouch attack\b/i.test(item.system.description?.value ?? "") : !!def?.fullAC,
       damage: !!action?.damage?.parts?.length,
       heal: action?.actionType === "heal",
       cl: message.system.config?.cl ?? item.system.cl ?? 0,
@@ -202,8 +214,8 @@ async function resolveCard(message) {
   if (!data || data.resolved) return;
   const caster = ChatMessage.implementation.getSpeakerActor(message.speaker);
   const item = caster?.items.get(message.system.item?.id) ?? message.itemSource;
-  const def = spellDef(item);
-  const source = item?.type === "spell" ? item : await sourceSpell(data.name);
+  const def = data.ability ? abilityDef(item, data.save?.type) : spellDef(item);
+  const source = item?.type === "spell" || data.ability ? item : await sourceSpell(data.name);
   if (data.sr === null) data.sr = !!source?.system.sr;
   // A scroll, wand or potion of a spell with no save, no entry and no spell resistance: nothing to show
   if (!def && !data.save && !data.sr) return message.unsetFlag(MODULE_ID, FLAG);
@@ -309,7 +321,7 @@ Hooks.on("createChatMessage", (save) => {
     else {
       const caster = ChatMessage.implementation.getSpeakerActor(card.speaker);
       const item = caster?.items.get(card.system.item?.id) ?? card.itemSource;
-      await applyRow(row, rowDef(spellDef(item), row), data, caster, { saved: passed });
+      await applyRow(row, rowDef(data.ability ? abilityDef(item, data.save?.type) : spellDef(item), row), data, caster, { saved: passed });
     }
     await card.setFlag(MODULE_ID, FLAG, data);
   });
@@ -430,6 +442,9 @@ async function applyRow(row, def, data, caster, { saved }) {
   else if (data.damage) applied.push("full damage");
   if (saved && def && !def.onSave && !data.damage) applied.push(row.hitDamage ? "no further effect" : "no effect");
   if (effect && actor) applied.push(...(await applyEffect(actor, effect, data, caster)));
+  // An ability whose effect couldn't be read from its text: the GM applies it (DECISIONS.md)
+  if (!saved && def?.reminder?.length) applied.push(`${def.reminder.join(", ")}: its duration isn't in the text, apply by hand`);
+  if (!saved && def?.unread && !data.damage) applied.push("apply its effect by hand (see the ability)");
   if (def?.cooldown && actor && !saved) await actor.setFlag(MODULE_ID, "spellCooldown", { [data.name.toLowerCase()]: game.time.worldTime + def.cooldown * 6 });
   row.applied = applied;
 }
@@ -441,7 +456,7 @@ function tierFor(def, actor) {
 
 async function applyEffect(actor, effect, data, caster) {
   const out = [];
-  const rollData = { cl: data.cl };
+  const rollData = { ...(data.ability ? caster?.getRollData?.() ?? {} : {}), cl: data.cl };
   for (const [key, formula] of Object.entries(effect.roll ?? {})) rollData[key] = (await new Roll(formula).evaluate()).total;
   const { types } = creatureTypes(actor);
   const living = !types.has("undead") && !types.has("construct");
@@ -667,4 +682,20 @@ registerFootnote((item) => {
   return ["Automated: the card lists each creature it affects (your targets, or those in the template). Spell resistance is checked for you; each creature's save is rolled from its row, and the result is applied (conditions and buffs with their duration)."];
 });
 
-export const _test = { FLAG, spellDef, unaffectedBy, penetration, resolveCard };
+// Abilities with a save: what their rows do
+const conditionText = ([id, formula]) => `${pf1.registry.conditions.get(id)?.name.toLowerCase() ?? id}${formula == null ? "" : ` (${String(formula).replace(/^\((.+)\) \* 10$/, "$1 min").replace(/^\((.+)\) \* 600$/, "$1 h").replace(/^(\d[^ ]*)$/, "$1 rd")})`}`;
+registerFootnote((item) => {
+  if (!item || spellNameOf(item) || isChannel(item)) return null;
+  const save = item.actions?.find?.((a) => a.save?.type)?.save;
+  if (!save) return null;
+  const def = abilityDef(item, save.type);
+  if (!def) return null;
+  const parts = ["Used with targets, its card gets a row per creature with its save"];
+  if (def.effect?.conditions?.length) parts.push(`; a failed save applies ${def.effect.conditions.map(conditionText).join(", ")}`);
+  if (def.onSave?.conditions?.length) parts.push(`, a successful one ${def.onSave.conditions.map(conditionText).join(", ")}`);
+  if (def.reminder?.length) parts.push(`; ${def.reminder.join(", ")}: apply by hand (its duration isn't in the text)`);
+  if (def.unread) parts.push("; apply its effect by hand");
+  return [`${parts.join("")}.`];
+});
+
+export const _test = { FLAG, spellDef, unaffectedBy, penetration, resolveCard, abilityDef };

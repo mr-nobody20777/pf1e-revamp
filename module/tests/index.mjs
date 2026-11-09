@@ -31,6 +31,7 @@ import { registerRangedSpecialTests } from "./ranged-special.test.mjs";
 import { registerSpellTests } from "./spells.test.mjs";
 import { registerCreatureTypeTests } from "./creature-types.test.mjs";
 import { registerCreatureBonusTests } from "./creature-bonuses.test.mjs";
+import { registerAbilitySaveTests } from "./ability-saves.test.mjs";
 
 export function registerTests(quench) {
   registerTwoWeaponTests(quench);
@@ -42,6 +43,7 @@ export function registerTests(quench) {
   registerResistanceTests(quench);
   registerCreatureTypeTests(quench);
   registerCreatureBonusTests(quench);
+  registerAbilitySaveTests(quench);
   registerQuarryTests(quench);
   registerTrueStrikeTests(quench);
   registerMissChanceTests(quench);
