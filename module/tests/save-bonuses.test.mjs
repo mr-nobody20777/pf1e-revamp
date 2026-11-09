@@ -145,6 +145,15 @@ export function registerSaveBonusTests(quench) {
             await restore();
           }
         });
+
+        it("channel resistance: '+[[4]] to resist channel energy' counts against channel energy only", async () => {
+          const actor = await withRace("Quench Channel Resistant");
+          await actor.createEmbeddedDocuments("Item", [{ name: "Channel Resistance", type: "feat", system: { subType: "misc", contextNotes: [{ target: "allSavingThrows", text: "+[[4]] to resist channel energy." }] } }], { pf1eRevampNoPrompt: true });
+          const effect = (name) => ({ name, text: name, school: null, subschools: new Set(), descriptors: new Set(), isSpell: false, isSLA: false, isPoison: false });
+          const { saveBonuses } = await import("../save-bonuses.mjs");
+          assert.equal(saveBonuses(actor, "will", effect("Channel Energy")).find((b) => b.label === "Channel Resistance")?.value, 4);
+          assert.isUndefined(saveBonuses(actor, "will", effect("Fireball")).find((b) => b.label === "Channel Resistance"));
+        });
       });
     },
     { displayName: "PF1e Revamp: Save Bonuses vs Effects" }

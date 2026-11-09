@@ -129,6 +129,18 @@ export function creatureTypes(actor) {
   return { types, subtypes, original, dropped, typeFrom, unresolved: false };
 }
 
+/**
+ * Healed by negative energy and harmed by positive energy: undead, and living creatures with negative
+ * energy affinity ("The creature is alive but reacts to positive and negative energy as if it were
+ * undead—positive energy harms it, negative energy heals it", dhampirs and others). Channel energy and
+ * cure and inflict spells use this; effects that name undead as a type (Disrupt Undead) use the type.
+ */
+export function energyAsUndead(actor) {
+  if (!actor) return false;
+  if (creatureTypes(actor).types.has("undead")) return true;
+  return actor.items.some((i) => i.type === "feat" && i.isActive !== false && /^negative energy affinity\b/i.test(i.name));
+}
+
 /* -------------------------------------------- */
 /*  Creatures named in rules text               */
 /* -------------------------------------------- */

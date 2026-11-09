@@ -2,6 +2,7 @@
 // card, with true seeing, see invisibility and Blind-Fight adjusting them per the spell text.
 
 import { createTestActor, addItems, removeItems, waitFor, cleanup, useTestScene, placeToken, setTargets, deleteTokens } from "./helpers.mjs";
+import { missChances } from "../miss-chance.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -131,6 +132,35 @@ export function registerMissChanceTests(quench) {
           const [line] = attacks[0];
           assert.deepEqual(line.rolls, [1, 1], "missed, then rerolled");
           assert.isTrue(line.miss);
+        });
+
+        it("faerie fire, blindsight and Improved Precise Shot remove the miss chances they ignore", async () => {
+          const longsword = attacker.items.getName("Longsword");
+          const javelin = attacker.items.getName("Javelin");
+          const labels = (item, type, opts) => missChances(defender, attacker, item, type, opts).map((c) => c.label);
+          const [blur] = await defender.createEmbeddedDocuments("Item", [{ name: "Blur", type: "buff", system: { active: true } }]);
+          const [ff] = await defender.createEmbeddedDocuments("Item", [{ name: "Faerie Fire", type: "buff", system: { active: true } }]);
+          try {
+            assert.notInclude(labels(longsword, "mwak"), "Blur", "faerie fire: no blur");
+            await ff.delete();
+            assert.include(labels(longsword, "mwak"), "Blur");
+            const [ips] = await attacker.createEmbeddedDocuments("Item", [{ name: "Improved Precise Shot", type: "feat", system: { subType: "feat" } }]);
+            assert.notInclude(labels(javelin, "twak"), "Blur", "less than total concealment");
+            assert.include(labels(longsword, "mwak"), "Blur", "ranged attacks only");
+            const [disp] = await defender.createEmbeddedDocuments("Item", [{ name: "Displacement", type: "buff", system: { active: true } }]);
+            assert.include(labels(javelin, "twak"), "Displacement", "as if total concealment");
+            await disp.delete();
+            await ips.delete();
+            await defender.setCondition("invisible", true);
+            const [bs] = await attacker.createEmbeddedDocuments("Item", [{ name: "Blindsight 30'", type: "feat", system: { subType: "misc" } }]);
+            assert.notInclude(labels(longsword, "mwak", { distance: 5 }), "Invisible", "within 30 ft.");
+            assert.include(labels(longsword, "mwak", { distance: 40 }), "Invisible", "beyond its range");
+            await bs.delete();
+          } finally {
+            await defender.setCondition("invisible", false);
+            if (defender.items.has(blur.id)) await blur.delete();
+            if (defender.items.has(ff.id)) await ff.delete();
+          }
         });
       });
     },

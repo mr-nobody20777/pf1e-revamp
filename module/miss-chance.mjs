@@ -24,7 +24,7 @@
 
 import { MODULE_ID, MELEE_ATTACKS as MELEE, RANGED_ATTACKS as RANGED } from "./const.mjs";
 import { registerFootnote } from "./footnote.mjs";
-import { esc } from "./util.mjs";
+import { esc, tokenDistance } from "./util.mjs";
 
 
 // Defender buffs, by name. `concealment` = Blind-Fight can reroll it.
@@ -72,7 +72,7 @@ function isTotalConcealment(actor) {
  * Every miss chance a defender has against this attack.
  * @returns {Array<{ chance: number, label: string, concealment?: boolean, nevela?: boolean }>}
  */
-export function missChances(defender, attacker, item, actionType) {
+export function missChances(defender, attacker, item, actionType, { distance = null } = {}) {
   const melee = MELEE.includes(actionType);
   const candidates = [];
 
@@ -103,13 +103,52 @@ export function missChances(defender, attacker, item, actionType) {
     candidates.push({ chance: nevelaActive() && isTotalConcealment(defender) ? 50 : 20, label: "Concealed", concealment: true, nevela: nevelaActive() });
   }
 
-  return candidates;
+  // What lets the attacker ignore some of them
+  const negated = negators(defender, attacker, actionType, distance);
+  const kept = candidates.filter((c) => !negated.some((n) => n.test(c)));
+  kept.negatedNevela = candidates.some((c) => c.nevela) && !kept.some((c) => c.nevela);
+  kept.negatedBy = [...new Set(candidates.filter((c) => !kept.includes(c)).map((c) => negated.find((n) => n.test(c)).label))];
+  return kept;
+}
+
+/**
+ * Rules that remove miss chances against this attack:
+ *   - Faerie fire on the defender: "Outlined creatures do not benefit from the concealment normally
+ *     provided by darkness (though a 2nd-level or higher magical darkness effect functions normally),
+ *     blur, displacement, invisibility, or similar effects." PF1's Concealed condition doesn't say where
+ *     it comes from (darkness of which level, fog), so it's kept.
+ *   - Blindsight within range: "Invisibility, darkness, and most kinds of concealment are irrelevant."
+ *     PF1's Blindsight item sets the blindsense sense, so the range is read from the item too.
+ *   - Improved Precise Shot, ranged attacks: "ignore ... the miss chance granted to targets by anything
+ *     less than total concealment". Displacement ("as if it had total concealment"), invisibility and
+ *     an unseen target are total concealment, so they still count.
+ */
+function negators(defender, attacker, actionType, distance) {
+  const out = [];
+  if (hasBuff(defender, /^faerie fire$/i)) out.push({ label: "Faerie Fire", test: (c) => /^(blur|displacement|invisible)$/i.test(c.label) });
+  const range = blindsightRange(attacker);
+  if (range > 0 && distance != null && distance <= range) out.push({ label: "Blindsight", test: (c) => !!c.concealment });
+  const ips = (attacker?.itemTypes?.feat ?? []).some((f) => f.isActive !== false && /^improved precise shot$/i.test(f.name));
+  if (ips && RANGED.includes(actionType)) out.push({ label: "Improved Precise Shot", test: (c) => !!c.concealment && c.chance < 50 });
+  return out;
+}
+
+/** Blindsight range in feet: the sense, or a Blindsight item ("Blindsight 30'", or its change's amount). */
+function blindsightRange(actor) {
+  let range = Number(actor?.system.traits?.senses?.bs?.total ?? actor?.system.traits?.senses?.bs?.value ?? 0) || 0;
+  for (const item of actor?.items ?? []) {
+    if (!/^blindsight\b/i.test(item.name) || item.isActive === false || (item.type !== "feat" && item.type !== "buff")) continue;
+    const fromName = Number(item.name.match(/(\d+)/)?.[1]);
+    const fromChange = Number((item.system.changes ?? []).find((c) => /^sense(bs|bse)$/.test(c.target))?.formula);
+    range = Math.max(range, fromName || fromChange || 0);
+  }
+  return range;
 }
 
 /** Best miss chance a defender has against this attack (they don't stack), or null. */
-export function defenderMissChance(defender, attacker, item, actionType) {
+export function defenderMissChance(defender, attacker, item, actionType, options) {
   // Highest wins; on a tie, leave it to Nevela's roll so it isn't rolled twice
-  return missChances(defender, attacker, item, actionType).reduce((best, c) => (!best || c.chance > best.chance || (c.chance === best.chance && c.nevela) ? c : best), null);
+  return missChances(defender, attacker, item, actionType, options).reduce((best, c) => (!best || c.chance > best.chance || (c.chance === best.chance && c.nevela) ? c : best), null);
 }
 
 // preCreateChatMessage can't wait for an async Roll (v13 dice can't be rolled synchronously), so
@@ -137,6 +176,7 @@ Hooks.on("preCreateChatMessage", (message) => {
   const targets = (message.system.targets ?? []).map((uuid) => fromUuidSync(uuid)).filter((t) => t?.actor);
   const reroll = MELEE.includes(actionType) && hasBlindFight(attacker);
   const attackerBlinks = hasBuff(attacker, /^blink$/i);
+  const attackerToken = message.speaker.token ? canvas.scene?.tokens.get(message.speaker.token) ?? fromUuidSync(`Scene.${message.speaker.scene}.Token.${message.speaker.token}`) : null;
 
   const result = { attacks: [], card: [], nevelaSuperseded: false };
 
@@ -146,7 +186,10 @@ Hooks.on("preCreateChatMessage", (message) => {
       if (attackerBlinks && !isSpell) lines.push({ ...rollMiss({ chance: 20, label: "Blink (yours)" }), own: true });
       for (const token of targets) {
         if (isSpell && hasBuff(token.actor, /^blink$/i)) continue; // spell failure below instead
-        const best = defenderMissChance(token.actor, attacker, item, actionType);
+        const distance = attackerToken?.object && token.object ? tokenDistance(attackerToken.object, token.object) : null;
+        const list = missChances(token.actor, attacker, item, actionType, { distance });
+        if (list.negatedNevela && nevelaActive()) result.nevelaSuperseded = true; // Nevela still rolls its Concealed
+        const best = list.reduce((b, c) => (!b || c.chance > b.chance || (c.chance === b.chance && c.nevela) ? c : b), null);
         if (!best) continue;
         if (best.nevela) continue; // Nevela rolls it
         if (token.actor.statuses.has("concealed") && nevelaActive()) result.nevelaSuperseded = true;

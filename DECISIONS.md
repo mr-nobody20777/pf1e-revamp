@@ -14,6 +14,7 @@ feature before changing it. Newest first within each section. Format: **decision
 - **Don't rewrite players' item descriptions**: they may hold flavor text; show automation in footnotes or separate items instead (2026-10-23).
 
 ## Rolls and buffs
+- **Miss chances that are cancelled** (2026-11-09): Improved Precise Shot ("anything less than total concealment") doesn't beat displacement, whose miss chance is "as if it had total concealment"; invisibility and an unseen target are total concealment too. Faerie fire leaves PF1's plain Concealed condition alone, since it doesn't say whether it comes from darkness (which faerie fire cancels unless it's 2nd-level or higher) or from fog (which it doesn't).
 - **Afflictions are tracked later, with the repeating-effects engine** (onset, periodic saves, cure count, poison doses), not as a separate feature; until then they stay with the GM (2026-10-26).
 - **Evasion and improved evasion are applied automatically** on Reflex-half spell rows (no damage on a success; half on a failure with improved evasion), checking the light-or-no-armor and not-helpless conditions (2026-10-26).
 - **Spells that fire several rays (scorching ray) get one attack roll and one row per ray** when automated, with the caster picking each ray's target; per-ray energy resistance and the once-per-casting damage bonuses and sneak attack follow from that (2026-10-26).
@@ -34,6 +35,7 @@ feature before changing it. Newest first within each section. Format: **decision
 - **Bit of Luck: always take the better of two d20s automatically**: taking the better roll is never worse (2026-10-22).
 
 ## Cleric / channel energy
+- **A channel that doesn't happen** (cancelled, or the cleric has no token) refunds the use and deletes PF1's card, rather than leaving a card that shows the uses before the refund (2026-11-09).
 - **No summary chat message after a channel**: PF1's card shows the amount and saves have their own cards; the GM request is whispered and deleted once applied (2026-10-23).
 - **Variant channeling halves per the rules as written**: roll the normal dice and halve the total on PF1's own card (one number in chat), **minimum 1** ("damage and hit points have a minimum of 1") (2026-10-23).
 - **Variant channeling is chosen at creation (new-cleric level-up window) or once from Channel Energy's note, then locked; GM-only reset.** The choice shows on the sheet as a "Variant Channeling (portfolio)" class feature (2026-10-23).

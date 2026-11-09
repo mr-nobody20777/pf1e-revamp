@@ -217,6 +217,17 @@ export function registerSneakAttackTests(quench) {
           const card = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.type === "action"));
           assert.match(card.systemRolls.attacks[0].damage.map((d) => d.formula).join(" + "), /2d6\[Sneak Attack\]/);
         });
+
+        it("all-around vision: flanking doesn't allow sneak attack", async () => {
+          const [aav] = await goblin.createEmbeddedDocuments("Item", [{ name: "All-Around Vision", type: "feat", system: { subType: "misc" } }]);
+          try {
+            const e = sneakEntry(slayer, true);
+            assert.isFalse(e.applies);
+            assert.match(e.reason, /all-around vision/);
+          } finally {
+            await aav.delete();
+          }
+        });
       });
     },
     { displayName: "PF1e Revamp: Sneak Attack" }

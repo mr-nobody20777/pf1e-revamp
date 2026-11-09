@@ -233,6 +233,8 @@ registerRollEffect({
     const denied = deniedDex(target, actor);
     if (denied) return yes(denied);
     if (!ranged && roll.flags?.flanking) {
+      // All-around vision: "The creature sees in all directions at once. It cannot be flanked."
+      if (hasFeat(target, /^all-around vision\b/i).length) return not("all-around vision: it can't be flanked");
       if (canFlank(target, actor, srcs)) return yes("you flank the target");
       return not("Improved Uncanny Dodge: can't be flanked by you");
     }

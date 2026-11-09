@@ -12,7 +12,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { esc, onGmRequest, classLevel, titleFor, saveResult } from "./util.mjs";
-import { creatureTypes } from "./creature-types.mjs";
+import { creatureTypes, energyAsUndead } from "./creature-types.mjs";
 import { variantEffect, variantOf, variantsAllowed, chooseVariant, clearVariant, applyVariant, channelBonus, isVariantFeature, VARIANTS } from "./variant-channeling.mjs";
 
 const RADIUS = 30;
@@ -24,10 +24,6 @@ function modeOf(action) {
   return { heal: name.includes("heal"), undead: /heal undead|harm undead/.test(name) };
 }
 
-/** Undead by the creature type on its race (PCs and most NPCs carry one); anything else is living. */
-export function isUndead(actor) {
-  return creatureTypes(actor).types.has("undead");
-}
 
 const hasSelectiveChanneling = (actor) => actor.itemTypes.feat.some((f) => /^selective channeling$/i.test(f.name));
 
@@ -50,7 +46,7 @@ function harmedAsUndead(actor) {
 
 export function creaturesInBurst(centerToken, undead, { blossoming = false } = {}) {
   return canvas.tokens.placeables
-    .filter((t) => t.actor && !t.document.hidden && (isUndead(t.actor) === undead || (blossoming && undead && harmedAsUndead(t.actor))))
+    .filter((t) => t.actor && !t.document.hidden && (energyAsUndead(t.actor) === undead || (blossoming && undead && harmedAsUndead(t.actor))))
     .map((t) => ({ token: t, distance: t === centerToken ? 0 : canvas.grid.measurePath([centerToken.center, t.center]).distance }))
     .filter((c) => c.distance <= RADIUS)
     .sort((a, b) => a.distance - b.distance);
@@ -73,7 +69,13 @@ export async function channel(actionUse, { targets = null } = {}) {
   const dc = actionUse.shared.saveDC;
   const mode = modeOf(action);
   const variant = variantEffect(item, mode);
-  const refund = () => item.update({ "system.uses.value": (item.system.uses.value ?? 0) + 1 });
+  // A channel that doesn't happen (cancelled, or no token) gives the use back and removes PF1's card, which
+  // would otherwise still show the uses left before the refund
+  const refund = async () => {
+    await item.update({ "system.uses.value": (item.system.uses.value ?? 0) + 1 });
+    const card = actionUse.shared.message;
+    if (card && game.messages.has(card.id) && card.isOwner) await card.delete();
+  };
 
   const clericToken = actor.getActiveTokens()[0];
   if (!clericToken) {

@@ -2,7 +2,8 @@
 // harmed creatures roll Will for half.
 
 import { createTestActor, waitFor, waitForItem, cleanup, useTestScene, placeToken, deleteTokens } from "./helpers.mjs";
-import { creaturesInBurst, isUndead } from "../channel-energy.mjs";
+import { creaturesInBurst } from "../channel-energy.mjs";
+import { energyAsUndead as isUndead } from "../creature-types.mjs";
 import { setVariant, clearVariant, applyVariant } from "../variant-channeling.mjs";
 
 const MODULE_ID = "pf1e-revamp";

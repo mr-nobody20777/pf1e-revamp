@@ -195,3 +195,5 @@ Spells that affect only certain creatures, channel energy, immunity to precision
 ## Miss chances
 
 Miss chances from Blur, Displacement, Blink, Entropic Shield, invisibility and blindness are rolled on attack cards, as are these against ranged attacks only: Air Barrier, Spirit Shield, Wind Ward, Stormlure, Distracting Pattern and Arrow-Collecting armor. See [Spells and Buffs](Spells-and-Buffs#miss-chances).
+
+Some things cancel them: **faerie fire** on the defender removes blur, displacement and invisibility; an attacker's **blindsight** ignores concealment within its range; **Improved Precise Shot** ignores, on ranged attacks, miss chances below total concealment (blur, a plain Concealed condition), but not displacement or invisibility.

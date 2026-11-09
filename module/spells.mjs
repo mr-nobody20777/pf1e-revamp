@@ -46,10 +46,9 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { SPELLS } from "./spell-data.mjs";
-import { creatureTypes } from "./creature-types.mjs";
+import { creatureTypes, energyAsUndead } from "./creature-types.mjs";
 import { compendiumBuff, nevelaAppliesBuff } from "./buff-grants.mjs";
 import { esc, evaluate, isActiveGM, onGmRequest, createQueue, tokenDistance, timed, saveResult } from "./util.mjs";
-import { isUndead } from "./channel-energy.mjs";
 import { registerFootnote } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 
@@ -138,6 +137,7 @@ Hooks.on("preCreateChatMessage", (message) => {
       attack: ["msak", "rsak"].includes(action?.actionType) && !def?.autoHit,
       // A touch spell without an attack roll of its own: the melee touch attack is rolled for it
       touch: (def?.touchAttack ?? (range === "touch" && !["msak", "rsak"].includes(action?.actionType))) || false,
+      fullAC: !!def?.fullAC,
       damage: !!action?.damage?.parts?.length,
       heal: action?.actionType === "heal",
       cl: message.system.config?.cl ?? item.system.cl ?? 0,
@@ -213,7 +213,7 @@ async function resolveCard(message) {
   const needsTouch = data.touch && data.rows.some((r) => !accepts(data, r, caster));
   if (needsTouch && !attack && caster) {
     attack = await new Roll(`1d20 + ${touchBonus(caster, data.touch === "ranged")}`).evaluate();
-    data.touchRoll = { total: attack.total, ranged: data.touch === "ranged" };
+    data.touchRoll = { total: attack.total, ranged: data.touch === "ranged", fullAC: !!data.fullAC };
   }
   const natural = attack?.dice?.[0]?.total;
 
@@ -237,7 +237,7 @@ async function resolveCard(message) {
     // Touch and ray attacks first (an ally accepting a touch needs no roll), then spell resistance
     const touchAccepted = data.touch && !data.attack && accepts(data, row, caster);
     if ((data.attack || data.touch) && attack && !willing && !touchAccepted) {
-      const ac = actor.system.attributes?.ac?.touch?.total ?? 10;
+      const ac = actor.system.attributes?.ac?.[data.fullAC ? "normal" : "touch"]?.total ?? 10;
       const intoMelee = data.touchRoll?.ranged && engaged(token, data, caster) ? -4 : 0;
       const total = attack.total + intoMelee;
       row.attack = { total, ac, intoMelee: !!intoMelee, hit: natural === 20 || (natural !== 1 && total >= ac) };
@@ -424,7 +424,7 @@ async function applyRow(row, def, data, caster, { saved }) {
   const effect = !def ? null : saved ? def.onSave : def.tiers ? tierFor(def, actor) : def.effect;
   const applied = [];
   // A healing spell heals the living; undead take it as damage (half on a save), and inflict spells heal them
-  const reversed = !!actor && isUndead(actor) && REVERSED.test(data.name);
+  const reversed = !!actor && energyAsUndead(actor) && REVERSED.test(data.name);
   if (actor && data.heal !== reversed) applied.push("healing");
   else if (saved && data.damage) applied.push("half damage");
   else if (data.damage) applied.push("full damage");
@@ -598,7 +598,7 @@ Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
 const REVERSED = /^(mass )?(cure|inflict) \w+ wounds\b/i;
 Hooks.on("pf1ApplyDamage", (actor, options) => {
   const item = options.action?.item ?? options.message?.itemSource;
-  if (!REVERSED.test(spellNameOf(item) ?? "") || !isUndead(actor) || options[`${MODULE_ID}Reversed`]) return;
+  if (!REVERSED.test(spellNameOf(item) ?? "") || !energyAsUndead(actor) || options[`${MODULE_ID}Reversed`]) return;
   options[`${MODULE_ID}Reversed`] = true;
   options.value = -options.value;
 });
@@ -636,7 +636,7 @@ function rowElement(message, data, row, index) {
   div.style.cssText = `margin: 0.2em 0; padding: 0 4px; border-left: 3px solid ${!row.state || row.state === "save" ? "#888" : good ? "#5a5" : "#b33"};`;
   const parts = [];
   if (row.sr) parts.push(`SR check ${row.sr.total}${gm ? ` vs SR ${row.sr.value}` : ""}: ${row.sr.passed ? "overcome" : "resisted"}`);
-  if (row.attack) parts.push(`${data.touchRoll ? (data.touchRoll.ranged ? "ranged touch " : "melee touch ") : ""}${row.attack.total}${row.attack.intoMelee ? " (−4 into melee)" : ""}${gm ? ` vs touch AC ${row.attack.ac}` : ""}: ${row.attack.hit ? "hits" : "misses"}`);
+  if (row.attack) parts.push(`${data.touchRoll ? (data.touchRoll.fullAC ? "ranged " : data.touchRoll.ranged ? "ranged touch " : "melee touch ") : ""}${row.attack.total}${row.attack.intoMelee ? " (−4 into melee)" : ""}${gm ? ` vs ${data.fullAC ? "" : "touch "}AC ${row.attack.ac}` : ""}: ${row.attack.hit ? "hits" : "misses"}`);
   if (row.hitDamage) parts.push(esc(row.hitDamage));
   if (row.state === "unaffected") parts.push(`unaffected${gm && row.why ? ` (${esc(row.why)})` : ""}`);
   const save = saveOf(data, row);

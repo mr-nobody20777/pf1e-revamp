@@ -29,6 +29,7 @@
 //   autoHit    no attack roll is needed (Magic Missile), whatever PF1 rolls
 //   touchAttack  true / "ranged": the touch attack is rolled here; a spell with a range of touch and no
 //              attack roll of its own gets a melee touch attack anyway (Mudball: "ranged")
+//   fullAC     the attack rolled for it is a normal attack against full AC, not a touch attack (Nauseating Dart)
 //   initialSave  false: no save when cast, only the new saves to end it (Mudball)
 //   onHit      { damage: { formula, type } } applied on a hit, before the save (PF1's card has none)
 //   undead     fields that replace these for undead creatures, e.g. { save: "will", effect }
@@ -46,7 +47,7 @@ export const SPELLS = {
   "disrupt undead": { types: ["undead"] },
   resistance: { effect: { buff: "Resistance" } },
   virtue: { effect: { buff: "Virtue" } },
-  lullaby: { effect: { buff: "Lullaby" } },
+  lullaby: { living: true, effect: { buff: "Lullaby" } }, // "Area living creatures within a 10-ft.-radius burst"
   stabilize: { living: true, dying: true, effect: { conditions: [["stable", null]] } },
   bleed: { living: true, dying: true, effect: { remove: ["stable"] } },
 
@@ -66,6 +67,7 @@ export const SPELLS = {
   },
   sleep: { pool: "4", unless: "unconscious", effect: { conditions: [["sleep", "10 * @cl"]] } },
   hypnotism: {
+    living: true, // "Area several living creatures"
     pool: "2d4",
     saveModifiers: [
       { when: "inCombat", value: 2, label: "in combat", reason: "only in combat" },
@@ -199,7 +201,9 @@ export const SPELLS = {
     effect: { changes: [{ target: "attack", formula: "-1", type: "untyped" }, { target: "allSavingThrows", formula: "-1", type: "untyped" }, { target: "skills", formula: "-1", type: "untyped" }, { target: "allChecks", formula: "-1", type: "untyped" }], note: "none of it on a turn it scratches (a move action)" },
   },
   ironbeard: { effect: { changes: [{ target: "aac", formula: "1", type: "untyped" }], note: "an armor bonus that stacks with worn armor (not against touch attacks); 20% spell failure for verbal components" } },
-  "nauseating dart": { effect: { conditions: [["nauseated", "1"]], note: "only if the dart hit (a ranged attack, 1d2 piercing)" } },
+  // "as though you had fired a dart from a blowgun. You must succeed at a ranged attack to hit your target": a
+  // normal ranged attack (full AC), 1d2 piercing, then Fortitude or nauseated 1 round
+  "nauseating dart": { touchAttack: "ranged", fullAC: true, onHit: { damage: { formula: "1d2", type: "piercing" } }, effect: { conditions: [["nauseated", "1"]] } },
   "touch of bloodletting": { wounded: true, effect: { conditions: [["exhausted", "@cl"]], note: "1 bleed each round; a DC 15 Heal check or any healing spell ends it" } },
   "hairline fractures": { types: ["earth"], effect: { changes: [{ target: "ac", formula: "-2", type: "untyped" }] } },
   paranoia: { effect: { marker: true, note: "treats every creature as an enemy and must make attacks of opportunity; -2 on attacks, weapon damage, checks and saves when adjacent to two or more creatures" } },

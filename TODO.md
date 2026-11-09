@@ -111,15 +111,7 @@ The design reference gives every feat, trait, class and archetype feature, racia
 - **Test tooling.** Nevela's Automation Suite cancels targeted buff spells (such as *Haste*) cast without a target, so tests that cast spells must set a target or use a non-buff spell.
 
 ### Known issues
-- **Lullaby and Hypnotism affect undead and constructs.** Both affect living creatures only, but their spell entries don't mark them as living-only.
-- **Faerie fire doesn't remove miss chances.** Outlined creatures lose concealment from blur, displacement, invisibility and darkness (except 2nd-level or higher magical darkness), but miss chances are still rolled against them.
-- **Nauseating Dart has no attack roll.** It needs a normal ranged attack against full AC, as with a blowgun dart; the nausea currently applies on a failed save even when the dart would have missed.
-- **Blindsight and Improved Precise Shot don't cancel miss chances.** Creatures with blindsight ignore invisibility, darkness and most concealment within range; Improved Precise Shot ignores anything less than total concealment. Both still see miss chances rolled.
-- **All-around vision doesn't prevent flanking.** Creatures with it can't be flanked, so flanking them shouldn't enable sneak attack.
-- **Channel resistance isn't applied.** Its bonus should be added to saves against channel energy and effects that rely on it.
-- **Negative energy affinity isn't reversed.** Living creatures with it (dhampirs and others) are healed by negative energy and harmed by positive energy, like undead; cure and inflict spells and channel energy treat them as living.
 - **Snap Shot archers don't threaten.** With Snap Shot, an archer threatens squares within 5 feet (more with Improved Snap Shot), which affects flanking and the warning for shooting while threatened. The Snap Shot feat is also missing from the installed compendiums (only the rogue talent of the same name exists).
-- **Channel Energy refunds.** When a channel is cancelled or the cleric has no token, the use is refunded, but PF1's chat card still shows the uses remaining before the refund.
 
 ### Release readiness
 - **Per-feature settings and localization.** On/off settings for each feature and translatable text, for a wider audience.

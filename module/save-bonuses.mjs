@@ -48,6 +48,8 @@ const KEYWORDS = [
   [/\bparaly/, (e) => /paraly/i.test(e.text)],
   [/\bpolymorph/, (e) => e.subschools.has("polymorph")],
   [/\b(fire|cold|acid|electricity|sonic)\b/, (e, m) => e.descriptors.has(m[1])],
+  // Channel resistance: "+[[4]] to resist channel energy", including effects that rely on it (Command Undead)
+  [/\bchannel(?:ed)?\b/, (e) => /channel|command undead|turn undead/i.test(e.name)],
 ];
 // Words for the form of an effect rather than its kind
 const FORMS = [
@@ -96,7 +98,7 @@ function effectOf(card) {
 
 /** One line of a note, "+[[2]] Racial vs Poisons, Spells and Spell-likes" → { formula, type, parts } or null. */
 export function parseNote(line) {
-  const m = line.match(/([+-])?\s*\[\[\s*(.+?)\s*\]\]\s*([A-Za-z]+)?[^.\n]*?\b(?:vs\.?|against)\s+([^.\n]+)/i);
+  const m = line.match(/([+-])?\s*\[\[\s*(.+?)\s*\]\]\s*([A-Za-z]+)?[^.\n]*?\b(?:vs\.?|against|to resist)\s+([^.\n]+)/i);
   if (!m || SKIP_LINE.test(line)) return null;
   const formula = `${m[1] === "-" ? "-" : ""}(${m[2]})`;
   const type = TYPE_WORDS[(m[3] ?? "").toLowerCase()] ?? "untyped";

@@ -2,7 +2,7 @@
 // template's text, misspelled subtypes match, and two type-changing templates need a choice.
 
 import { createTestActor, fromPack, cleanup } from "./helpers.mjs";
-import { creatureTypes } from "../creature-types.mjs";
+import { creatureTypes, energyAsUndead } from "../creature-types.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 const NO_PROMPT = { pf1eRevampNoPrompt: true };
@@ -70,6 +70,14 @@ export function registerCreatureTypeTests(quench) {
           assert.isFalse(read.unresolved);
           assert.deepEqual([...read.types], ["undead"]);
           assert.equal(read.typeFrom, template(actor, "Zombie"));
+        });
+
+        it("negative energy affinity: a living creature reacts to energy as undead, but isn't undead", async () => {
+          const actor = await build("Quench Dhampir", [["pf1.races", "Human"]]);
+          assert.isFalse(energyAsUndead(actor));
+          await actor.createEmbeddedDocuments("Item", [{ name: "Negative Energy Affinity", type: "feat", system: { subType: "racial" } }], NO_PROMPT);
+          assert.isTrue(energyAsUndead(actor));
+          assert.isFalse(creatureTypes(actor).types.has("undead"));
         });
       });
     },
