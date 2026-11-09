@@ -160,6 +160,26 @@ When a ranged attack is made next to an enemy that can act, the card notes that 
 
 Not automated: wind and cover (the GM's call). Not yet automated: range changes that depend on something the module can't see (Strong Arm, Ki Range and similar), full attacks with thrown weapons, gunslinger deeds and misfires.
 
+## Bonuses against kinds of creatures
+Many racial traits, traits and feats give a bonus only against certain creatures: the dwarf's +1 on attack rolls against orcs and goblinoids, Defensive Training's +4 dodge bonus to AC against giants, a trait's +1 against evil creatures. PF1 prints these as reminders; PF1e Revamp applies them when the creature they name is involved:
+- **Attack rolls, weapon damage and combat maneuver checks**: against the attack's targets, in the roll window. Without a target, or against a creature that doesn't qualify, the bonus is listed under Not Applied with the reason, and can be ticked.
+- **Several targets**: when only some of them qualify, the roll goes without the bonus and the card shows each qualifying target's own attack total. Its extra damage is added when the card's damage is applied to that creature.
+- **AC and CMD**: against the attacker, in the target's AC on the attack card (seen by the GM and the target's owner). Dodge bonuses aren't added to flat-footed AC.
+- **Skill and ability checks**: against the single target.
+- **Saving throws**: against effects from that kind of creature ("+2 vs fear effects created by outsiders"), when the save is rolled from the effect's card.
+- **Choosing the creatures**: items that say to choose (pf-content's variant Hatred, Defensive Training, Lesser, Vengeful) ask when they're added; the choice can be changed from the item's note.
+- **Not applied automatically**: bonuses with a condition the module can't check (opposed checks, a specific combat maneuver, a critical hit, the terrain). They stay in the roll window to tick.
+
+Creatures are recognized by their type, subtypes and alignment, as described under [Creature types and templates](#creature-types-and-templates). A creature whose type is unknown gets no bonus until it's known.
+
+## Creature types and templates
+Spells that affect only certain creatures, channel energy, immunity to precision damage and similar rules depend on a creature's type and subtypes. PF1e Revamp reads them from the race and the creature's other items, and applies its monster templates as their rules text says:
+- **A template's type replaces the race's.** A half-fiend goblin is an outsider (native), not a humanoid, so *Hold Person* doesn't affect it. A template that gives the augmented subtype keeps the original type only as "augmented humanoid" for effects that name it.
+- **Subtypes follow the template's text.** Templates such as Zombie and Skeleton keep subtypes "except for alignment subtypes and subtypes that indicate kind". PF1e Revamp reads "kind" as species (giant, goblinoid, human, elf, orc and similar) and keeps trait and origin subtypes (elemental, cold, aquatic, native, incorporeal, shapechanger). The template's note lists the subtypes it dropped. To keep one, add it to the template's **Creature Subtypes** on its Details tab.
+- **Two templates that change the type**: a window asks which template sets it. Until one is chosen, the creature's type is unknown and rules that depend on it don't apply. The template's note has a button to choose again.
+- **Monsters with racial Hit Dice and no race** (many of PF1's bestiary monsters) take their type from the racial Hit Dice class.
+- **Subtypes typed by hand** match regardless of capitals, spaces and hyphens; PF1's misspelled "Reptillian" on kobolds and lizardfolk counts as reptilian.
+
 ## Energy resistance
 
 - **Resistances never stack.** Against the same energy, only the highest counts: racial fire resistance 5 and fire resistance 10 from a bloodline give **fire resistance 10**.

@@ -37,6 +37,8 @@ function wardFor(item) {
   if (item.type !== "buff") return null;
   return item.flags[MODULE_ID]?.ward ?? KNOWN_WARDS[item.name.toLowerCase()] ?? null;
 }
+/** Is this item a ward this module already applies (so its notes aren't applied a second time)? */
+export const isWard = (item) => !!wardFor(item);
 
 /** Is this change a flat copy of the ward's bonus (vs. everyone instead of vs. the alignment)? */
 function isFlatWardChange(c, w) {

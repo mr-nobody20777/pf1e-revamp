@@ -2,7 +2,12 @@
 
 ## Unreleased
 
+### New
+- **Bonuses against kinds of creatures.** Context notes such as the dwarf's "+1 Racial vs Humanoids (Orc, Goblinoid)", Defensive Training's "+4 Dodge vs Giants" or a trait's "+1 vs evil creatures" now apply on their own: attack rolls, weapon damage and combat maneuver checks against the targets, AC and CMD on the attack card against the attacker (dodge bonuses not in flat-footed AC), skill and ability checks against the target, and saves against effects from that kind of creature ("+2 vs fear effects created by outsiders"). When only some of several targets qualify, the roll goes without the bonus and the card gives each qualifying target its own total; its extra damage is added when the damage is applied to it. Bonuses with a condition the module can't check stay in the roll window as Not Applied, with the reason. Items that say to choose the creatures (pf-content's variant Hatred, Defensive Training, Lesser, Vengeful) ask for the choice when added, or from their note.
+
 ### Fixed
+- **Monster templates change a creature's type** instead of adding to it: a half-fiend goblin is an outsider (native), not also a humanoid, and a human zombie is undead without the human subtype. Each template's change follows its rules text, including the subtypes it keeps or drops; the template's note lists dropped subtypes, and adding one to the template's Creature Subtypes keeps it. When two templates change the type, a window asks which one sets it.
+- **Hand-typed subtypes match** regardless of capitals, spaces and hyphens, and PF1's misspelled "Reptillian" subtype (kobolds, lizardfolk) counts as reptilian.
 - **A sneak attack talent that isn't once a day no longer uses up a charge** when it was already the talent chosen last time.
 - **A longer condition now replaces a shorter one timed in rounds.** A condition applied by PF1 or another module in rounds was treated as permanent, so the spell's longer duration was dropped.
 - **Players see their own hidden token's row** on a spell card and can roll its save; other players still don't see it.

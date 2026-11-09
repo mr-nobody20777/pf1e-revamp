@@ -12,7 +12,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { esc, onGmRequest, classLevel, titleFor, saveResult } from "./util.mjs";
-import { creatureTypes } from "./resistance.mjs";
+import { creatureTypes } from "./creature-types.mjs";
 import { variantEffect, variantOf, variantsAllowed, chooseVariant, clearVariant, applyVariant, channelBonus, isVariantFeature, VARIANTS } from "./variant-channeling.mjs";
 
 const RADIUS = 30;

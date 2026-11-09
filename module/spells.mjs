@@ -46,7 +46,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { SPELLS } from "./spell-data.mjs";
-import { creatureTypes } from "./resistance.mjs";
+import { creatureTypes } from "./creature-types.mjs";
 import { compendiumBuff, nevelaAppliesBuff } from "./buff-grants.mjs";
 import { esc, evaluate, isActiveGM, onGmRequest, createQueue, tokenDistance, timed, saveResult } from "./util.mjs";
 import { isUndead } from "./channel-energy.mjs";

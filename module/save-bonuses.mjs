@@ -12,14 +12,17 @@
 // buffs) that target saving throws. A note is used when it reads like "+N <type> vs <effects>":
 //   - each part of "vs A, B and C" is one alternative; words in a part all have to match ("death
 //     spells" = death AND spell), and a part with no recognized word never matches.
-//   - notes about creatures ("vs evil creatures": alignment wards handle those), conditional notes
-//     ("when", "if", "once per day") and notes about existing effects or immunities are left alone.
+//   - notes about creatures ("vs evil creatures", "vs fear effects created by outsiders") count when the
+//     effect's source (the card's speaker) is such a creature (creature-types.mjs reads its type,
+//     subtypes and alignment); conditional notes ("when", "if", "once per day") and notes about
+//     existing effects or immunities are left alone.
 // Stacking follows PF1: racial, untyped, dodge and circumstance bonuses stack; other types use only
 // the highest, and only the part above the character's existing bonus of that type on that save.
 
 import { MODULE_ID } from "./const.mjs";
 import { evaluate } from "./util.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
+import { parseCreatures, matchesCreatures } from "./creature-types.mjs";
 
 // Words in a note → test against the effect
 const KEYWORDS = [
@@ -69,7 +72,7 @@ function tidyAgainst(text) {
   t = t.replace(/\s+incl$/i, "").replace(/[\s,;:]+$/, ""); // "diseases (incl. magical)" is cut at its period
   return t.length > 60 ? `${t.slice(0, 57).replace(/\s+\S*$/, "")}…` : t;
 }
-const TYPE_WORDS = {
+export const TYPE_WORDS = {
   racial: "racial", trait: "trait", morale: "morale", resistance: "resist", luck: "luck", sacred: "sacred", profane: "profane",
   competence: "competence", insight: "insight", circumstance: "circumstance", enhancement: "enh", dodge: "dodge", alchemical: "alchemical",
 };
@@ -97,10 +100,24 @@ export function parseNote(line) {
   if (!m || SKIP_LINE.test(line)) return null;
   const formula = `${m[1] === "-" ? "-" : ""}(${m[2]})`;
   const type = TYPE_WORDS[(m[3] ?? "").toLowerCase()] ?? "untyped";
+  // The creature the effect must come from: "vs evil creatures" (any of their effects), or "vs fear
+  // effects created by outsiders" (those effects, from that creature); checked against the effect's source
+  let vs = m[4];
+  let creatures = parseCreatures(tidyAgainst(vs));
+  if (creatures) vs = "";
+  else {
+    const c = vs.match(/\s*\b(?:created|cast|employed|used|inflicted|generated|produced)\s+by\s+(.+)$|\s*\bfrom\s+(.+)$/i);
+    const spec = c && parseCreatures(tidyAgainst(c[1] ?? c[2]));
+    if (spec) {
+      creatures = spec;
+      vs = vs.slice(0, c.index);
+    }
+  }
+  if (creatures && !vs.trim()) return { formula, type, parts: [], creatures, against: tidyAgainst(m[4]), conditional: false };
   // Split "A, B and C" keeping each part's joiner: in "charm spells and spell-like abilities" the
   // second part only names a form, so it inherits "charm" from the part before; a comma list
   // ("poison, spells, and spell-like abilities") names separate things.
-  const pieces = m[4].toLowerCase().split(/(\s*,\s*(?:and\s+|or\s+)?|\s+(?:and|or)\s+)/);
+  const pieces = vs.toLowerCase().split(/(\s*,\s*(?:and\s+|or\s+)?|\s+(?:and|or)\s+)/);
   const parts = [];
   let previous = null;
   for (let i = 0; i < pieces.length; i += 2) {
@@ -114,14 +131,15 @@ export function parseNote(line) {
     if (part.kinds.length || part.forms.length) parts.push(part);
     previous = part;
   }
-  return parts.length ? { formula, type, parts, against: tidyAgainst(m[4]), conditional: CONDITIONAL.test(m[4]) } : null;
+  return parts.length ? { formula, type, parts, creatures, against: tidyAgainst(m[4]), conditional: CONDITIONAL.test(vs) } : null;
 }
 
 /** A note's text as separate lines (notes often hold several, e.g. "+2 vs enchantment\nImmune to magic sleep"). */
-const noteLines = (text) => text.split(/\n|<br\s*\/?>|<\/p>/i).map((l) => l.replace(/<[^>]+>/g, " ").trim()).filter(Boolean);
+export const noteLines = (text) => text.split(/\n|<br\s*\/?>|<\/p>/i).map((l) => l.replace(/<[^>]+>/g, " ").trim()).filter(Boolean);
 
 /** Does any part of "vs A, B and C" describe this effect? (A bare "effects" never matches alone.) */
 function matches(parts, effect) {
+  if (!parts.length) return true; // a note about the source creature only ("vs evil creatures")
   return parts.some(({ kinds, forms }) => {
     if (!kinds.length && forms.every(([m]) => /effect/.test(m[0]))) return false;
     return [...kinds, ...forms].every(([m, test]) => test(effect, m));
@@ -129,7 +147,7 @@ function matches(parts, effect) {
 }
 
 /** Bonuses this actor gets on this save against this effect (any effect, without one), after stacking. */
-export function saveBonuses(actor, saveId, effect, { stack = true } = {}) {
+export function saveBonuses(actor, saveId, effect, { stack = true, source = null } = {}) {
   const candidates = [];
   // The race item and its racial trait items often state the same bonus in different words
   // (halfling "+2 vs fear" on the race and on Fearless): count it once.
@@ -142,12 +160,13 @@ export function saveBonuses(actor, saveId, effect, { stack = true } = {}) {
       for (const line of noteLines(note.text ?? "")) {
         const parsed = parseNote(line);
         if (!parsed || (effect && (parsed.conditional || !matches(parsed.parts, effect)))) continue;
+        if (effect && parsed.creatures && matchesCreatures(source, parsed.creatures) !== true) continue;
         const value = evaluate(parsed.formula, item);
         if (!value) continue;
         const key = `${value}|${parsed.type}`;
         if (racialSource && racialSeen.has(key)) continue;
         if (racialSource) racialSeen.add(key);
-        candidates.push({ value, type: parsed.type, label: item.name, against: parsed.against, conditional: parsed.conditional });
+        candidates.push({ value, type: parsed.type, label: item.name, against: parsed.against, conditional: parsed.conditional, creatures: !!parsed.creatures });
       }
     }
   }
@@ -168,13 +187,15 @@ export function saveBonuses(actor, saveId, effect, { stack = true } = {}) {
 registerRollEffect({
   collect(actor, roll) {
     if (roll.kind !== "save") return [];
-    const effect = effectOf(roll.reference ? fromUuidSync(roll.reference) : null);
+    const card = roll.reference ? fromUuidSync(roll.reference) : null;
+    const effect = effectOf(card);
+    const source = card ? ChatMessage.implementation.getSpeakerActor(card.speaker) : null;
     const id = (b) => `save-vs.${b.label}.${b.against}`;
-    const applied = effect ? saveBonuses(actor, roll.saveId, effect) : [];
+    const applied = effect ? saveBonuses(actor, roll.saveId, effect, { source }) : [];
     const out = applied.map((b) => ({ id: id(b), label: b.label, part: b.label, type: b.type, roll: b.value, applies: true, tooltip: `vs ${b.against}` }));
     const seen = new Set(out.map((b) => b.id));
     // Against this effect but beaten by a higher bonus of the same type (Bless's +1 morale vs fear beside +4 morale)
-    const matching = new Set(effect ? saveBonuses(actor, roll.saveId, effect, { stack: false }).map(id) : []);
+    const matching = new Set(effect ? saveBonuses(actor, roll.saveId, effect, { stack: false, source }).map(id) : []);
     for (const b of saveBonuses(actor, roll.saveId, null)) {
       if (seen.has(id(b))) continue;
       seen.add(id(b));

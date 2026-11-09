@@ -12,6 +12,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { esc, wrapMethod } from "./util.mjs";
+import { creatureTypes } from "./creature-types.mjs";
 
 const SETTING = "quickApplyResistance";
 const FROM_DIALOG = `${MODULE_ID}FromDialog`;
@@ -37,25 +38,6 @@ const isImmune = (types, immunities) => types.every((t) => immunities.has(t)) ||
 // oozes, elementals, incorporeal and amorphous creatures, and some shape-changing spells. Checked when
 // the damage is applied, so the attacker doesn't learn it before attacking.
 const PRECISION_IMMUNE_FORMS = /^(gaseous form|elemental body (iii|iv)|particulate form)$/i;
-/**
- * A creature's types and subtypes, lower case. From its race (and PF1's traits built from it); a monster with
- * racial Hit Dice and no race (PF1's bestiary: a Human Skeleton is "Undead" class levels) has its type only
- * in that class's name, which PF1 doesn't read, so it's taken from there.
- */
-export function creatureTypes(actor) {
-  const race = actor?.race?.system;
-  const traits = actor?.system?.traits;
-  const set = (field) => new Set([...(race?.[field]?.base ?? []), ...(race?.[field]?.total ?? []), ...(traits?.[field]?.total ?? [])].map((t) => String(t).toLowerCase()));
-  const types = set("creatureTypes");
-  if (!types.size) {
-    for (const cls of actor?.itemTypes?.class ?? []) {
-      if (cls.system.subType !== "racial") continue;
-      const key = Object.entries(pf1.config.creatureTypes ?? {}).find(([, v]) => String(v?.label ?? v).toLowerCase() === cls.name.toLowerCase())?.[0];
-      if (key) types.add(key.toLowerCase());
-    }
-  }
-  return { types, subtypes: set("creatureSubtypes") };
-}
 export const isIncorporeal = (actor) => !!actor?.statuses?.has("incorporeal") || creatureTypes(actor).subtypes.has("incorporeal");
 export function precisionImmune(actor) {
   if (!actor) return false;
@@ -152,7 +134,21 @@ function beforeRatio(damage, ratio) {
   return value;
 }
 
+// Damage that's part of the hit but only known per target (creature-bonuses.mjs: "+2 damage against
+// goblinoids" when only some targets were goblinoids). Added before the resistance below works from
+// the damage's value, whatever order the scripts load in.
+const additions = [];
+/** fn(actor, options) adds to options.value when damage is applied. */
+export function registerDamageAddition(fn) {
+  additions.push(fn);
+}
+
 Hooks.on("pf1ApplyDamage", (actor, options) => {
+  for (const fn of additions) fn(actor, options);
+  quickApplyResistance(actor, options);
+});
+
+function quickApplyResistance(actor, options) {
   if (!game.settings.get(MODULE_ID, SETTING)) return;
   if (options[FROM_DIALOG] || !(options.value > 0) || !options.instances?.length) return;
 
@@ -211,7 +207,7 @@ Hooks.on("pf1ApplyDamage", (actor, options) => {
     whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
     content: `<p><strong>${esc(actor.name)}</strong> resists ${reduced} damage${halving ? " (after halving)" : ""}: ${esc(notes.join(", "))}. Took ${took}.</p>`,
   });
-});
+}
 
 // Halved damage or healing never drops below 1: "if you wind up with a fraction, round down ...
 // Exception: Certain rolls, such as damage and hit points, have a minimum of 1." PF1 applies its ratio

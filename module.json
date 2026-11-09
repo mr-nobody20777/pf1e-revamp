@@ -87,6 +87,8 @@
     "module/two-weapon.mjs",
     "module/archetypes.mjs",
     "module/prereqs.mjs",
+    "module/creature-bonuses.mjs",
+    "module/creature-types.mjs",
     "module/resistance.mjs",
     "module/subclass.mjs"
   ],

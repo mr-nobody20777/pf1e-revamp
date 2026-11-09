@@ -21,10 +21,25 @@ Next, the focus moves to:
   - **Cover-dependent abilities** (with cover deferred): Improved Precise Shot, Pinpoint Targeting (its armor and shield part is done), Lob Shot, Low Profile, Combat Sandals, Volley Fire, Covered Sniper, veering weapons.
 - **Cantrips and 1st-level spells** (research: `docs/SPELLS-RESEARCH.md`). Done for the Core Rulebook, Advanced Player's Guide, Ultimate Magic and Ultimate Combat. Still to do:
   - **Other books**: the combat-relevant spells are done; what's left is mostly utility (skill bonuses in narrow situations). Spells whose effect depends on what the creature does (Coward's Cowl, Halfling Vengeance, Veil of Heaven, Burst of Adrenaline) need a design.
-  - **Effects that repeat**: Entangle's save at the end of each of the caster's turns while in the area, Grease's Acrobatics checks. Chill Touch's further touches (one per caster level).
+  - **Effects that repeat**: afflictions (poison, disease and curses: onset, the periodic save at each frequency interval, consecutive successful saves toward a cure, and stacking doses of the same poison), creatures entering or leaving a lasting area (emanations), Entangle's save at the end of each of the caster's turns while in the area, Grease's Acrobatics checks. Chill Touch's further touches (one per caster level).
   - **Higher-level spells**: they already get the rows (spell resistance and saves); their effects come after the 1st-level spells are complete.
 
 ## Planned
+
+### Shared engines (ranked by coverage)
+The design reference gives every feat, trait, class and archetype feature, racial trait, template, item and spell a rules checklist. Grouping those checklists by the mechanic they share shows which reusable engines would automate the most content. Counts are approximate (pattern matching over about 28,000 entries) and include only entries not automated yet.
+1. **Conditional bonuses** (about 3,400 entries). Phase 1 is done: bonuses against creature types, subtypes and alignments written as context notes (attack rolls, weapon damage, AC, CMD, combat maneuver, skill and ability checks, and saves against effects from a kind of creature). Remaining: bonuses with other conditions (opposed checks, critical hits, specific maneuvers, terrain), bonuses to spell DCs, caster level and spell resistance against a kind of creature (with the spells engine), items whose bonus has no context note (Creature Focus, Vengeful Banisher, Planewalker's Insight), and situational bonuses that don't name a creature. Absorbs Alignment-specific bonuses (Buffs and spells), Save bonuses against non-spell effects, and the unified rules layer (Interface).
+2. **Damage reduction, energy resistance and immunities granted by features** (about 2,200 entries). Extend the resistance engine and the `grants` flag so class features, archetype features, feats and templates add DR, resistance and immunities, scaling with level where the text says so.
+3. **Save-or-condition effects outside spells** (about 900 entries). Spells already get a row per creature with its save and outcome; give the same rows to class features, feats, items and monster abilities that impose a condition on a failed save ("Will or shaken for 1d4 rounds").
+4. **Healing, temporary hit points and fast healing** (about 900 entries). Reuse the channel energy application path for abilities that heal or grant temporary hit points, and track fast healing per turn.
+5. **Auras** (about 900 entries, a third of them monster abilities). Effects on creatures within a radius while the aura is active, updated as tokens move: bard and skald style bonuses, paladin auras, Foretell (Combat), and monster fear or stench auras.
+6. **On-hit riders** (about 730 entries). Extra damage dice, bleed, ability damage or a condition when an attack hits or a critical is confirmed. Generalize the sneak attack and bleed riders.
+7. **Combat maneuver modifiers** (about 730 entries). Bonuses to specific maneuvers and to CMD against them; largely a case of the conditional bonus engine.
+8. **Spell-like abilities granted** (about 700 entries). Create the spell-like ability entries (uses per day, caster level) when the feature, trait or racial trait is added.
+9. **Immediate-action reactions** (about 640 entries). Offer the reaction on the triggering event (being attacked, failing a save) with the cost and effect applied.
+10. **Activated buffs** (about 600 entries). Using the ability applies its bonus for its duration and spends the use or pool point; generalize the buff-grant engine.
+11. **Rerolls and rolling twice** (about 450 entries). Extend the next-roll engine to the remaining feats, class features and traits.
+12. **Afflictions** (about 370 entries). Already planned under Interface (Poisons and diseases) and Effects that repeat.
 
 ### Interface (from the PF2e design study, `docs/PF2E-UX-STUDY.md`)
 - **Spell cards (round 5 of the study).** Hide NPC save totals from players (they see saved or failed); a GM button that rolls every NPC row's save; the save margin in each row; a template helper (target enemies, allies or all inside a placed template, then remove it); retargeting a posted card; draggable condition links in the effect line.
@@ -56,12 +71,15 @@ Next, the focus moves to:
 - **Battle Scion: Song of Questing (10th level).** Described within the archetype's Raging Song and mostly narrative; consider listing it in the song picker as a reminder.
 
 ### Races
-- **Creature-type combat bonuses.** Hatred (+1 on attack rolls against certain subtypes) and Defensive Training (+4 dodge bonus to AC against giants, shown on attack cards like alignment wards). The same mechanism covers trait and feat bonuses against favored enemies.
 - **Elven Magic.** +2 on caster level checks to overcome spell resistance.
 - **Half-orc Ferocity.** Remain conscious below 0 hit points while staggered; must work alongside Nevela's dying and unconscious handling.
 - **Heritages that replace Base Statistics** (Sunsoul ifrit, angelkin aasimar and others) should swap the race's ability modifiers. They are currently marked "adjust by hand".
 
 ### Buffs and spells
+- **Evasion on spell rows.** Apply evasion and improved evasion automatically to Reflex-half rows (no damage on a successful save; half on a failure with improved evasion), only in light or no armor and not while helpless.
+- **Multi-ray spells.** Give each ray of scorching ray and similar spells its own attack roll and row, with a target per ray; damage bonuses and sneak attack apply to one ray only (Core Rulebook FAQ), and energy resistance to each.
+- **Summoning.** Place summoned creatures when a summoning spell is cast and remove them when it ends, is dispelled, or they drop to 0 hit points; spells they cast end with them. Choosing the creature, its statistics and duration make this a feature of its own. Prior art to study: PF2e Summons Assistant (ChasarooniZ/pf2e-summons-assistant), built on the Foundry Summons module.
+- **Held touch spell charges.** A touch spell not discharged in the round it is cast is held until the caster touches something, even by accident, or casts another spell. Show a reminder on the caster while a charge is held, naming the spell and what ends it; touching an enemy in a later round is a standard action and can't be part of a full attack (Core Rulebook FAQ).
 - **Alignment-specific bonuses** using the existing ward engine: *Dispel Evil/Good/Law/Chaos* (+4 deflection against that alignment), *Angelic Aspect, Lesser*, and the "against evil" part of *Halo*.
 - **Next-roll penalties** using the existing next-roll engine: *Bungle* (−20 on the next roll), *Ill Omen* and *Misfortune* (roll twice and take the worse result, for a number of rolls).
 - **Missing buffs:** *Freedom of Movement*, *Shield Other* (half the damage transferred to the caster, which can be automated), *False Life*, *Deathless*, *Transformation*, *Lesser Spell Immunity*.
@@ -74,8 +92,12 @@ Next, the focus moves to:
 
 ## Backlog
 
+### Separate projects
+- **Creature Builder (separate module).** Conditional bonuses ("+1 on attack rolls against goblinoids", "+2 against evil creatures") depend on accurate creature types, subtypes and alignment, and NPC sheets built by hand often lack them: a new NPC defaults to true neutral, and some compendium NPCs have no race at all. A separate module would build NPC sheets from stat blocks, PDFs and JSON, and require the values that rules automation depends on (type, subtypes, alignment, templates) before the sheet is created. The existing PF1 Statblock Converter already parses stat blocks and should be evaluated as a starting point.
+
 ### Content coverage
 - **Foundry vs. Archives of Nethys.** Compare the number of entries per category in Foundry's compendiums with Archives of Nethys to find published content missing from Foundry; content must exist as an item before it can be automated. Reference counts (2026-10-23, about 45,000 entries including about 32,000 items): class features 11,598; feats 3,644; spells 3,111; traits 2,045; racial traits 1,677; archetypes 1,268; prestige classes 119; races 85; base classes 49; equipment about 7,000; monster rules about 2,350; buffs 344; monster and NPC stat blocks 10,387 (journals), 427 actors and 92 traps and haunts.
+- **Hero points (optional rule).** Hero points (Advanced Player's Guide) have no rules entry in the design reference yet. Add one covering how they are earned, spent and capped, then link the feats, class features, racial traits and items that grant or spend them, such as Reaver's Scythe, which grants 1 hero point on a kill that is lost if unused within 1 hour.
 
 ### Interface research
 - **Continue the PF2e comparison.** The study (`docs/PF2E-UX-STUDY.md`) covers the character sheet, level-up, roll windows, chat cards, spells and abilities, and the effects panel. Remaining: how item sheets present their rules.
@@ -89,10 +111,18 @@ Next, the focus moves to:
 - **Test tooling.** Nevela's Automation Suite cancels targeted buff spells (such as *Haste*) cast without a target, so tests that cast spells must set a target or use a non-buff spell.
 
 ### Known issues
+- **Lullaby and Hypnotism affect undead and constructs.** Both affect living creatures only, but their spell entries don't mark them as living-only.
+- **Faerie fire doesn't remove miss chances.** Outlined creatures lose concealment from blur, displacement, invisibility and darkness (except 2nd-level or higher magical darkness), but miss chances are still rolled against them.
+- **Nauseating Dart has no attack roll.** It needs a normal ranged attack against full AC, as with a blowgun dart; the nausea currently applies on a failed save even when the dart would have missed.
+- **Blindsight and Improved Precise Shot don't cancel miss chances.** Creatures with blindsight ignore invisibility, darkness and most concealment within range; Improved Precise Shot ignores anything less than total concealment. Both still see miss chances rolled.
+- **All-around vision doesn't prevent flanking.** Creatures with it can't be flanked, so flanking them shouldn't enable sneak attack.
+- **Channel resistance isn't applied.** Its bonus should be added to saves against channel energy and effects that rely on it.
+- **Negative energy affinity isn't reversed.** Living creatures with it (dhampirs and others) are healed by negative energy and harmed by positive energy, like undead; cure and inflict spells and channel energy treat them as living.
+- **Snap Shot archers don't threaten.** With Snap Shot, an archer threatens squares within 5 feet (more with Improved Snap Shot), which affects flanking and the warning for shooting while threatened. The Snap Shot feat is also missing from the installed compendiums (only the rogue talent of the same name exists).
 - **Channel Energy refunds.** When a channel is cancelled or the cleric has no token, the use is refunded, but PF1's chat card still shows the uses remaining before the refund.
 
 ### Release readiness
 - **Per-feature settings and localization.** On/off settings for each feature and translatable text, for a wider audience.
 - **Foundry package listing.** Foundry's AI policy requires human-written item and description text for a listing on foundryvtt.com.
 - **Documentation.** Keep the wiki (`wiki/`, published to the repository wiki) current with every feature.
-- **Next performance review** after ten more features (0 of 10 so far). Review #3 was completed on 2026-10-24.
+- **Next performance review** after ten more features (1 of 10 so far). Review #3 was completed on 2026-10-24.

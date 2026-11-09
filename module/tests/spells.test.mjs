@@ -7,7 +7,7 @@ import { settled } from "../util.mjs";
 import { SPELLS } from "../spell-data.mjs";
 import { _test as effects } from "../roll-effects.mjs";
 import { nevelaApplies, nevelaAppliesBuff } from "../buff-grants.mjs";
-import { creatureTypes } from "../resistance.mjs";
+import { creatureTypes } from "../creature-types.mjs";
 import { isUndead } from "../channel-energy.mjs";
 
 const MODULE_ID = "pf1e-revamp";
