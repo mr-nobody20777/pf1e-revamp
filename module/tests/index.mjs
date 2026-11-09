@@ -33,6 +33,7 @@ import { registerCreatureTypeTests } from "./creature-types.test.mjs";
 import { registerCreatureBonusTests } from "./creature-bonuses.test.mjs";
 import { registerAbilitySaveTests } from "./ability-saves.test.mjs";
 import { registerFastHealingTests } from "./fast-healing.test.mjs";
+import { registerAuraTests } from "./auras.test.mjs";
 
 export function registerTests(quench) {
   registerTwoWeaponTests(quench);
@@ -46,6 +47,7 @@ export function registerTests(quench) {
   registerCreatureBonusTests(quench);
   registerAbilitySaveTests(quench);
   registerFastHealingTests(quench);
+  registerAuraTests(quench);
   registerQuarryTests(quench);
   registerTrueStrikeTests(quench);
   registerMissChanceTests(quench);

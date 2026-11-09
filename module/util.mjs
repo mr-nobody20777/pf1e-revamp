@@ -136,13 +136,23 @@ Hooks.on("createChatMessage", (message) => {
   for (const [key, handler] of gmHandlers) if (flags[key] !== undefined) handler(message, flags[key]);
 });
 
-/** Distance between the nearest squares two tokens occupy (large creatures fill several), or null. */
+/**
+ * Distance between the nearest squares two tokens occupy (large creatures fill several), or null. Takes
+ * tokens or token documents (a scene that isn't on screen); positions are the documents' final ones, not
+ * mid-animation.
+ */
 export function tokenDistance(a, b) {
   if (!a || !b) return null;
-  if (canvas.grid.isGridless) return canvas.grid.measurePath([a.center, b.center]).distance;
-  const cells = (t) => t.document.getOccupiedGridSpaceOffsets().map((o) => canvas.grid.getCenterPoint(o));
+  const docA = a.document ?? a;
+  const docB = b.document ?? b;
+  const grid = docA.parent?.grid ?? canvas.grid;
+  if (grid.isGridless) {
+    const center = (d) => ({ x: d.x + (d.width * grid.size) / 2, y: d.y + (d.height * grid.size) / 2 });
+    return grid.measurePath([center(docA), center(docB)]).distance;
+  }
+  const cells = (d) => d.getOccupiedGridSpaceOffsets().map((o) => grid.getCenterPoint(o));
   let best = Infinity;
-  for (const p of cells(a)) for (const q of cells(b)) best = Math.min(best, canvas.grid.measurePath([p, q]).distance);
+  for (const p of cells(docA)) for (const q of cells(docB)) best = Math.min(best, grid.measurePath([p, q]).distance);
   return best;
 }
 

@@ -180,6 +180,15 @@ Spells that affect only certain creatures, channel energy, immunity to precision
 - **Monsters with racial Hit Dice and no race** (many of PF1's bestiary monsters) take their type from the racial Hit Dice class.
 - **Subtypes typed by hand** match regardless of capitals, spaces and hyphens; PF1's misspelled "Reptillian" on kobolds and lizardfolk counts as reptilian.
 
+## Auras
+Auras give their effect to the creatures within their radius as a buff named for the aura and its bearer ("Aura of Courage (Seelah)"), added and removed as tokens move, are hidden or leave the scene. The active GM's client keeps them in sync, so a GM must be connected.
+- **Covered:** Aura of Courage, Resolve and Righteousness (paladin); Aura of Cowardice, Despair and Depravity (antipaladin); Foretell and Aura of Despair (wizard); Aura of Heroism, Aura of Protection (domain power and warpriest blessing) and Aura of Menace (cleric).
+- **Who:** allies or enemies by token disposition (friendly and hostile are enemies of each other; neutral tokens are neither). "Allies" includes the bearer. Paladin and antipaladin auras work only while the bearer is conscious. The enchanter's Aura of Despair is mind-affecting, so mindless creatures, undead, constructs and plants ignore it.
+- **Stacking:** two creatures with the same aura give one buff, from the higher level. Aura of Despair and Aura of Cowardice together give −4 on saves against fear, not −6.
+- **Auras used in rounds per day** start from the feature's Use button (or the button in its note). The window asks how many rounds to spend and, for Foretell, whether to aid allies or hinder enemies. The bearer gets a buff for the aura; turning it off or deleting it ends the aura and gives back the rounds not yet used (the round in progress counts as used). Using the feature again replaces the running aura.
+- **Leaving someone out:** turn off a creature's aura buff; it stays off until the creature leaves the aura. A deleted aura buff comes back while the creature is still inside.
+- **Not yet:** the bearer's own benefits (fear immunity, DR), Foretell's bonus on caster level checks (add it by hand), and auras that force saves or deal damage.
+
 ## Fast healing and regeneration
 A creature with fast healing or regeneration heals at the start of each of its turns in combat, once a round (stepping the tracker back and forward doesn't heal it twice). The amount comes from the sheet's Fast Healing and Regeneration fields, items named for them ("Fast Healing 5", "Regeneration 10 (fire)"), and the buffs of Infernal Healing and Celestial Healing. Nonlethal damage heals too if PF1's dual-heal setting is on.
 - **Regeneration** is stopped for the creature's next turn by damage of a type in its entry ("5 (acid, fire)"), when that damage is applied with its type through PF1. Its line says when it can die normally.

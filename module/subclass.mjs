@@ -534,12 +534,12 @@ function addTrait(trait, type) {
   else if (Array.isArray(trait?.value) && !trait.value.includes(type)) trait.value.push(type);
 }
 
-// Runs on every actor preparation: only feats carry grants, and the flag is read directly
-// (getFlag validates its scope on every call).
+// Runs on every actor preparation: only feats (class features) and buffs (auras.mjs) carry grants, and
+// the flag is read directly (getFlag validates its scope on every call).
 Hooks.on("pf1PrepareDerivedActorData", (actor) => {
   const traits = actor.system.traits;
   if (!traits) return;
-  for (const item of actor.itemTypes?.feat ?? []) {
+  for (const item of [...(actor.itemTypes?.feat ?? []), ...(actor.itemTypes?.buff ?? [])]) {
     if (!item.flags[MODULE_ID]?.grants) continue;
     for (const grant of activeGrants(item)) {
       if (grant.trait === "eres") {

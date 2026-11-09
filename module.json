@@ -75,6 +75,7 @@
     "module/studied-target.mjs",
     "module/bleed.mjs",
     "module/fast-healing.mjs",
+    "module/auras.mjs",
     "module/sneak-talents.mjs",
     "module/sneak-attack.mjs",
     "module/fortification.mjs",

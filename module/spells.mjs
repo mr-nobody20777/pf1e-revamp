@@ -161,6 +161,16 @@ Hooks.on("preCreateChatMessage", (message) => {
   });
 });
 
+/**
+ * Immune to mind-affecting effects: by its immunities, as undead or a construct, as a plant (whatever its
+ * Intelligence), or mindless (no Intelligence score: vermin, oozes).
+ */
+export function mindAffectingImmune(actor, types = creatureTypes(actor).types) {
+  const ci = actor.system.traits?.ci?.total ?? new Set();
+  const int = actor.system.abilities?.int?.value;
+  return ci.has("mindAffecting") || types.has("undead") || types.has("construct") || types.has("plant") || int == null || int === 0;
+}
+
 /** Why the creature can't be affected (GM-only text), or null. */
 function unaffectedBy(def, actor, spell) {
   const { types, subtypes } = creatureTypes(actor);
@@ -180,9 +190,7 @@ function unaffectedBy(def, actor, spell) {
   }
   const ci = actor.system.traits?.ci?.total ?? new Set();
   const descriptors = new Set(spell.descriptors);
-  const mindless = actor.system.abilities?.int?.value == null || actor.system.abilities.int.value === 0;
-  // Plants are immune whatever their Intelligence; vermin and oozes because they're mindless
-  if (descriptors.has("mindAffecting") && (ci.has("mindAffecting") || undeadOrConstruct || mindless || types.has("plant"))) return "immune to mind-affecting effects";
+  if (descriptors.has("mindAffecting") && mindAffectingImmune(actor, types)) return "immune to mind-affecting effects";
   if (descriptors.has("fear") && ci.has("fear")) return "immune to fear";
   if (descriptors.has("death") && ci.has("deathEffects")) return "immune to death effects";
   if (spell.save === "fort" && !spell.harmless && !spell.objectSave && undeadOrConstruct) return "undead and constructs ignore Fortitude effects";
