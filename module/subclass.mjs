@@ -5,14 +5,12 @@
 //     the character already qualifies for. Powers are found by explicit link, by tag, or by the
 //     names in the subclass text, in PF1's class abilities and this module's Class Features pack
 //     (which holds powers PF1 lacks, like the Solar bloodline's).
-//   - Trait grants: features with flags["pf1e-revamp"].grants add energy resistance, damage
-//     immunity or condition immunity to the character while it's prepared (nothing is written to
-//     the actor, so removing the feature removes the trait).
+//   - Trait grants (flags["pf1e-revamp"].grants: resistance and immunities) are applied by defenses.mjs.
 //   - Bloodline arcana: extra damage per die for spells with a given descriptor.
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { evaluate, classLevel, itemsFromSource, classFlagUpdate, createClassFeatures, esc, norm, plainText, openLink, addSearch, isActiveGM, titleFor } from "./util.mjs";
+import { itemsFromSource, classFlagUpdate, createClassFeatures, esc, norm, plainText, openLink, addSearch, isActiveGM, titleFor } from "./util.mjs";
 import { variantsAllowed, variantOptions, setVariant, VARIANTS } from "./variant-channeling.mjs";
 import { checkPrerequisites } from "./prereqs.mjs";
 import { promptOpposition, specialtyOf } from "./opposition-schools.mjs";
@@ -497,86 +495,6 @@ registerFootnote((item) => {
     );
   }
   return content;
-});
-
-/* -------------------------------------------- */
-/*  Trait grants (resistances, immunities)      */
-/* -------------------------------------------- */
-
-const TRAIT_LABELS = { eres: "resistance", di: "immunity", ci: "immunity" };
-
-/**
- * Grants active at the item's class level. This runs on every actor preparation, so it reads the
- * class level directly and evaluates amounts against a tiny roll data object, never the item's
- * full roll data.
- */
-// Grant amounts depend only on formula and class level; a handful of entries at most.
-const amountCache = new Map();
-
-function activeGrants(item) {
-  const flags = item.flags[MODULE_ID];
-  const grants = flags?.grants;
-  if (!grants?.length || !item.isActive) return [];
-  const fallbackTag = (flags.levelFormula ?? "").match(/@classes\.(\w+)\.level/)?.[1] ?? "sorcerer";
-  const level = classLevel(item, fallbackTag);
-  const amount = (formula) => {
-    const key = `${formula}|${level}`;
-    if (!amountCache.has(key)) amountCache.set(key, evaluate(formula, item, { class: { level }, classes: { [fallbackTag]: { level } } }));
-    return amountCache.get(key);
-  };
-  return grants
-    .filter((g) => level >= (g.minLevel ?? 0) && level <= (g.maxLevel ?? Infinity))
-    .map((g) => ({ ...g, amount: g.amount ? amount(g.amount) : null }));
-}
-
-function addTrait(trait, type) {
-  if (trait?.standard instanceof Set) trait.standard.add(type);
-  else if (Array.isArray(trait?.value) && !trait.value.includes(type)) trait.value.push(type);
-}
-
-// Runs on every actor preparation: only feats (class features) and buffs (auras.mjs) carry grants, and
-// the flag is read directly (getFlag validates its scope on every call).
-Hooks.on("pf1PrepareDerivedActorData", (actor) => {
-  const traits = actor.system.traits;
-  if (!traits) return;
-  for (const item of [...(actor.itemTypes?.feat ?? []), ...(actor.itemTypes?.buff ?? [])]) {
-    if (!item.flags[MODULE_ID]?.grants) continue;
-    for (const grant of activeGrants(item)) {
-      if (grant.trait === "eres") {
-        traits.eres ??= { value: [], custom: "" };
-        traits.eres.value ??= [];
-        const existing = traits.eres.value.find((e) => e.types?.includes(grant.type));
-        if (existing) existing.amount = Math.max(existing.amount ?? 0, grant.amount);
-        else traits.eres.value.push({ amount: grant.amount, operator: true, types: [grant.type, ""] });
-      } else {
-        addTrait(traits[grant.trait], grant.type);
-      }
-    }
-  }
-  // Energy resistances don't stack: of several against the same single energy type (a granted one
-  // and one typed in by hand, say), only the highest is kept, so PF1's Apply Damage dialog can't
-  // apply both.
-  const eres = traits.eres?.value;
-  if (eres?.length > 1) {
-    const best = new Map();
-    const multi = [];
-    for (const entry of eres) {
-      const types = (entry.types ?? []).filter(Boolean);
-      if (types.length !== 1) multi.push(entry);
-      else if (!best.has(types[0]) || (entry.amount ?? 0) > (best.get(types[0]).amount ?? 0)) best.set(types[0], entry);
-    }
-    if (best.size + multi.length < eres.length) traits.eres.value = [...best.values(), ...multi];
-  }
-});
-
-registerFootnote((item) => {
-  const grants = item.getFlag(MODULE_ID, "grants");
-  if (!grants?.length) return null;
-  if (!item.actor) return [`Grants are applied automatically as the character levels: ${grants.map((g) => `${g.type} ${TRAIT_LABELS[g.trait]}`).join(", ")}.`];
-  const active = activeGrants(item);
-  return [
-    `Applied automatically: ${active.map((g) => `${g.type} ${TRAIT_LABELS[g.trait]}${g.amount ? ` ${g.amount}` : ""}`).join(", ") || "nothing at this level"}.`,
-  ];
 });
 
 /* -------------------------------------------- */

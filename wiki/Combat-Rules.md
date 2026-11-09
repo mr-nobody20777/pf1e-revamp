@@ -194,10 +194,19 @@ A creature with fast healing or regeneration heals at the start of each of its t
 - **Regeneration** is stopped for the creature's next turn by damage of a type in its entry ("5 (acid, fire)"), when that damage is applied with its type through PF1. Its line says when it can die normally.
 - **A dead creature** doesn't heal. Out of combat, healing over time is left to the GM.
 
+## Damage reduction, resistances and immunities from features
+PF1's class features and templates mostly describe their DR, resistances and immunities in text only. PF1e Revamp gives them to the creature, at its level or Hit Dice, and the feature's note says what it gives right now.
+- **Covered:** barbarian and bloodrager Damage Reduction; the Energy Resistance rage power (while raging); Armor Mastery (in armor or with a shield); monk Diamond Body, Purity of Body and Perfect Self; paladin Divine Health, the immunities and DR of Aura of Courage, Resolve and Righteousness, and Holy Champion; antipaladin Aura of Depravity and Unholy Champion; Venom Immunity and Poison Immunity; sorcerer bloodline resistances, Death's Gift and the 20th-level powers; the Celestial, Fiendish, Entropic, Resolute, Shadow Creature, Half-Celestial, Half-Fiend, Vampire, Lich, Skeleton and Zombie templates.
+- **"Your energy type"** (Draconic and Elemental bloodlines, the Energy Resistance rage power) is asked when the power is added, and can be changed from its note.
+- **Only the best DR counts.** "If a creature has damage reduction from more than one source, the two forms of damage reduction do not stack." DR 5/— and DR 10/magic stop 10 from a mundane sword, not 15; against a +1 sword, DR 5/— is the one that counts.
+- **Death's Gift** gives DR 5/— (10/— at 9th level) against nonlethal damage only; the Apply Damage dialog lists it as "(nonlethal only)".
+- **Charm and compulsion immunity** (Aura of Resolve, Aura of Righteousness) make the spell rows skip charm and compulsion spells; PF1 has no option for them, so they don't show on the sheet.
+- **Silver:** an alchemical silver weapon gets past DR/silver.
+
 ## Energy resistance
 
 - **Resistances never stack.** Against the same energy, only the highest counts: racial fire resistance 5 and fire resistance 10 from a bloodline give **fire resistance 10**.
-- **Damage applied from the card is reduced too.** PF1 only applies resistance through its Apply Damage dialog; PF1e Revamp also reduces damage applied straight from a card's buttons, and tells the target's owner and the GM what was resisted. This is a setting, on by default.
+- **Damage applied from the card is reduced too.** PF1 only applies resistance and damage reduction through its Apply Damage dialog; PF1e Revamp also reduces damage applied straight from a card's buttons (DR with the weapon's material, alignment and enhancement, as the dialog does), and tells the target's owner and the GM what was stopped. This is a setting, on by default.
 - **Halving comes first.** A save for half is applied before resistance (20 fire, halved to 10, against resistance 10 is fully resisted). There's no official ruling; this is the common reading and the more favorable one for the creature.
 - **Precision and nonlethal immunity** stop damage that has another type as well ("piercing, precision"), which PF1 alone doesn't.
 - **Sources:** racial traits, bloodline powers and anything PF1 already tracks. With Nevela's Automation Suite, its Resist Energy and Protection from Energy work alongside.

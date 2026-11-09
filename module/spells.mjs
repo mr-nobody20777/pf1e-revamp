@@ -52,6 +52,7 @@ import { SPELLS } from "./spell-data.mjs";
 import { abilityDef } from "./ability-effects.mjs";
 import { creatureTypes, energyAsUndead } from "./creature-types.mjs";
 import { compendiumBuff, nevelaAppliesBuff } from "./buff-grants.mjs";
+import { immunitiesOf } from "./defenses.mjs";
 import { esc, evaluate, isActiveGM, onGmRequest, createQueue, tokenDistance, timed, saveResult } from "./util.mjs";
 import { registerFootnote } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
@@ -193,6 +194,9 @@ function unaffectedBy(def, actor, spell) {
   if (descriptors.has("mindAffecting") && mindAffectingImmune(actor, types)) return "immune to mind-affecting effects";
   if (descriptors.has("fear") && ci.has("fear")) return "immune to fear";
   if (descriptors.has("death") && ci.has("deathEffects")) return "immune to death effects";
+  // Paladin auras: "immune to charm spells and spell-like abilities", "immunity to compulsion spells and spell-like abilities"
+  const immune = immunitiesOf(actor);
+  for (const sub of ["charm", "compulsion"]) if (immune.has(sub) && spell.subschools?.includes(sub)) return `immune to ${sub} spells`;
   if (spell.save === "fort" && !spell.harmless && !spell.objectSave && undeadOrConstruct) return "undead and constructs ignore Fortitude effects";
   return null;
 }
@@ -227,7 +231,7 @@ async function resolveCard(message) {
   if (data.sr === null) data.sr = !!source?.system.sr;
   // A scroll, wand or potion of a spell with no save, no entry and no spell resistance: nothing to show
   if (!def && !data.save && !data.sr) return message.unsetFlag(MODULE_ID, FLAG);
-  const spell = { name: data.name, descriptors: [...(source?.system.descriptors?.total ?? source?.system.descriptors?.base ?? [])], save: data.save?.type, harmless: data.harmless, objectSave: data.objectSave };
+  const spell = { name: data.name, descriptors: [...(source?.system.descriptors?.total ?? source?.system.descriptors?.base ?? [])], subschools: data.ability ? [] : [...(source?.system.subschool?.base ?? [])], save: data.save?.type, harmless: data.harmless, objectSave: data.objectSave };
   let attack = message.systemRolls?.attacks?.[0]?.attack ?? null;
   // PF1's data for some touch spells has no attack roll (Chill Touch): roll it here
   const needsTouch = data.touch && data.rows.some((r) => !accepts(data, r, caster));

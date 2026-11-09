@@ -92,7 +92,8 @@
     "module/creature-bonuses.mjs",
     "module/creature-types.mjs",
     "module/resistance.mjs",
-    "module/subclass.mjs"
+    "module/subclass.mjs",
+    "module/defenses.mjs"
   ],
   "packs": [
     {

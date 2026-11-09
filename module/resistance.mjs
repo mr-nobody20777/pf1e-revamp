@@ -1,9 +1,10 @@
-// Energy resistance and immunity on quick-applied damage. PF1 only applies resistances through its
-// Apply Damage dialog; the quick path (applying straight from a chat card) applies the full amount.
+// Energy resistance, immunity and damage reduction on quick-applied damage. PF1 only applies them through
+// its Apply Damage dialog; the quick path (applying straight from a chat card) applies the full amount.
 // This reduces each damage instance by the target's best matching energy resistance, or ignores it
 // entirely if the target is immune to all of its types (or to precision or nonlethal damage it carries),
-// and whispers what happened. The dialog path is left alone, since the dialog already handles
-// resistances (its precision/nonlethal immunity is corrected below).
+// takes off the target's DR as PF1's dialog works it out for that attack (weapon material, alignment and
+// enhancement; only the best DR, see defenses.mjs), and whispers what happened. The dialog path is left
+// alone, since the dialog already handles them (its precision/nonlethal immunity is corrected below).
 //
 // Order: the rules don't say whether a save for half or resistance comes first (no FAQ). Following the
 // usual table reading and the guideline of applying effects in the order most favorable to the creature,
@@ -13,14 +14,15 @@
 import { MODULE_ID } from "./const.mjs";
 import { esc, wrapMethod } from "./util.mjs";
 import { creatureTypes } from "./creature-types.mjs";
+import { hasConditionalDR } from "./defenses.mjs";
 
 const SETTING = "quickApplyResistance";
 const FROM_DIALOG = `${MODULE_ID}FromDialog`;
 
 Hooks.once("init", () => {
   game.settings.register(MODULE_ID, SETTING, {
-    name: "Apply energy resistance on quick damage",
-    hint: "PF1 only applies energy resistance and immunity through its Apply Damage dialog. When on, damage applied straight from a chat card is also reduced by the target's matching resistance or immunity.",
+    name: "Apply resistance and DR on quick damage",
+    hint: "PF1 only applies energy resistance, immunity and damage reduction through its Apply Damage dialog. When on, damage applied straight from a chat card is also reduced by the target's matching resistance, immunity or damage reduction.",
     scope: "world",
     config: true,
     type: Boolean,
@@ -171,12 +173,11 @@ function quickApplyResistance(actor, options) {
     resistances,
     immunities: [...immunities],
   });
-  if (!amounts) return; // several damage types and no way to tell how much is which: left to the GM
-
-  const shares = proportional(amounts, total);
   let reduced = 0;
   const notes = [];
-  options.instances.forEach((instance, i) => {
+  // Several damage types and no way to tell how much is which: energy resistance is left to the GM
+  const shares = amounts ? proportional(amounts, total) : [];
+  if (amounts) options.instances.forEach((instance, i) => {
     const types = [...(instance.types ?? [])];
     const share = shares[i] ?? 0;
     if (!types.length || share <= 0) return;
@@ -194,6 +195,9 @@ function quickApplyResistance(actor, options) {
       notes.push(`${types.join("/")} resistance ${best} (−${r})`);
     }
   });
+  const dr = amounts ? quickDR(actor, options, amounts, ratio) : { amount: 0, notes: [] };
+  reduced = Math.min(total, reduced + dr.amount);
+  notes.push(...dr.notes);
   if (!reduced) return;
 
   // PF1 still applies its ratio after this hook, and later hooks may read it to see the target saved:
@@ -207,6 +211,33 @@ function quickApplyResistance(actor, options) {
     whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
     content: `<p><strong>${esc(actor.name)}</strong> resists ${reduced} damage${halving ? " (after halving)" : ""}: ${esc(notes.join(", "))}. Took ${took}.</p>`,
   });
+}
+
+/**
+ * The damage the target's DR stops on a quick-applied hit, worked out by PF1's own dialog without showing it
+ * (its weapon material, alignment and enhancement checks, plus this module's best-DR rule), on the damage
+ * after halving. Physical damage only; energy resistance is handled above.
+ */
+function quickDR(actor, options, amounts, ratio) {
+  const none = { amount: 0, notes: [] };
+  const traits = actor.system.traits?.dr;
+  if (!traits?.value?.length && !traits?.custom && !hasConditionalDR(actor)) return none;
+  // Each instance's own amount (PF1's quick path drops them; amountsOf works them out)
+  const instances = options.instances.map((i, n) => {
+    const part = new pf1.models.action.DamagePartModel(i.toObject?.() ?? pf1.utils.deepClone(i));
+    part.value = amounts[n] ?? 0;
+    return part;
+  });
+  if (!instances.some((i) => i.value > 0)) return none; // no per-type amounts to work from
+  const app = new pf1.applications.ApplyDamage({ value: options.value, instances, action: options.action, targets: [actor], critMult: options.critMult, asNonlethal: options.asNonlethal });
+  const target = app.targets.get(actor.uuid);
+  if (!target) return none;
+  if (ratio !== 1) {
+    target.ratio = ratio;
+    app._refreshTarget(actor.uuid);
+  }
+  const used = (target.dr ?? []).filter((e) => e.active && Number.isFinite(e.available) && e.value > e.available);
+  return { amount: target.reduction?.physical ?? 0, notes: used.map((e) => `DR ${e.label} (−${e.value - e.available})`) };
 }
 
 // Halved damage or healing never drops below 1: "if you wind up with a fraction, round down ...
