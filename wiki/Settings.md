@@ -4,7 +4,7 @@ Under **Game Settings → Configure Settings → PF1e Revamp**. Most are world s
 
 | Setting | Default | What it does |
 |---|---|---|
-| **Apply energy resistance on quick damage** | On | PF1 only applies energy resistance through its Apply Damage dialog. When on, damage applied straight from a chat card is reduced too, and the target's owner and the GM get a private note of what was resisted. Turn it off if another module already does this. |
+| **Apply resistance and DR on quick damage** | On | PF1 only applies energy resistance, immunity and damage reduction through its Apply Damage dialog. When on, damage applied straight from a chat card is reduced too (DR with the weapon's material, alignment and enhancement), and the target's owner and the GM are told what was stopped. |
 | **Track loaded ranged weapons** | Off | Crossbows, slings and firearms track their loaded shots. An empty weapon can't fire until it's reloaded with the Reload button, and a full attack gets only the loaded shots. See [Combat Rules](Combat-Rules#loaded-weapons-optional). |
 | **Shield bashes use martial weapon proficiency** | On | Shields are martial weapons when used to bash, but PF1 gives every shield bash the −4 non-proficiency penalty. When on, characters proficient with martial weapons bash without it. |
 | **Variant channeling (optional rule)** | Off | *Ultimate Magic*'s variant channeling. When on, new clerics choose standard channel energy or a portfolio variant in the level-up window, and existing channelers can choose once from Channel Energy's note. See [Classes](Classes#variant-channeling-optional-rule). |

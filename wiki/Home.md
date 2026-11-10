@@ -7,7 +7,7 @@ PF1e Revamp makes Pathfinder 1e content in Foundry VTT work the way its rules te
 | Page | Covers |
 |---|---|
 | [Spells and Buffs](Spells-and-Buffs) | Spells on their targets (saves, spell resistance, effects), miss chances, alignment wards, one-roll buffs |
-| [Combat Rules](Combat-Rules) | Sneak attack, ranged combat, fortification, bleed, save bonuses, energy resistance |
+| [Combat Rules](Combat-Rules) | Sneak attack, ranged combat, auras, damage reduction and resistances, bonuses against kinds of creatures, creature types, fast healing, fortification, bleed, save bonuses |
 | [Classes](Classes) | Cleric, skald, slayer, sorcerer, wizard and their options |
 | [Archetypes](Archetypes) | How an archetype changes its class |
 | [Races](Races) | Racial traits, alternate traits and ability choices |

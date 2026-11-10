@@ -25,7 +25,10 @@ PF1e Revamp makes the class features, archetypes, racial traits, character trait
 - **Sneak attack** is added automatically when the target is flat-footed or flanked, with every class's dice, talents such as Bleeding Attack, and precision immunity respected.
 - **Ranged combat**: Point-Blank Shot, range-changing feats and items, defenses against ranged attacks, firearms against touch AC, and optional tracking of loaded crossbows and firearms.
 - **Fortification**, **miss chances** (Blur, Displacement, invisibility) and **bleed** are rolled and tracked for you.
-- Save bonuses against fear, poison, charm and other effects apply on their own, and energy resistances never stack.
+- **Auras** (paladin, antipaladin, Foretell, cleric domain auras) put their effect on every creature in range, updated as tokens move.
+- **Damage reduction, resistances and immunities** from class features, bloodlines and templates are applied, only the best DR counts, and DR works on damage applied from the card.
+- **Creatures**: bonuses against kinds of creatures ("+1 vs goblinoids") apply on their own, templates change a creature's type, and fast healing and regeneration work each turn.
+- Save bonuses against fear, poison, charm and other effects apply on their own, abilities with a save get the same rows as spells, and energy resistances never stack.
 
 → [Combat Rules](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Combat-Rules)
 
@@ -65,7 +68,7 @@ New versions arrive through Foundry's usual update check.
 
 ## 🧪 Testing
 
-Every feature has automated tests (over 240, all run before each release), is played through as a player as well as a GM, and goes through a regular performance review. See [Testing and Reviews](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Testing-and-Reviews).
+Every feature has automated tests (almost 300, all run before each release), is played through as a player as well as a GM, and goes through a regular performance review. See [Testing and Reviews](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Testing-and-Reviews).
 
 ## 🐞 Bugs and suggestions
 
