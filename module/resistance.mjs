@@ -158,7 +158,8 @@ Hooks.on("pf1ApplyDamage", (actor, options) => {
 });
 
 function quickApplyResistance(actor, options) {
-  if (!game.settings.get(MODULE_ID, SETTING)) return;
+  // PF1 calls this hook before it checks the user may change the target, then refuses: say nothing
+  if (!actor.isOwner || !game.settings.get(MODULE_ID, SETTING)) return;
   if (options[FROM_DIALOG] || !(options.value > 0) || !options.instances?.length) return;
 
   const traits = actor.system.traits ?? {};

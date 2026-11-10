@@ -241,8 +241,9 @@ Hooks.on("pf1PrepareDerivedActorData", (actor) => {
     else if (g.trait === "immune") extra.add(g.type);
     else if (traits[g.trait]) {
       const trait = traits[g.trait];
-      for (const set of [trait.standard, trait.total]) if (set instanceof Set) set.add(g.type);
-      if (Array.isArray(trait.value) && !trait.value.includes(g.type)) trait.value.push(g.type);
+      // PF1 keeps immunities as Sets (its old `value` array is deprecated and warns when read)
+      if (trait.standard instanceof Set) for (const set of [trait.standard, trait.total]) set?.add?.(g.type);
+      else if (Array.isArray(trait.value) && !trait.value.includes(g.type)) trait.value.push(g.type);
     }
   }
   extraImmunities.set(actor, extra);

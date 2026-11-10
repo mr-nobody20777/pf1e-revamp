@@ -61,6 +61,13 @@ import { registerRollEffect } from "./roll-effects.mjs";
 const FLAG = "spell";
 const ATTACKS = ["mwak", "rwak", "twak", "msak", "rsak", "mcman", "rcman"];
 const WEAPON_ATTACKS = ["mwak", "rwak", "twak", "mcman", "rcman"];
+/** A non-spell ability's own touch attack, from its text: "ranged", true (melee) or false. */
+function abilityTouch(item, action) {
+  if (["msak", "rsak", ...WEAPON_ATTACKS].includes(action?.actionType)) return false; // PF1 rolls the attack
+  const text = item.system.description?.value ?? "";
+  if (/\branged touch attack/i.test(text)) return "ranged";
+  return /\btouch attack/i.test(text);
+}
 const SAVE_NAMES = { fort: "Fortitude", ref: "Reflex", will: "Will" };
 const queue = createQueue("spell results");
 // Spells another feature already puts on their targets (buff-grants.mjs)
@@ -151,11 +158,12 @@ Hooks.on("preCreateChatMessage", (message) => {
       sr,
       // An ability delivered by an attack affects only what it hit: full AC, touch AC for touch attacks
       attack: ability ? ATTACKS.includes(action?.actionType) && !!message.systemRolls?.attacks?.length : ["msak", "rsak"].includes(action?.actionType) && !def?.autoHit,
-      // A touch spell without an attack roll of its own: the melee touch attack is rolled for it
-      touch: (def?.touchAttack ?? (range === "touch" && !["msak", "rsak"].includes(action?.actionType))) || false,
-      // Abilities: delivered by a weapon or natural attack, full AC; otherwise (a touch-range power) touch AC,
-      // unless the text says it's delivered by an unarmed strike (Stunning Fist)
-      fullAC: ability ? (WEAPON_ATTACKS.includes(action?.actionType) || /\bunarmed strike\b/i.test(item.system.description?.value ?? "")) && !/\btouch attack\b/i.test(item.system.description?.value ?? "") : !!def?.fullAC,
+      // A touch spell without an attack roll of its own: the melee touch attack is rolled for it. An ability
+      // rolls one only when its text says so ("make a ranged touch attack"): a touch-range ability is often
+      // delivered by the user's own attack (Stunning Fist's unarmed strike) or needs no roll at all (hexes)
+      touch: ability ? abilityTouch(item, action) : (def?.touchAttack ?? (range === "touch" && !["msak", "rsak"].includes(action?.actionType))) || false,
+      // Abilities delivered by a weapon or natural attack hit full AC; a touch attack hits touch AC
+      fullAC: ability ? WEAPON_ATTACKS.includes(action?.actionType) && !/\btouch attack\b/i.test(item.system.description?.value ?? "") : !!def?.fullAC,
       // A thrown splash weapon's save (bombs) is for the splash: the creature hit directly takes full damage
       damage: !!action?.damage?.parts?.length && !(ability && action?.actionType === "twak"),
       heal: action?.actionType === "heal",
