@@ -110,6 +110,24 @@ A monster's attack whose statblock says "plus grab", "plus trip", "plus poison",
 - **The monster's choice:** grab, trip, pull and push are buttons. Each rolls the monster's combat maneuver check against the target's CMD: grab with its +4 bonus (both grappled), or **Hold (−20)** (only the target grappled); trip knocks prone; pull and push give the distance for the GM to move the token. Grab, pull and push only work on creatures the monster's size or smaller, trip up to one size larger. After a successful grab, **Constrict** deals its damage.
 - **Immune:** undead and constructs to paralysis, poison, disease and energy drain, and condition immunities count.
 
+### Burn
+A monster's "plus burn (2d6, DC 15)" deals its fire damage on a melee hit (energy resistance applies) and rolls the target's Reflex save. On a failure the target catches fire for 1d4 rounds: it takes the burn damage at the start of each of its turns, and the message offers a **Reflex save** (a full-round action) or **Drop and roll** (+4, and the creature falls prone). A creature that hits a monster with burn using a natural weapon or unarmed strike takes the same fire damage and save. The fire shows as the Burning condition when a module provides it (Nevela's Automation Suite does).
+
+### Rend
+Once the monster has hit the same target with the attacks its rend names (for example two claws) in the same round, the card that completes them shows a **Rend** button with the extra damage, usable once a round. In combat the hits are counted across the round's cards; outside combat, on one card.
+
+### The grapple on later rounds
+When a grab succeeds, the module remembers the grapple. At the start of each of the monster's turns while both creatures are still grappled, the GM gets a card:
+- **Maintain:** its combat maneuver check (+4 for grab, +5 for later rounds, −20 for a hold). On a success it deals the grab attack's damage and constrict; on a failure the grapple ends.
+- **Rake:** its free claw attacks (from "rake (2 claws +8, 1d4+2)") against the creature it holds.
+- **Swallow whole:** for a hold made with a bite on a creature at least one size smaller. On a success the creature takes bite damage and is inside: it stays grappled, the monster doesn't, and a Swallowed effect shows the interior's AC and the damage needed to cut free. It takes the swallowed damage at the start of each of the monster's turns, until the GM clicks **Cut free or escaped**.
+- **Let go.**
+
+Maintain and Swallow whole are each the monster's check for the round, so the card allows one of them. Pinning, tying up and escaping are handled at the table; removing the grappled condition ends the module's record.
+
+### Blood drain
+At the end of the monster's turn, while it's attached or grappling, its blood drain (for example "1d2 Constitution") is applied to the creature it holds, with an Undo.
+
 ## Critical feats
 When an attack threatens a critical hit, the card shows the attacker's critical feats under that attack, one button each. Once the critical is confirmed, the attacker or the GM clicks the one to use, and it's applied to the creature hit (a player's click is carried out by the GM's client).
 - **One per critical hit**, two with Critical Mastery: the other buttons go once the limit is reached.

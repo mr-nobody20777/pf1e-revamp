@@ -13,21 +13,31 @@
 //       part, "-20 penalty ... but does not gain the grappled condition itself"; only against creatures its
 //       size or smaller); trip ("If the attempt fails, the creature is not tripped in return"; no more than
 //       one size larger, as for any trip); pull and push (its size or smaller; the GM moves the token).
-//       Constrict deals its damage on a successful grab.
+//       Constrict deals its damage on a successful grab. The grapple on later rounds: monster-grapple.mjs.
+//   - Phase 3: burn "deals fire damage in addition to damage dealt on a successful hit in melee", with a
+//     Reflex save or catch fire (burning.mjs); "Creatures that hit a burning creature with natural weapons or
+//     unarmed attacks take fire damage as though hit by the burning creature" (the attacker's card). Rend:
+//     "If it hits with two or more natural attacks in 1 round… an additional amount of damage, but no more
+//     than once per round": the creature's hits on a target are counted for the round (on one card outside
+//     combat) and the card that completes them offers it, as the monster's choice ("can cause").
+//     An @Use link to the ability in any note is a rider even without "plus" (the stirge's touch attack).
 // Rulings (DECISIONS.md, 2026-11-10): automatic riders are applied when the module can tell the attack hit
 // (attack total against AC, natural 20 and 1, after miss chances), else they wait for an Apply button;
 // the creature's own entry gives the numbers, and when PF1's data disagrees with the rules text the text
 // wins (the universal Paralysis item's Charisma-based DC is computed from Constitution).
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM, onGmRequest, requestedByOwner, saveResult, timed } from "./util.mjs";
+import { dealDamage, esc, isActiveGM, onGmRequest, requestedByOwner, restoreDamage, rollTotal, saveResult, timed } from "./util.mjs";
 import { creatureTypes } from "./creature-types.mjs";
 import { setBleed, stopBleed } from "./bleed.mjs";
+import { extinguish, setBurning } from "./burning.mjs";
+import { constrictFormula, endGrapple, maneuverCheck, recordGrapple, sizeOf, specialAttack } from "./monster-grapple.mjs";
 
 const FLAG = "naturalRiders";
 const SAVE_NAME = { fort: "Fortitude", ref: "Reflex", will: "Will" };
-const roll = async (formula) => (await new Roll(formula).evaluate()).total;
-const WORDS = { "energy drain": "energyDrain", grab: "grab", trip: "trip", pull: "pull", push: "push", paralysis: "paralysis", poison: "poison", disease: "disease", bleed: "bleed", attach: "attach" };
+const roll = rollTotal;
+const DICE = String.raw`\d+d\d+(?:\s*[+-]\s*\d+)?`;
+const WORDS = { "energy drain": "energyDrain", burn: "burn", grab: "grab", trip: "trip", pull: "pull", push: "push", paralysis: "paralysis", poison: "poison", disease: "disease", bleed: "bleed", attach: "attach" };
 const WORD_RE = new RegExp(`\\b(${Object.keys(WORDS).join("|")})\\b`, "gi");
 const NUMBERS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
 
@@ -39,9 +49,14 @@ const plain = (html) => String(html ?? "").replace(/@Use\[([^;\]]+)[^\]]*\]/g, "
 
 /** The rider keys an attack carries ("plus grab", "Bite (plus Grab)", "plus @Use[Poison]"), with any "(…)" detail. */
 export function ridersOf(item, action) {
-  const notes = [...(item.system.attackNotes ?? []), ...(item.system.effectNotes ?? []), ...(action?.notes?.effect ?? []), ...(action?.notes?.footer ?? [])].map((n) => plain(n?.text ?? n));
-  // A clause runs to the end of the sentence: details in parentheses may hold ";" ("poison (Fort DC 13; effect …)")
-  const clauses = [item.name, ...notes].flatMap((t) => [...t.matchAll(/\bplus\s+([^.]+)/gi)].map((m) => m[1]));
+  const raw = [...(item.system.attackNotes ?? []), ...(item.system.effectNotes ?? []), ...(action?.notes?.attack ?? []), ...(action?.notes?.effect ?? []), ...(action?.notes?.footer ?? [])].map((n) => String(n?.text ?? n ?? ""));
+  const notes = raw.map(plain);
+  // A clause runs to the end of the sentence: details in parentheses may hold ";" ("poison (Fort DC 13; effect …)").
+  // A link to the ability is a rider by itself (the stirge's touch: "@Use[Attach;as=auto]")
+  const clauses = [
+    ...[item.name, ...notes].flatMap((t) => [...t.matchAll(/\bplus\s+([^.]+)/gi)].map((m) => m[1])),
+    ...raw.flatMap((t) => [...t.matchAll(/@Use\[([^;\]]+)/g)].map((m) => m[1])),
+  ];
   const found = new Map();
   for (const clause of clauses) {
     for (const m of clause.matchAll(WORD_RE)) {
@@ -58,7 +73,6 @@ const abilityOf = (actor, key) => {
   const word = Object.keys(WORDS).find((w) => WORDS[w] === key);
   return actor.items.find((i) => i.type === "feat" && i.name.toLowerCase().replace(/\s*\(.*$/, "") === word) ?? null;
 };
-const constrictOf = (actor) => actor.items.find((i) => i.type === "feat" && /^constrict\b/i.test(i.name)) ?? null;
 
 /** "DC = 10 + 1/2 racial HD + Con modifier", the universal monster rules' default. */
 const defaultDC = (actor) => 10 + Math.floor((actor.system.attributes?.hd?.total ?? 0) / 2) + (actor.system.abilities?.con?.mod ?? 0);
@@ -67,8 +81,9 @@ const isGenericRule = (item) => /pf-universal-monster-rules|monster-abilities/.t
 /** The rider's numbers: DC, duration, bleed amount, negative levels, distance, constrict damage. */
 function detailsOf(actor, key, detail) {
   const item = abilityOf(actor, key);
-  const text = `${detail} ${plain(item?.system.description?.value)}`;
+  const text = `${detail} ${item?.name ?? ""} ${plain(item?.system.description?.value)}`;
   const out = { key, label: key === "energyDrain" ? "Energy drain" : key.charAt(0).toUpperCase() + key.slice(1) };
+  out.save = { paralysis: "fort", poison: "fort", disease: "fort", burn: "ref" }[key] ?? null;
   // The exact DC is in the creature's text; else its ability's own formula (unless it's the generic rule,
   // whose Paralysis formula uses Charisma against its text); else the rules' default
   const textDC = Number(text.match(/\bDC\s*(\d+)/)?.[1]);
@@ -80,6 +95,7 @@ function detailsOf(actor, key, detail) {
     const n = text.match(/\b(\d+|one|two|three|four|five|six)\s+negative levels?/i)?.[1]?.toLowerCase();
     out.count = Number(n) || NUMBERS[n] || 1;
   }
+  if (key === "burn") out.formula = detail.match(new RegExp(DICE))?.[0] ?? text.match(new RegExp(`burn\\s*\\((${DICE})`, "i"))?.[1] ?? text.match(new RegExp(DICE))?.[0] ?? null;
   if (key === "pull" || key === "push") out.distance = Number(text.match(/(\d+)\s*(?:feet|ft)/i)?.[1]) || null;
   if (["poison", "disease"].includes(key)) out.effect = text.match(/effect\s+([^;.]+)/i)?.[1]?.trim() ?? null;
   return out;
@@ -117,9 +133,6 @@ export function hitOf(message, index, targetUuid) {
 /*  Applying                                    */
 /* -------------------------------------------- */
 
-const SIZES = () => Object.keys(pf1.config.sizeChart);
-const sizeOf = (actor) => SIZES().indexOf(actor.system.traits?.size?.base ?? actor.system.traits?.size ?? "med");
-
 function immuneTo(target, key) {
   const { types } = creatureTypes(target);
   const undeadOrConstruct = types.has("undead") || types.has("construct");
@@ -131,11 +144,13 @@ function immuneTo(target, key) {
   if (key === "disease" && (undeadOrConstruct || has("disease"))) return "immune to disease";
   if (key === "energyDrain" && (undeadOrConstruct || has("energyDrain"))) return "immune to energy drain";
   if (key === "bleed" && has("bleed")) return "immune to bleed";
+  const di = target.system.traits?.di;
+  if (key === "burn" && (di?.total ?? di?.standard)?.has?.("fire")) return "immune to fire";
   return null;
 }
 
 /** Automatic riders: returns { text, undo }. */
-async function applyAuto(rider, { attacker, target, critical, message }) {
+async function applyAuto(rider, { attacker, target, targetUuid, critical, message }) {
   const immune = immuneTo(target, rider.key);
   if (immune) return { text: immune };
   const save = async (type) => {
@@ -153,7 +168,16 @@ async function applyAuto(rider, { attacker, target, critical, message }) {
     }
     case "attach": {
       if (!attacker.statuses.has("grappled")) await attacker.setConditions({ grappled: true });
-      return { text: `${attacker.name} is attached (grappled; ${target.name} is not)`, undo: { attackerConditions: ["grappled"] } };
+      await recordGrapple(attacker, { target: targetUuid, attach: true });
+      return { text: `${attacker.name} is attached (grappled; ${target.name} is not)`, undo: { attackerConditions: ["grappled"], grapple: true } };
+    }
+    case "burn": {
+      if (!rider.formula) return { text: "burns (its entry gives no damage: apply it by hand)" };
+      const total = await roll(rider.formula);
+      const lost = await dealDamage(target, total, ["fire"]);
+      if (await save("ref")) return { text: `${total} fire damage; saved (Reflex DC ${rider.dc})`, undo: { lost } };
+      const rounds = await setBurning(target, { formula: rider.formula, dc: rider.dc, source: rider.reverse ? `touching ${attacker.name}` : attacker.name });
+      return { text: `${total} fire damage; failed (Reflex DC ${rider.dc}): catches fire for ${rounds} round${rounds === 1 ? "" : "s"}`, undo: { lost, burning: true } };
     }
     case "bleed": {
       if (!rider.amount) return { text: "bleeds (its entry gives no amount: apply it by hand)" };
@@ -177,23 +201,29 @@ async function applyAuto(rider, { attacker, target, critical, message }) {
 }
 
 /** The monster's choice: a combat maneuver against the target's CMD. Returns { text, undo, success }. */
-async function applyManeuver(rider, { attacker, target, message, hold = false }) {
+async function applyManeuver(rider, { attacker, target, targetUuid, message, index, hold = false }) {
   const diff = sizeOf(target) - sizeOf(attacker);
   if (rider.key === "trip" ? diff > 1 : diff > 0) return { text: `no effect: ${target.name} is too big` };
   const bonus = (rider.key === "grab" ? 4 : 0) + (hold ? -20 : 0);
-  const cmd = target.system.attributes.cmd;
-  const against = target.statuses.has("flatFooted") ? cmd.flatFootedTotal : cmd.total;
-  const check = await new Roll(`1d20 + ${attacker.system.attributes.cmb.total}${bonus ? ` + ${bonus}` : ""}`).evaluate();
-  const natural = check.dice[0]?.total;
-  const success = natural === 20 || (natural !== 1 && check.total >= against);
-  await check.toMessage({ speaker: ChatMessage.implementation.getSpeaker({ actor: attacker }), flavor: `${rider.label}${hold ? " (hold, −20)" : ""}: combat maneuver check — <strong>${success ? "succeeds" : "fails"}</strong>` });
-  if (!success) return { text: `${check.total}: fails${rider.key === "trip" ? " (not tripped in return)" : ""}` };
+  const check = await maneuverCheck(attacker, target, bonus, `${rider.label}${hold ? " (hold, −20)" : ""}`);
+  if (!check.success) return { text: `${check.total}: fails${rider.key === "trip" ? " (not tripped in return)" : ""}` };
   switch (rider.key) {
     case "grab": {
       const update = [target.setConditions({ grappled: true })];
       if (!hold && !attacker.statuses.has("grappled")) update.push(attacker.setConditions({ grappled: true }));
       await Promise.all(update);
-      return { text: `${check.total}: grabs ${target.name}${hold ? ` (held; ${attacker.name} isn't grappled)` : " (both grappled)"}`, undo: { conditions: ["grappled"], ...(hold ? {} : { attackerConditions: ["grappled"] }) }, success: true };
+      // The grapple on later rounds (monster-grapple.mjs): the grab attack's damage, and a bite can swallow
+      const rolls = message.systemRolls?.attacks?.[index]?.damage ?? [];
+      const attackName = message.getFlag(MODULE_ID, FLAG)?.attackName ?? "";
+      await recordGrapple(attacker, {
+        target: targetUuid,
+        hold,
+        attack: attackName,
+        bite: /\bbite\b/i.test(attackName),
+        formula: rolls.map((r) => `(${r.formula})`).join(" + ") || null,
+        types: [...new Set(rolls.flatMap((r) => r.options?.damageType ?? []))],
+      });
+      return { text: `${check.total}: grabs ${target.name}${hold ? ` (held; ${attacker.name} isn't grappled)` : " (both grappled)"}`, undo: { conditions: ["grappled"], ...(hold ? {} : { attackerConditions: ["grappled"] }), grapple: true }, success: true };
     }
     case "trip":
       await target.setConditions({ prone: true });
@@ -205,19 +235,21 @@ async function applyManeuver(rider, { attacker, target, message, hold = false })
 
 /** Constrict after a successful grab: its damage (or the attack's) as bludgeoning damage to the target. */
 async function constrict(message, index, data, target) {
-  const attacker = fromUuidSync(data.attacker);
-  const formula = data.constrict ?? message.systemRolls?.attacks?.[index]?.damage?.[0]?.formula;
+  const formula = data.constrict || message.systemRolls?.attacks?.[index]?.damage?.[0]?.formula;
   if (!formula) return "constrict: no damage given";
   const total = await roll(formula);
-  const instance = new pf1.models.action.DamagePartModel({ formula: "0", types: ["bludgeoning"] });
-  await target.applyDamage(total, { instances: [instance], forceDialog: false });
+  await dealDamage(target, total, ["bludgeoning"]);
   return `constricts for ${total} bludgeoning damage`;
 }
 
-async function undo(entry, data) {
-  const target = fromUuidSync(data.target)?.actor;
-  const attacker = fromUuidSync(data.attacker);
+async function undo(entry, data, rider) {
+  let target = fromUuidSync(data.target)?.actor;
+  let attacker = fromUuidSync(data.attacker);
+  if (rider?.reverse) [attacker, target] = [target, attacker];
   const u = entry.undo ?? {};
+  if (attacker && u.grapple) await endGrapple(attacker);
+  if (target && u.burning) await extinguish(target);
+  if (target && u.lost) await restoreDamage(target, u.lost);
   if (target && u.conditions?.length) await target.setConditions(Object.fromEntries(u.conditions.map((c) => [c, false])));
   if (attacker && u.attackerConditions?.length) await attacker.setConditions(Object.fromEntries(u.attackerConditions.map((c) => [c, false])));
   if (target && u.bleed) await stopBleed(target);
@@ -227,9 +259,10 @@ async function undo(entry, data) {
 
 /**
  * Run one rider on attack `index` (the GM's client). `how`: "auto" (automatic, on a seen hit), "apply"
- * (automatic, by hand), "maneuver", "hold", "constrict" or "undo".
+ * (automatic, by hand), "maneuver", "hold", "constrict" or "undo"; "rend" and "rendUndo" for the card's rend.
  */
 export async function runRider(message, index, r, how) {
+  if (how === "rend" || how === "rendUndo") return runRend(message, how === "rendUndo");
   const data = message.getFlag(MODULE_ID, FLAG);
   const rider = data?.riders?.[r];
   if (!rider) return null;
@@ -240,7 +273,7 @@ export async function runRider(message, index, r, how) {
   let entry;
   if (how === "undo") {
     if (!current || current.undone) return null;
-    await undo(current, data);
+    await undo(current, data, rider);
     entry = { ...current, text: `${current.text} — undone`, undone: true, undo: null };
   } else if (how === "constrict") {
     if (!current?.success || current.constricted || !target) return null;
@@ -248,10 +281,12 @@ export async function runRider(message, index, r, how) {
   } else {
     if (current) return null;
     if (!target || !attacker) entry = { text: "no target" };
-    else if (rider.may) entry = await applyManeuver(rider, { attacker, target, message, hold: how === "hold" });
+    else if (rider.may) entry = await applyManeuver(rider, { attacker, target, targetUuid: data.target, message, index, hold: how === "hold" });
     else {
       const hit = hitOf(message, index, data.target);
-      entry = await applyAuto(rider, { attacker, target, critical: hit.critical, message });
+      // A burning creature hit with a natural weapon: the attacker is the one burned
+      const [by, on] = rider.reverse ? [target, attacker] : [attacker, target];
+      entry = await applyAuto(rider, { attacker: by, target: on, targetUuid: data.target, critical: hit.critical, message });
     }
   }
   if (message.isOwner) await message.update({ [path]: entry });
@@ -263,25 +298,104 @@ export async function runRider(message, index, r, how) {
 /* -------------------------------------------- */
 
 const MAY = new Set(["grab", "trip", "pull", "push"]);
+const MELEE = new Set(["mwak", "msak", "mcman"]);
+
+/** Rend "(2 claws, 1d8+9)": how many hits, with which attack ("claw"; any natural attack if it doesn't say), and the extra damage. */
+function rendOf(actor) {
+  const r = specialAttack(actor, "rend");
+  if (!r) return null;
+  const m = r.detail.match(/^\s*(\d+|two|three|four)\s+([a-z ]+?)\s*,/i);
+  const n = m?.[1]?.toLowerCase();
+  return { count: Number(n) || NUMBERS[n] || 2, attack: m?.[2]?.trim().replace(/s$/i, "") || null, formula: r.detail.match(new RegExp(DICE, "g"))?.pop() ?? null, detail: r.detail };
+}
+
+/** Does the creature burn those who touch it ("Burn" ability, or "plus burn" on one of its attacks)? Its detail, else undefined. */
+function burnsOnTouch(actor) {
+  if (abilityOf(actor, "burn")) return "";
+  for (const item of actor.items.filter((i) => i.type === "attack")) {
+    const detail = ridersOf(item, item.defaultAction).get("burn");
+    if (detail !== undefined) return detail;
+  }
+  return undefined;
+}
 
 Hooks.on("pf1PreDisplayActionUse", (use) => {
   const actor = use.actor;
   const item = use.item;
   if (!actor || !item || !["attack", "weapon"].includes(item.type) || !use.shared.chatAttacks?.length) return;
-  const found = ridersOf(item, use.action);
-  if (!found.size) return;
-  const riders = [...found].map(([key, detail]) => ({ ...detailsOf(actor, key, detail), may: MAY.has(key) }));
-  const c = constrictOf(actor);
-  const constrictDamage = c ? plain(c.system.description?.value).match(/constrict\s*\((\d+d\d+(?:\s*[+-]\s*\d+)?)/i)?.[1] ?? c.defaultAction?.damage?.parts?.[0]?.formula ?? null : null;
+  const melee = MELEE.has(use.action?.actionType);
+  const targetToken = use.shared.targets?.[0]?.document ?? null;
+  const defender = targetToken?.actor ?? null;
+  // Burn only "on a successful hit in melee"
+  const riders = [...ridersOf(item, use.action)].map(([key, detail]) => ({ ...detailsOf(actor, key, detail), may: MAY.has(key) })).filter((r) => r.key !== "burn" || melee);
+  // "Creatures that hit a burning creature with natural weapons or unarmed attacks take fire damage as though hit by the burning creature"
+  const bodily = item.system.subType === "natural" || /\bunarmed\b/i.test(item.name);
+  const touchBurn = melee && bodily && defender && defender !== actor ? burnsOnTouch(defender) : undefined;
+  if (touchBurn !== undefined) riders.push({ ...detailsOf(defender, "burn", touchBurn), label: `Burn (touching ${defender.name})`, reverse: true, may: false });
+  const rend = rendOf(actor);
+  const rendHere = rend && melee && item.system.subType === "natural" && (!rend.attack || new RegExp(rend.attack, "i").test(item.name)) ? rend : null;
+  if (!riders.length && !rendHere) return;
+  const constrict = constrictFormula(actor);
   use.shared.chatData[`flags.${MODULE_ID}.${FLAG}`] = {
     riders,
     attacker: actor.uuid,
-    target: use.shared.targets?.[0]?.document?.uuid ?? null,
-    constrict: c ? constrictDamage : null,
-    hasConstrict: !!c,
+    target: targetToken?.uuid ?? null,
+    attackName: item.name,
+    constrict: constrict || null,
+    hasConstrict: constrict !== null,
+    rend: rendHere,
     applied: {},
   };
 });
+
+/**
+ * Rend: count the creature's hits on this target this round (on this card outside combat); once there are
+ * enough, the card offers the extra damage, once a round.
+ */
+async function countRend(message, data) {
+  const attacker = fromUuidSync(data.attacker);
+  const hits = (message.systemRolls?.attacks ?? []).filter((_, i) => hitOf(message, i, data.target).hit).length;
+  if (!attacker || !hits) return;
+  const combat = game.combats.find((c) => c.started && c.getCombatantsByActor(attacker).length) ?? null;
+  const round = combat ? `${combat.id}.${combat.round}` : `card.${message.id}`;
+  const prev = attacker.getFlag(MODULE_ID, "rendHits");
+  const same = prev?.round === round && prev.target === data.target;
+  const record = { round, target: data.target, count: (same ? prev.count : 0) + hits, offered: same && prev.offered, used: same && prev.used };
+  const ready = record.count >= data.rend.count && !record.offered;
+  if (ready) record.offered = true;
+  await attacker.setFlag(MODULE_ID, "rendHits", record);
+  if (ready) await message.update({ [`flags.${MODULE_ID}.${FLAG}.rendReady`]: true });
+}
+
+/** The rend's extra damage (the GM's client), or its undo. */
+async function runRend(message, undoIt = false) {
+  const data = message.getFlag(MODULE_ID, FLAG);
+  const attacker = fromUuidSync(data?.attacker);
+  const target = fromUuidSync(data?.target)?.actor;
+  if (!data?.rendReady || !attacker || !target) return null;
+  const done = data.rendDone;
+  const record = attacker.getFlag(MODULE_ID, "rendHits");
+  let entry;
+  if (undoIt) {
+    if (!done?.undo) return null;
+    await restoreDamage(target, done.undo.lost);
+    if (record) await attacker.setFlag(MODULE_ID, "rendHits", { ...record, used: false });
+    entry = { text: `${done.text} — undone` };
+  } else {
+    if (done) return null;
+    if (record?.used) entry = { text: "already used this round (no more than once per round)" };
+    else if (!data.rend.formula) entry = { text: "its entry gives no damage: roll it by hand" };
+    else {
+      const total = await roll(data.rend.formula);
+      const types = [...new Set((message.systemRolls?.attacks ?? []).flatMap((a) => a.damage ?? []).flatMap((r) => r.options?.damageType ?? []))];
+      const lost = await dealDamage(target, total, types);
+      if (record) await attacker.setFlag(MODULE_ID, "rendHits", { ...record, used: true });
+      entry = { text: `tears ${target.name} for ${total} damage`, undo: { lost } };
+    }
+  }
+  if (message.isOwner) await message.update({ [`flags.${MODULE_ID}.${FLAG}.rendDone`]: entry });
+  return entry;
+}
 
 // Automatic riders, as soon as the card exists and the hit is known (the active GM's client)
 Hooks.on("createChatMessage", async (message) => {
@@ -294,6 +408,7 @@ Hooks.on("createChatMessage", async (message) => {
     if (!hit.known || !hit.hit) continue;
     for (const [r, rider] of data.riders.entries()) if (!rider.may) await runRider(message, i, r, "auto");
   }
+  if (data.rend) await countRend(message, data);
 });
 
 function button(label, tooltip, onClick) {
@@ -318,10 +433,11 @@ const request = (message, index, r, how) =>
 
 Hooks.on("renderChatMessagePF", (message, html) => {
   const data = message.getFlag(MODULE_ID, FLAG);
-  if (!data?.riders?.length) return;
+  if (!data) return;
   const attacker = fromUuidSync(data.attacker);
   const canAct = game.user.isGM || !!attacker?.isOwner;
-  (message.systemRolls?.attacks ?? []).forEach((attack, i) => {
+  const attacks = message.systemRolls?.attacks ?? [];
+  if (data.riders?.length) attacks.forEach((attack, i) => {
     const el = html.querySelector(`.chat-attack[data-index="${i}"]`);
     if (!el || !attack?.attack) return;
     const div = document.createElement("div");
@@ -331,7 +447,7 @@ Hooks.on("renderChatMessagePF", (message, html) => {
     for (const [r, rider] of data.riders.entries()) {
       const done = data.applied?.[i]?.[r];
       const line = document.createElement("div");
-      line.innerHTML = `· <strong>${esc(rider.label)}</strong>${rider.may || done ? "" : ` <span style="opacity:0.7">(automatic${["paralysis", "poison", "disease"].includes(rider.key) ? `, Fortitude DC ${rider.dc}` : ""})</span>`}${done ? `: ${esc(done.text)}${done.constricted ? `; ${esc(done.constricted)}` : ""}` : ""}`;
+      line.innerHTML = `· <strong>${esc(rider.label)}</strong>${rider.may || done ? "" : ` <span style="opacity:0.7">(automatic${rider.save ? `, ${SAVE_NAME[rider.save]} DC ${rider.dc}` : ""})</span>`}${done ? `: ${esc(done.text)}${done.constricted ? `; ${esc(done.constricted)}` : ""}` : ""}`;
       if (canAct && !done) {
         if (rider.may) {
           line.append(button(rider.label, `${rider.label}: the creature's combat maneuver check against the target's CMD`, () => request(message, i, r, "maneuver")));
@@ -345,13 +461,26 @@ Hooks.on("renderChatMessagePF", (message, html) => {
     const table = el.querySelector("table");
     table ? table.after(div) : el.append(div);
   });
+  // Rend, once the hits are there: under the last attack
+  if (data.rendReady) {
+    const last = html.querySelectorAll(".chat-attack");
+    const el = last[last.length - 1];
+    if (!el) return;
+    const div = document.createElement("div");
+    div.className = `${MODULE_ID}-rend`;
+    div.style.cssText = "margin: 0.25em 0; padding: 0 4px; border-left: 3px solid #a85;";
+    div.innerHTML = `<strong>Rend</strong> (${esc(data.rend.detail)})${data.rendDone ? `: ${esc(data.rendDone.text)}` : ": the hits are there"}`;
+    if (canAct && !data.rendDone) div.append(button("Rend", `Extra damage${data.rend.formula ? ` (${data.rend.formula})` : ""}, no more than once per round`, () => request(message, -1, -1, "rend")));
+    if (game.user.isGM && data.rendDone?.undo) div.append(button("Undo", "Remove the rend's damage", () => runRider(message, -1, -1, "rendUndo")));
+    el.append(div);
+  }
 });
 
 onGmRequest("naturalRider", async (request, { message, index, rider, how }) => {
   const card = game.messages.get(message);
   const attacker = fromUuidSync(card?.getFlag(MODULE_ID, FLAG)?.attacker);
-  if (card && requestedByOwner(request, attacker) && ["apply", "maneuver", "hold"].includes(how)) await runRider(card, index, rider, how);
+  if (card && requestedByOwner(request, attacker) && ["apply", "maneuver", "hold", "rend"].includes(how)) await runRider(card, index, rider, how);
   await request.delete();
 });
 
-export const _test = { ridersOf, detailsOf, hitOf, runRider, FLAG };
+export const _test = { ridersOf, detailsOf, hitOf, runRider, rendOf, FLAG };

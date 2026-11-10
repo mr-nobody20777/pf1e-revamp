@@ -162,6 +162,42 @@ export const equippedItem = (actor, re) => actor?.items.find((i) => i.type === "
 /** Did the user who made this GM request own the actor (players may only ask for their own)? */
 export const requestedByOwner = (request, actor) => !!actor && !!request.author && (request.author.isGM || actor.testUserPermission(request.author, "OWNER"));
 
+/**
+ * Apply `total` damage of the given types straight away (no dialog; the quick-damage resistance and DR
+ * rules apply). Returns what it took off, { hp, temp }, for an undo with `restoreDamage`.
+ */
+export async function dealDamage(actor, total, types = []) {
+  const hp = actor.system.attributes.hp;
+  const before = { hp: hp.value, temp: hp.temp ?? 0 };
+  const instance = new pf1.models.action.DamagePartModel({ formula: "0", types });
+  await actor.applyDamage(total, { instances: [instance], forceDialog: false });
+  return { hp: before.hp - actor.system.attributes.hp.value, temp: before.temp - (actor.system.attributes.hp.temp ?? 0) };
+}
+
+/** Undo `dealDamage`: give back the hit points and temporary hit points it took. */
+export async function restoreDamage(actor, lost) {
+  if (!actor || !(lost?.hp || lost?.temp)) return;
+  const hp = actor.system.attributes.hp;
+  await actor.update({ "system.attributes.hp.value": hp.value + (lost.hp ?? 0), "system.attributes.hp.temp": (hp.temp ?? 0) + (lost.temp ?? 0) });
+}
+
+/** Total of a dice formula ("1d8+9", "sizeRoll(1, 4, 2, 2) + 3"). */
+export const rollTotal = async (formula, rollData) => (await new Roll(String(formula), rollData).evaluate()).total;
+
+/**
+ * Once a round: true the first time it's asked for this combat and round on this actor's `flag`, false
+ * after (stepping the tracker back and forward again doesn't repeat it).
+ */
+export async function oncePerRound(actor, flag, combat, round = combat.round) {
+  const tick = `${combat.id}.${round}`;
+  if (actor.getFlag(MODULE_ID, flag) === tick) return false;
+  await actor.setFlag(MODULE_ID, flag, tick);
+  return true;
+}
+
+/** combatTurnChange: the tracker was stepped back, not forward. */
+export const steppedBack = (prior, current) => !!prior && !!current && (current.round < prior.round || (current.round === prior.round && current.turn < prior.turn));
+
 /** Users to whisper an actor's prompts to: its player owners, or the GMs if it has none. */
 export function ownerWhisper(actor) {
   const owners = game.users.filter((u) => !u.isGM && actor.testUserPermission(u, "OWNER")).map((u) => u.id);
