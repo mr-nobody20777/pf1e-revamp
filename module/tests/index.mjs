@@ -36,6 +36,7 @@ import { registerFastHealingTests } from "./fast-healing.test.mjs";
 import { registerAuraTests } from "./auras.test.mjs";
 import { registerDefenseTests } from "./defenses.test.mjs";
 import { registerCriticalFeatTests } from "./critical-feats.test.mjs";
+import { registerNaturalRiderTests } from "./natural-riders.test.mjs";
 
 export function registerTests(quench) {
   registerTwoWeaponTests(quench);
@@ -52,6 +53,7 @@ export function registerTests(quench) {
   registerAuraTests(quench);
   registerDefenseTests(quench);
   registerCriticalFeatTests(quench);
+  registerNaturalRiderTests(quench);
   registerQuarryTests(quench);
   registerTrueStrikeTests(quench);
   registerMissChanceTests(quench);

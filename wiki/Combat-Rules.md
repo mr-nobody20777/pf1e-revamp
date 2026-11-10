@@ -104,6 +104,12 @@ Bleeding Attack's bleed is tracked with its amount, since PF1's Bleed condition 
 
 Not automated: Ghostslayer, the Assassin's Sight, Briar Bandit, Inspired Sneak Attack, Opportunity Attacker, Strangler, Savage Critical with Vital Strike, Sweeping Dodge, Ironskin, Nine Lives and Survivor.
 
+## Monster attack riders
+A monster's attack whose statblock says "plus grab", "plus trip", "plus poison", "plus paralysis", "plus bleed", "plus attach" or "plus energy drain" (or links the ability) shows those under each attack on its card. The numbers (save DC, duration, bleed amount, negative levels) come from the creature's own entry, or the universal monster rules' default DC (10 + half its racial Hit Dice + its Constitution modifier).
+- **Automatic, on every hit:** paralysis (Fortitude save; lasts the duration in its entry), poison and disease (the first save; apply the rest by hand for now), bleed, attach (the monster is grappled, the target isn't) and energy drain (twice as many negative levels on a confirmed critical; the monster gains 5 temporary hit points per level). They're applied as soon as the module can tell the attack hit (its total against the target's AC, natural 20 and 1, after miss chances), and an **Undo** button takes them back. When the module can't tell, an **Apply** button waits.
+- **The monster's choice:** grab, trip, pull and push are buttons. Each rolls the monster's combat maneuver check against the target's CMD: grab with its +4 bonus (both grappled), or **Hold (−20)** (only the target grappled); trip knocks prone; pull and push give the distance for the GM to move the token. Grab, pull and push only work on creatures the monster's size or smaller, trip up to one size larger. After a successful grab, **Constrict** deals its damage.
+- **Immune:** undead and constructs to paralysis, poison, disease and energy drain, and condition immunities count.
+
 ## Critical feats
 When an attack threatens a critical hit, the card shows the attacker's critical feats under that attack, one button each. Once the critical is confirmed, the attacker or the GM clicks the one to use, and it's applied to the creature hit (a player's click is carried out by the GM's client).
 - **One per critical hit**, two with Critical Mastery: the other buttons go once the limit is reached.
