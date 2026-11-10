@@ -23,6 +23,7 @@ import { MODULE_ID } from "./const.mjs";
 import { evaluate } from "./util.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 import { parseCreatures, matchesCreatures } from "./creature-types.mjs";
+import { isWard } from "./ward.mjs";
 
 // Words in a note → test against the effect
 const KEYWORDS = [
@@ -155,7 +156,7 @@ export function saveBonuses(actor, saveId, effect, { stack = true, source = null
   // (halfling "+2 vs fear" on the race and on Fearless): count it once.
   const racialSeen = new Set();
   for (const item of actor.items) {
-    if (item.isActive === false || !item.system.contextNotes?.length) continue;
+    if (item.isActive === false || !item.system.contextNotes?.length || isWard(item)) continue; // wards: ward.mjs
     const racialSource = item.type === "race" || item.system.subType === "racial";
     for (const note of item.system.contextNotes) {
       if (note.target !== "allSavingThrows" && note.target !== saveId) continue;

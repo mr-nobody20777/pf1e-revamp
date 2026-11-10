@@ -77,6 +77,8 @@ export function registerDefenseTests(quench) {
           assert.notInclude(drs(sorc), "5/-", "not a general DR");
           assert.equal(dialog(sorc, [[8, ["bludgeoning", "nonlethal"]]]).reduction.physical, 5);
           assert.equal(dialog(sorc, [[8, ["bludgeoning"]]]).reduction.physical, 0);
+          const asNonlethal = new pf1.applications.ApplyDamage({ value: 8, instances: [Object.assign(part(["bludgeoning"]), { value: 8 })], targets: [sorc], asNonlethal: true });
+          assert.equal(asNonlethal.targets.get(sorc.uuid).reduction.physical, 5, "damage applied as nonlethal");
         });
 
         it("Armor Mastery: DR 5/— only while wearing armor", async () => {
@@ -95,6 +97,15 @@ export function registerDefenseTests(quench) {
           assert.equal(eres(b, "fire"), 0, "not raging");
           await b.itemTypes.buff.find((x) => x.name === "Rage").update({ "system.active": true }); // the Barbarian class adds PF1's Rage buff
           assert.equal(eres(b, "fire"), 4);
+        });
+
+        it("a skald's rage power Energy Resistance uses the skald level, though PF1 files it under barbarian", async () => {
+          const k = await make("Quench Raging Skald", { items: [["pf1.classes", "Skald", { system: { level: 10 } }]] });
+          const [power] = await k.createEmbeddedDocuments("Item", [game.items.fromCompendium(await fromUuid("Compendium.pf1.class-abilities.Item.4SnRYolTwZqq5Nbw"))], { pf1eRevampNoPrompt: true });
+          await power.update({ "system.class": "barbarian" });
+          await power.setFlag(MODULE_ID, "energyType", "cold");
+          await k.createEmbeddedDocuments("Item", [{ name: "Inspired Rage (Skald)", type: "buff", system: { active: true } }]);
+          assert.equal(eres(k, "cold"), 5);
         });
 
         it("Draconic bloodline: the energy type chosen once for the bloodline, 10 at 9th level", async () => {

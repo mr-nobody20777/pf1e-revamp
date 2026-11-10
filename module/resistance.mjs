@@ -101,6 +101,9 @@ function refreshStaleTarget(app, target, options) {
  */
 function amountsOf(options) {
   const instances = options.instances;
+  // Damage added for this target (+2 against goblinoids) is more of the weapon's damage: its first instance
+  const added = Math.max(0, options[ADDED] ?? 0);
+  const rolled = options.value - added;
   let amounts = instances.map((i) => Math.max(0, i.value ?? 0));
   if (!amounts.some((a) => a > 0)) {
     if (instances.length === 1) return [options.value];
@@ -108,8 +111,9 @@ function amountsOf(options) {
     const rolls = attack ? [...(attack.damage ?? []), ...(options.critMult ? attack.critDamage ?? [] : [])] : [];
     const key = (types) => [...(types ?? [])].sort().join("|");
     amounts = instances.map((i) => rolls.filter((r) => key(r.options?.damageType) === key(i.types)).reduce((t, r) => t + (r.total ?? 0), 0));
-    if (amounts.reduce((t, a) => t + a, 0) !== options.value) return null;
+    if (amounts.reduce((t, a) => t + a, 0) !== rolled) return null;
   }
+  amounts[0] += added;
   const rest = options.value - amounts.reduce((t, a) => t + a, 0);
   return rest > 0 ? [...amounts, rest] : amounts;
 }
@@ -145,8 +149,11 @@ export function registerDamageAddition(fn) {
   additions.push(fn);
 }
 
+const ADDED = `${MODULE_ID}Added`; // options: damage the additions put on top of the card's own rolls
 Hooks.on("pf1ApplyDamage", (actor, options) => {
+  const before = options.value;
   for (const fn of additions) fn(actor, options);
+  options[ADDED] = (options.value ?? 0) - (before ?? 0);
   quickApplyResistance(actor, options);
 });
 

@@ -181,7 +181,7 @@ Spells that affect only certain creatures, channel energy, immunity to precision
 - **Subtypes typed by hand** match regardless of capitals, spaces and hyphens; PF1's misspelled "Reptillian" on kobolds and lizardfolk counts as reptilian.
 
 ## Auras
-Auras give their effect to the creatures within their radius as a buff named for the aura and its bearer ("Aura of Courage (Seelah)"), added and removed as tokens move, are hidden or leave the scene. The active GM's client keeps them in sync, so a GM must be connected.
+Auras give their effect to the creatures within their radius as a buff named for the aura and its bearer ("Aura of Courage (Seelah)"), added and removed as tokens move, are hidden or leave the scene. The active GM's client keeps them in sync, so a GM must be connected. Only scenes in play count: the active scene, or one a connected user is viewing.
 - **Covered:** Aura of Courage, Resolve and Righteousness (paladin); Aura of Cowardice, Despair and Depravity (antipaladin); Foretell and Aura of Despair (wizard); Aura of Heroism, Aura of Protection (domain power and warpriest blessing) and Aura of Menace (cleric).
 - **Who:** allies or enemies by token disposition (friendly and hostile are enemies of each other; neutral tokens are neither). "Allies" includes the bearer. Paladin and antipaladin auras work only while the bearer is conscious. The enchanter's Aura of Despair is mind-affecting, so mindless creatures, undead, constructs and plants ignore it.
 - **Stacking:** two creatures with the same aura give one buff, from the higher level. Aura of Despair and Aura of Cowardice together give −4 on saves against fear, not −6.

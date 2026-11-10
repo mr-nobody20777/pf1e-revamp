@@ -22,7 +22,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton } from "./footnote.mjs";
-import { classLevel, isActiveGM, createQueue, settled, stillExists, esc, onSceneCatchUp, titleFor, tokenDistance } from "./util.mjs";
+import { classLevel, isActiveGM, createQueue, settled, stillExists, esc, onSceneCatchUp, titleFor, tokenDistance, allActors } from "./util.mjs";
 import { mindAffectingImmune } from "./spells.mjs";
 
 const LINK = "auraLink";
@@ -330,11 +330,38 @@ function targetBuff(e, effectKey, others, scene) {
   };
 }
 
+/**
+ * A scene in play: the active scene, or one a connected user is viewing (a GM running a side scene). Auras
+ * on other scenes (last session's map, where the party's linked tokens still stand) give nothing, so a
+ * creature never gets an aura from a position it isn't in.
+ */
+export function inPlay(scene) {
+  if (!scene || !game.scenes.has(scene.id)) return false;
+  return scene.active || game.users.some((u) => u.active && u.viewedScene === scene.id);
+}
+
+/** An aura buff that no scene in play accounts for (its scene left play or was deleted). */
+const stale = (link) => link?.role === "effect" && !inPlay(game.scenes.get(link.scene));
+
+/** Delete aura buffs of these actors that belong to `sceneId` (or to no scene in play, if omitted). */
+async function clearBuffs(actors, sceneId = null) {
+  for (const actor of actors) {
+    const ids = actor.itemTypes.buff
+      .filter((b) => {
+        const link = b.flags[MODULE_ID]?.[LINK];
+        return link?.role === "effect" && (sceneId ? link.scene === sceneId : stale(link));
+      })
+      .map((b) => b.id);
+    if (ids.length && stillExists(actor)) await actor.deleteEmbeddedDocuments("Item", ids, SYNC);
+  }
+}
+
 /** Make every aura buff tied to this scene match what the auras on it give. */
 export async function syncScene(scene) {
-  if (!scene || !game.scenes.has(scene.id)) return;
+  if (!inPlay(scene)) return;
   const wanted = wantedOn(scene);
-  const actors = new Set([...game.actors, ...scene.tokens.map((t) => t.actor).filter(Boolean)]);
+  // Only the scene's own creatures: one whose token left is cleared when it leaves (deleteToken below)
+  const actors = new Set(scene.tokens.map((t) => t.actor).filter(Boolean));
   const toCreate = new Map(); // actor → [data]
 
   for (const actor of actors) {
@@ -344,7 +371,7 @@ export async function syncScene(scene) {
     for (const buff of actor.itemTypes.buff) {
       const link = buff.flags[MODULE_ID]?.[LINK];
       if (link?.role !== "effect") continue;
-      if (link.scene !== scene.id && game.scenes.has(link.scene)) continue; // another scene's aura
+      if (link.scene !== scene.id && !stale(link)) continue; // another scene in play: its own recheck
       const e = mine.get(link.key);
       if (!e || e.item.uuid !== link.source || done.has(link.key)) {
         if (stillExists(buff)) await buff.delete(SYNC);
@@ -409,7 +436,25 @@ const recheckActor = (actor) => scenesOf(actor).forEach(recheck);
 
 const TOKEN_FIELDS = ["x", "y", "hidden", "disposition", "width", "height", "actorLink", "actorId"];
 Hooks.on("createToken", (token) => recheck(token.parent));
-Hooks.on("deleteToken", (token) => recheck(token.parent));
+Hooks.on("deleteToken", (token) => {
+  recheck(token.parent);
+  // A linked creature whose last token on the scene was removed keeps no aura from it
+  const actor = token.actorLink ? game.actors.get(token.actorId) : null;
+  if (actor && isActiveGM() && !token.parent.tokens.some((t) => t.actorLink && t.actorId === actor.id)) enqueue(() => clearBuffs([actor], token.parent.id));
+});
+// A scene going in or out of play (made active, or another one made active instead)
+Hooks.on("updateScene", (scene, changes) => {
+  if (!("active" in changes) || !isActiveGM()) return;
+  recheck(scene);
+  enqueue(() => clearBuffs(allActors()));
+});
+Hooks.on("deleteScene", () => isActiveGM() && enqueue(() => clearBuffs(game.actors)));
+// A user switching scenes (or leaving) can bring one into play or take it out
+Hooks.on("updateUser", (user, changes) => {
+  if (!("viewedScene" in changes) || !isActiveGM()) return;
+  if (changes.viewedScene) recheck(game.scenes.get(changes.viewedScene));
+  enqueue(() => clearBuffs(allActors()));
+});
 Hooks.on("updateToken", (token, changes) => {
   if (TOKEN_FIELDS.some((f) => f in changes)) recheck(token.parent);
 });
@@ -434,7 +479,10 @@ const effectChanged = (effect) => hasAura(effect.parent) && recheckActor(effect.
 Hooks.on("createActiveEffect", effectChanged);
 Hooks.on("deleteActiveEffect", effectChanged);
 
-Hooks.on("canvasReady", () => recheck(canvas.scene));
+Hooks.on("canvasReady", () => {
+  recheck(canvas.scene);
+  if (isActiveGM()) enqueue(() => clearBuffs(allActors())); // the scene viewed before may have left play
+});
 
 /* -------------------------------------------- */
 /*  Activated auras                             */
@@ -538,6 +586,8 @@ async function ended(indicator) {
   const back = roundsUnused(indicator);
   if (back && item?.isOwner) await item.update({ "system.uses.value": usesLeft(item) + back });
   const actor = indicator.actor;
+  // Turning the buff back on mustn't restart the aura for free: it's gone; Use starts a new one
+  if (stillExists(indicator)) await indicator.delete({ [`${MODULE_ID}AuraReplaced`]: true });
   ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
     content: `<p><strong>${esc(indicator.name)}</strong> ends.${back ? ` ${back} unused round${back === 1 ? "" : "s"} given back; rounds left today: ${usesLeft(item)}.` : ""}</p>`,

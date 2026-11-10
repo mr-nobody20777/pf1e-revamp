@@ -16,7 +16,7 @@ import { creatureTypes, energyAsUndead } from "./creature-types.mjs";
 import { variantEffect, variantOf, variantsAllowed, chooseVariant, clearVariant, applyVariant, channelBonus, isVariantFeature, VARIANTS } from "./variant-channeling.mjs";
 
 const RADIUS = 30;
-const isChannel = (item) => item?.type === "feat" && item.system.tag === "classFeat_channelEnergy";
+export const isChannel = (item) => item?.type === "feat" && item.system?.tag === "classFeat_channelEnergy";
 
 /** The channel's mode from PF1's action names ("Positive - Heal living", "Negative - Harm living"...). */
 function modeOf(action) {

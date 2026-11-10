@@ -18,7 +18,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { evaluate, classLevel, esc, titleFor, wrapMethod } from "./util.mjs";
+import { evaluate, classLevel, esc, titleFor, wrapMethod } from "./util.mjs"; // classLevel: flag grants
 
 const PF1 = "Compendium.pf1.class-abilities.Item.";
 const TPL = "Compendium.pf1.monster-templates.Item.";
@@ -148,9 +148,11 @@ export function defenseKey(item) {
   return !!DEFENSES[key].template === (item.system.subType === "template") ? key : null;
 }
 
+/** The level of the item's own class, else of the first listed class the creature has (a skald's rage power). */
 function levelOf(item, def) {
+  const classes = item.actor?.itemTypes.class ?? [];
   for (const tag of [item.system.class, ...(def.classTags ?? [])].filter(Boolean)) {
-    const level = classLevel(item, tag);
+    const level = classes.find((c) => c.system.tag === tag)?.system.level ?? 0;
     if (level) return level;
   }
   return 0;
@@ -285,7 +287,7 @@ Hooks.once("setup", () => {
         const against = extra[i].against;
         entry.against = against;
         entry.label = `${entry.label} (${against} only)`;
-        entry.active &&= this.instances.some((inst) => inst.typeIds?.has(against));
+        entry.active &&= this.instances.some((inst) => inst.typeIds?.has(against)) || (against === "nonlethal" && !!this.damageOptions?.asNonlethal);
       });
       return out;
     } finally {
@@ -293,7 +295,8 @@ Hooks.once("setup", () => {
     }
   });
   wrapMethod(`${AD}._isReducedBy`, function (wrapped, target, instance, entry, isDR) {
-    if (entry.against && !instance.typeIds?.has(entry.against)) return false;
+    const asNonlethal = entry.against === "nonlethal" && !!this.damageOptions?.asNonlethal; // the dialog's "as nonlethal"
+    if (entry.against && !asNonlethal && !instance.typeIds?.has(entry.against)) return false;
     return wrapped(target, instance, entry, isDR);
   });
 

@@ -33,7 +33,12 @@ const ABILITY_WORDS = { strength: "str", dexterity: "dex", constitution: "con", 
 
 // Items whose text reads wrong: by name in lower case, an entry in the spell-data.mjs format (or
 // { skip: true } for abilities whose save isn't against the targets, like a bomb's splash)
-export const CORRECTIONS = {};
+export const CORRECTIONS = {
+  // "Creatures in the splash radius take ... damage (Reflex half)": the save is for creatures splashed, which
+  // aren't the card's targets; the creature hit directly gets no save. (Discoveries such as Force Bomb give
+  // the creature hit directly a save against their condition, so they keep their rows.)
+  bomb: { skip: true },
+};
 
 /** "1d4+1 rounds", "1 minute", "permanently", "a number of rounds equal to your Wisdom modifier (minimum 1)". */
 function durationAfter(text) {

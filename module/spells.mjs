@@ -52,6 +52,7 @@ import { SPELLS } from "./spell-data.mjs";
 import { abilityDef } from "./ability-effects.mjs";
 import { creatureTypes, energyAsUndead } from "./creature-types.mjs";
 import { compendiumBuff, nevelaAppliesBuff } from "./buff-grants.mjs";
+import { isChannel } from "./channel-energy.mjs";
 import { immunitiesOf } from "./defenses.mjs";
 import { esc, evaluate, isActiveGM, onGmRequest, createQueue, tokenDistance, timed, saveResult } from "./util.mjs";
 import { registerFootnote } from "./footnote.mjs";
@@ -59,7 +60,7 @@ import { registerRollEffect } from "./roll-effects.mjs";
 
 const FLAG = "spell";
 const ATTACKS = ["mwak", "rwak", "twak", "msak", "rsak", "mcman", "rcman"];
-const isChannel = (item) => item?.type === "feat" && item.system?.tag === "classFeat_channelEnergy"; // channel-energy.mjs
+const WEAPON_ATTACKS = ["mwak", "rwak", "twak", "mcman", "rcman"];
 const SAVE_NAMES = { fort: "Fortitude", ref: "Reflex", will: "Will" };
 const queue = createQueue("spell results");
 // Spells another feature already puts on their targets (buff-grants.mjs)
@@ -131,7 +132,9 @@ Hooks.on("preCreateChatMessage", (message) => {
   const casterToken = caster?.getActiveTokens()[0]?.document ?? null;
   let targets = [...(message.system.targets ?? [])];
   const range = action?.range?.units;
-  if (def?.self || (def && range === "personal")) targets = [casterToken?.uuid ?? caster?.uuid].filter(Boolean);
+  // A personal-range spell targets its caster; a personal-range ability with a save is an emanation (Cold
+  // Aura, Thorn Burst): its targets are the creatures around
+  if (def?.self || (!ability && def && range === "personal")) targets = [casterToken?.uuid ?? caster?.uuid].filter(Boolean);
   if (def?.affects && casterToken) {
     const ally = (uuid) => tokenOf(uuid)?.disposition === casterToken.disposition;
     targets = targets.filter((uuid) => (def.affects === "allies") === ally(uuid));
@@ -150,8 +153,11 @@ Hooks.on("preCreateChatMessage", (message) => {
       attack: ability ? ATTACKS.includes(action?.actionType) && !!message.systemRolls?.attacks?.length : ["msak", "rsak"].includes(action?.actionType) && !def?.autoHit,
       // A touch spell without an attack roll of its own: the melee touch attack is rolled for it
       touch: (def?.touchAttack ?? (range === "touch" && !["msak", "rsak"].includes(action?.actionType))) || false,
-      fullAC: ability ? !["msak", "rsak"].includes(action?.actionType) && !/\btouch attack\b/i.test(item.system.description?.value ?? "") : !!def?.fullAC,
-      damage: !!action?.damage?.parts?.length,
+      // Abilities: delivered by a weapon or natural attack, full AC; otherwise (a touch-range power) touch AC,
+      // unless the text says it's delivered by an unarmed strike (Stunning Fist)
+      fullAC: ability ? (WEAPON_ATTACKS.includes(action?.actionType) || /\bunarmed strike\b/i.test(item.system.description?.value ?? "")) && !/\btouch attack\b/i.test(item.system.description?.value ?? "") : !!def?.fullAC,
+      // A thrown splash weapon's save (bombs) is for the splash: the creature hit directly takes full damage
+      damage: !!action?.damage?.parts?.length && !(ability && action?.actionType === "twak"),
       heal: action?.actionType === "heal",
       cl: message.system.config?.cl ?? item.system.cl ?? 0,
       // A save that also works on objects isn't one undead and constructs are immune to
@@ -663,7 +669,7 @@ function rowElement(message, data, row, index) {
   div.style.cssText = `margin: 0.2em 0; padding: 0 4px; border-left: 3px solid ${!row.state || row.state === "save" ? "#888" : good ? "#5a5" : "#b33"};`;
   const parts = [];
   if (row.sr) parts.push(`SR check ${row.sr.total}${gm ? ` vs SR ${row.sr.value}` : ""}: ${row.sr.passed ? "overcome" : "resisted"}`);
-  if (row.attack) parts.push(`${data.touchRoll ? (data.touchRoll.fullAC ? "ranged " : data.touchRoll.ranged ? "ranged touch " : "melee touch ") : ""}${row.attack.total}${row.attack.intoMelee ? " (−4 into melee)" : ""}${gm ? ` vs ${data.fullAC ? "" : "touch "}AC ${row.attack.ac}` : ""}: ${row.attack.hit ? "hits" : "misses"}`);
+  if (row.attack) parts.push(`${data.touchRoll ? (data.touchRoll.ranged ? (data.touchRoll.fullAC ? "ranged " : "ranged touch ") : data.touchRoll.fullAC ? "melee " : "melee touch ") : ""}${row.attack.total}${row.attack.intoMelee ? " (−4 into melee)" : ""}${gm ? ` vs ${data.fullAC ? "" : "touch "}AC ${row.attack.ac}` : ""}: ${row.attack.hit ? "hits" : "misses"}`);
   if (row.hitDamage) parts.push(esc(row.hitDamage));
   if (row.state === "unaffected") parts.push(`unaffected${gm && row.why ? ` (${esc(row.why)})` : ""}`);
   const save = saveOf(data, row);

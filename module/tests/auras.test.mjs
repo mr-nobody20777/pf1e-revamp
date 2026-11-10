@@ -3,7 +3,7 @@
 // (rounds spent and given back, Foretell's choice), mind-affecting immunity, and opting a creature out.
 
 import { createTestActor, cleanup, useTestScene, placeToken, deleteTokens, addItems, waitFor } from "./helpers.mjs";
-import { activateAura, aurasSettled, auraKey } from "../auras.mjs";
+import { activateAura, aurasSettled, auraKey, inPlay } from "../auras.mjs";
 import { parseNote } from "../save-bonuses.mjs";
 
 const MODULE_ID = "pf1e-revamp";
@@ -135,7 +135,7 @@ export function registerAuraTests(quench) {
           await waitFor(() => item.system.uses.value === 13); // the round in progress counts as used
           await aurasSettled();
           assert.lengthOf(named(ally, /Protection/), 0);
-          await indicator.delete();
+          await waitFor(() => !cleric.items.has(indicator.id)); // ended for good: turning it back on can't restart it unpaid
         });
 
         it("Foretell: its uses are rounds per day equal to wizard level; hinder affects enemies only", async () => {
@@ -164,6 +164,16 @@ export function registerAuraTests(quench) {
           await aurasSettled();
           assert.lengthOf(named(foe, /Despair/), 1);
           assert.lengthOf(named(golem, /Despair/), 0);
+        });
+
+        it("auras work only on a scene in play (the active one, or one a connected user views)", async () => {
+          const other = await Scene.create({ name: "Quench Aura Elsewhere", navigation: false });
+          try {
+            assert.isTrue(inPlay(canvas.scene));
+            assert.isFalse(inPlay(other));
+          } finally {
+            await other.delete();
+          }
         });
 
         it("a creature whose token leaves the scene loses its aura buffs", async () => {
