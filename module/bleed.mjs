@@ -14,10 +14,16 @@ import { esc, isActiveGM, onGmRequest, requestedByOwner } from "./util.mjs";
 const FLAG = "bleed";
 const HEALED = `${MODULE_ID}BleedHealed`;
 
-/** Start (or raise) a creature's bleed. Returns a short description of what happened. */
-export async function setBleed(actor, amount, source) {
+/**
+ * Start (or raise) a creature's bleed. Returns a short description of what happened.
+ * @param {boolean} [stack] The source says its bleed stacks (Bleeding Critical: "The effects of this feat
+ *   stack"): the amount is added to the current bleed instead of replacing a lower one.
+ */
+export async function setBleed(actor, amount, source, { stack = false } = {}) {
   const current = actor.getFlag(MODULE_ID, FLAG);
-  if (current && actor.statuses.has("bleed") && current.amount >= amount) return `already bleeding ${current.amount} (bleed doesn't stack)`;
+  const bleeding = !!current && actor.statuses.has("bleed");
+  if (stack && bleeding) amount += current.amount;
+  else if (bleeding && current.amount >= amount) return `already bleeding ${current.amount} (bleed doesn't stack)`;
   await actor.setFlag(MODULE_ID, FLAG, { amount, source });
   if (!actor.statuses.has("bleed")) await actor.setCondition("bleed", true);
   return `bleeds ${amount} at the start of each of its turns`;

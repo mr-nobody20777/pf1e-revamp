@@ -104,6 +104,15 @@ Bleeding Attack's bleed is tracked with its amount, since PF1's Bleed condition 
 
 Not automated: Ghostslayer, the Assassin's Sight, Briar Bandit, Inspired Sneak Attack, Opportunity Attacker, Strangler, Savage Critical with Vital Strike, Sweeping Dodge, Ironskin, Nine Lives and Survivor.
 
+## Critical feats
+When an attack threatens a critical hit, the card shows the attacker's critical feats under that attack, one button each. Once the critical is confirmed, the attacker or the GM clicks the one to use, and it's applied to the creature hit (a player's click is carried out by the GM's client).
+- **One per critical hit**, two with Critical Mastery: the other buttons go once the limit is reached.
+- **Applied:** Staggering, Stunning, Sickening, Tiring, Exhausting, Blinding, Deafening, Bleeding (slashing or piercing weapons), Censoring, Crippling and Flaying Critical, and Destroy Identity. The Fortitude save (DC 10 + base attack bonus) is rolled for the target.
+- **Repeated hits:** Staggering, Stunning and Sickening Critical add to the duration; Bleeding Critical's bleed adds up; Flaying Critical's −1 natural armor adds up, never below 0, until the encounter ends.
+- **Immune:** undead and constructs ignore the Fortitude effects, and condition immunities count. A critical hit negated by fortification gets no critical feat.
+- **Resolved by the GM:** Impaling, Dirty Critical Hit, Impact Critical Shot, Dispelling, Accursed, Banishing, Entreating, Blighted and Sin-Sharing Critical are offered so they count toward the limit; the card says to resolve them by hand.
+- PF1's own footnotes for these feats are hidden, so nothing is applied twice.
+
 ## Fortification
 
 Fortification can negate a critical hit or sneak attack ("damage is instead rolled normally"). When an attack is a critical threat or a sneak attack against a target with fortification, the chance is rolled once for that attack, before its damage, and shown on the card for everyone. On a negation, the critical damage and sneak attack dice are dropped, so PF1's damage buttons apply the right amount.

@@ -604,7 +604,7 @@ function stackedFear(actor, id) {
 }
 
 /** Seconds left on a condition the creature already has: null if it hasn't, Infinity if it doesn't end. */
-function remainingSeconds(actor, id) {
+export function remainingSeconds(actor, id) {
   if (!actor.statuses.has(id)) return null;
   const effect = actor.effects.find((e) => e.statuses.has(id));
   const { seconds, startTime, rounds, turns } = effect?.duration ?? {};

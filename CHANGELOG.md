@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+### New
+- **Critical feats on the card.** Under each attack that threatens a critical hit, the card offers the attacker's critical feats as buttons. Once the critical is confirmed, the attacker picks one (two with Critical Mastery) and it's applied to the creature hit, with its Fortitude save (DC 10 + base attack bonus) rolled: Staggering, Stunning, Sickening, Tiring, Exhausting, Blinding, Deafening, Bleeding, Censoring, Crippling and Flaying Critical, and Destroy Identity. Repeated hits add to Staggering, Stunning and Sickening Critical's duration, Bleeding Critical's bleed stacks, and Flaying Critical's penalty adds up until the encounter ends. Undead and constructs ignore the Fortitude effects. Critical feats the module can't resolve are offered too and count toward the limit. PF1's footnotes for these feats are hidden so nothing is applied twice.
+
 ## 0.21.0: auras, damage reduction, creatures
 
 ### New
