@@ -19,6 +19,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { evaluate, classLevel, esc, titleFor, wrapMethod } from "./util.mjs"; // classLevel: flag grants
+import { materialDR } from "./magic-arms.mjs";
 
 const PF1 = "Compendium.pf1.class-abilities.Item.";
 const TPL = "Compendium.pf1.monster-templates.Item.";
@@ -227,6 +228,8 @@ Hooks.on("pf1PrepareDerivedActorData", (actor) => {
     if (!item.flags[MODULE_ID]?.grants && !(item.type === "feat" && defenseKey(item))) continue;
     for (const g of activeGrants(item)) grants.push({ ...g, source: item.name });
   }
+  grants.push(...materialDR(actor)); // adamantine armor
+
   // A bare prepareData() keeps the arrays from last time: drop what this module added then
   traits.eres ??= { value: [], custom: "" };
   traits.dr ??= { value: [], custom: "" };

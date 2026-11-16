@@ -78,6 +78,7 @@
     "module/auras.mjs",
     "module/critical-feats.mjs",
     "module/natural-riders.mjs",
+    "module/magic-arms.mjs",
     "module/weapon-qualities.mjs",
     "module/sneak-talents.mjs",
     "module/sneak-attack.mjs",

@@ -1,8 +1,7 @@
-// Weapon qualities (on-hit riders, phase 4a): the magic weapon special abilities that change a weapon's
-// damage, critical range or alignment. PF1 has no field for them (its help says to type a flaming
-// weapon's 1d6 into the action's damage), so they're read from the weapon's name ("+1 Flaming Burst
-// Longsword", "+1 Undead Bane Longsword") or chosen in the weapon's Qualities window, which wins over the
-// name. Rulings: DECISIONS.md, "Weapon qualities".
+// Weapon qualities (on-hit riders, phase 4a): what the magic weapon special abilities do to an attack:
+// damage, critical range and alignment. Which qualities a weapon has comes from magic-arms.mjs (chosen in
+// the Magic Qualities panel on the weapon's Details tab, or read from its name). Rulings: DECISIONS.md,
+// "Weapon qualities".
 //
 // Rules (Core Rulebook and Ultimate Equipment, verbatim where quoted):
 //   - Flaming, frost, shock, corrosive: "an extra 1d6 points of fire [cold, electricity, acid] damage on a
@@ -30,94 +29,23 @@
 //   - Merciful: "an extra 1d6 points of damage, but all damage it deals is nonlethal damage"; suppressed on
 //     command (lethal damage, no extra die): unticking its row.
 // The extra dice apply to each arrow of Manyshot (they aren't precision damage). When the action already
-// has the die typed in (PF1's suggested setup), the module doesn't add its own.
+// has the die typed in (PF1's suggested setup), the module doesn't add its own. A player using an
+// unidentified weapon sees its rows as "Unidentified quality".
 
-import { MODULE_ID, MELEE_ATTACKS, ATTACK_ACTIONS } from "./const.mjs";
-import { esc, titleFor, addSearch, dealDamage, restoreDamage, rollTotal, isActiveGM, wrapMethod } from "./util.mjs";
+import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
+import { esc, dealDamage, restoreDamage, rollTotal, isActiveGM, wrapMethod } from "./util.mjs";
 import { registerRollEffect, rollPlan } from "./roll-effects.mjs";
-import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { parseCreatures, matchesCreatures, typeKey } from "./creature-types.mjs";
+import { registerFootnote } from "./footnote.mjs";
+import { matchesCreatures } from "./creature-types.mjs";
 import { hitOf } from "./natural-riders.mjs";
+import { QUALITIES, qualitiesOf, foeText, keenWorks, fits, limitText } from "./magic-arms.mjs";
 
-const FLAG = "weaponQualities"; // item flag: { list?: [ids], bane?: { types, subtypes } }; card flag: { vicious }
-const WEAPONS = new Set(["weapon", "attack"]);
+const FLAG = "weaponQualities"; // card flag: { vicious }
 const ENERGY_NAME = { fire: "fire", cold: "cold", electric: "electricity", acid: "acid", sonic: "sonic" };
-
-// Every quality the Qualities window offers; `later` ones are recorded but not automated yet
-const QUALITIES = {
-  flaming: { label: "Flaming", re: /\bflaming\b/i, energy: "fire" },
-  frost: { label: "Frost", re: /\bfrost\b/i, energy: "cold" },
-  shock: { label: "Shock", re: /\bshock\b/i, energy: "electric" },
-  corrosive: { label: "Corrosive", re: /\bcorrosive\b/i, energy: "acid" },
-  flamingBurst: { label: "Flaming Burst", re: /\bflaming burst\b/i, base: "flaming", crit: "1d10", energy: "fire" },
-  icyBurst: { label: "Icy Burst", re: /\bicy burst\b/i, base: "frost", crit: "1d10", energy: "cold" },
-  shockingBurst: { label: "Shocking Burst", re: /\bshocking burst\b/i, base: "shock", crit: "1d10", energy: "electric" },
-  corrosiveBurst: { label: "Corrosive Burst", re: /\bcorrosive burst\b/i, base: "corrosive", crit: "1d10", energy: "acid" },
-  thundering: { label: "Thundering", re: /\bthundering\b/i, crit: "1d8", energy: "sonic" },
-  holy: { label: "Holy", re: /\bholy\b/i, against: "evil", aligned: "good" },
-  unholy: { label: "Unholy", re: /\bunholy\b/i, against: "good", aligned: "evil" },
-  axiomatic: { label: "Axiomatic", re: /\baxiomatic\b/i, against: "chaotic", aligned: "lawful" },
-  anarchic: { label: "Anarchic", re: /\banarchic\b/i, against: "lawful", aligned: "chaotic" },
-  bane: { label: "Bane", re: /\bbane\b/i },
-  keen: { label: "Keen", re: /\bkeen\b/i },
-  vicious: { label: "Vicious", re: /\bvicious\b/i },
-  merciful: { label: "Merciful", re: /\bmerciful\b/i },
-  wounding: { label: "Wounding", re: /\bwounding\b/i, later: true },
-  disruption: { label: "Disruption", re: /\bdisruption\b/i, later: true },
-  vorpal: { label: "Vorpal", re: /\bvorpal\b/i, later: true },
-  brilliantEnergy: { label: "Brilliant Energy", re: /\bbrilliant energy\b/i, later: true },
-  ghostTouch: { label: "Ghost Touch", re: /\bghost[\s-]touch\b/i, later: true },
-  seeking: { label: "Seeking", re: /\bseeking\b/i, later: true },
-  speed: { label: "Speed", re: /\bspeed\b/i, later: true },
-  furious: { label: "Furious", re: /\bfurious\b/i, later: true },
-  defending: { label: "Defending", re: /\bdefending\b/i, later: true },
-};
-// A burst functions as its base quality ("Flaming Burst" names flaming too): qualitiesOf adds the base
-
-/* -------------------------------------------- */
-/*  Reading the weapon                          */
-/* -------------------------------------------- */
-
-/** The designated foe in a name ("+1 Undead Bane Longsword", "Orc-Bane Greataxe"), or null. */
-function baneFromName(name) {
-  const before = name.toLowerCase().match(/([a-z' -]+?)[\s-]+bane\b/)?.[1];
-  if (!before) return null;
-  const words = before.split(/[\s-]+/).filter(Boolean);
-  for (const n of [2, 1]) {
-    if (words.length < n) continue;
-    const spec = parseCreatures(words.slice(-n).join(" "));
-    if (spec && !spec.alignments.length) return { types: spec.types, subtypes: spec.subtypes };
-  }
-  return null;
-}
-
-/** The weapon's qualities: { ids: Set, fromName, bane: { types, subtypes } | null }, or null for other items. */
-export function qualitiesOf(item) {
-  if (!item || !WEAPONS.has(item.type)) return null;
-  const flag = item.getFlag?.(MODULE_ID, FLAG) ?? null;
-  const fromName = !Array.isArray(flag?.list);
-  const ids = new Set(fromName ? Object.keys(QUALITIES).filter((id) => QUALITIES[id].re.test(item.name ?? "")) : flag.list.filter((id) => QUALITIES[id]));
-  for (const id of [...ids]) if (QUALITIES[id].base) ids.add(QUALITIES[id].base);
-  const bane = ids.has("bane") ? flag?.bane ?? (fromName ? baneFromName(item.name ?? "") : null) : null;
-  return { ids, fromName, bane };
-}
-
-const labelOf = (v) => game.i18n.localize(typeof v === "string" ? v : v?.label ?? "");
-const typeName = (key) => labelOf(Object.entries(pf1.config.creatureTypes ?? {}).find(([k]) => typeKey(k) === key)?.[1]) || key;
-const subtypeName = (key) => labelOf(Object.entries(pf1.config.creatureSubtypes ?? {}).find(([k]) => typeKey(k) === key)?.[1]) || key;
-/** "undead", "humanoid (orc)", "orc" */
-export const foeText = (spec) => {
-  if (!spec) return "";
-  const types = spec.types.map(typeName).join(" or ");
-  const subs = spec.subtypes.map(subtypeName).join(" or ");
-  return (types && subs ? `${types} (${subs})` : types || subs).toLowerCase();
-};
 
 const typesOf = (part) => [...(part?.types ?? [])];
 /** Is this die already typed into the action (PF1's suggested setup for a flaming weapon)? */
 const typedIn = (action, prop, formula, type) => (action?.damage?.[prop] ?? []).some((p) => String(p.formula ?? "").replace(/\s+/g, "") === formula && typesOf(p).includes(type));
-/** Keen works only on piercing or slashing melee weapons. */
-const keenWorks = (action) => MELEE_ATTACKS.includes(action?.actionType) && (action.damage?.parts ?? []).some((p) => typesOf(p).some((t) => t === "piercing" || t === "slashing"));
 
 /* -------------------------------------------- */
 /*  The roll window                             */
@@ -139,17 +67,23 @@ registerRollEffect({
     const { action } = roll;
     const q = qualitiesOf(action.item);
     if (!q?.ids.size || !action.damage?.parts?.length) return [];
+    const hidden = !!action.item.showUnidentifiedData;
     const out = [];
-    const entry = (id, fields) => out.push({ id: `wq-${id}`, label: QUALITIES[id].label, type: "untyped", showIn: ["dmg"], applies: true, perArrow: true, ...fields });
+    const entry = (id, fields) => {
+      if (fits(id, action) === false) return; // "Only piercing or slashing melee weapons can be keen"
+      const e = { id: `wq-${id}`, label: QUALITIES[id].name, type: "untyped", showIn: ["dmg"], applies: true, perArrow: true, ...fields };
+      if (hidden) Object.assign(e, { label: "Unidentified quality", partLabel: e.partLabel ? { atk: "Unidentified quality", dmg: "Unidentified quality" } : undefined, tooltip: "A quality of this unidentified weapon" });
+      out.push(e);
+    };
     for (const id of ["flaming", "frost", "shock", "corrosive"]) {
       const type = QUALITIES[id].energy;
       if (q.ids.has(id) && !typedIn(action, "nonCritParts", "1d6", type)) entry(id, { dice: { dmg: "1d6" }, damageTypes: [type], tooltip: `+1d6 ${ENERGY_NAME[type]} on a hit. It works on command: untick it while it's off.` });
     }
     for (const id of ["flamingBurst", "icyBurst", "shockingBurst", "corrosiveBurst", "thundering"]) {
-      const { crit, energy, label } = QUALITIES[id];
+      const { crit, energy, name } = QUALITIES[id];
       if (!q.ids.has(id) || typedIn(action, "critParts", crit, energy)) continue;
       const die = crit.slice(1);
-      entry(id, { critDamage: [{ formula: crit, types: [energy], label }], valueText: `+${crit} ${ENERGY_NAME[energy]} on a critical hit`, tooltip: `On a critical hit: ${crit} ${ENERGY_NAME[energy]} at ×2, 2${die} at ×3, 3${die} at ×4.` });
+      entry(id, { critDamage: [{ formula: crit, types: [energy], label: hidden ? "Unidentified quality" : name }], valueText: `+${crit} ${ENERGY_NAME[energy]} on a critical hit`, tooltip: `On a critical hit: ${crit} ${ENERGY_NAME[energy]} at ×2, 2${die} at ×3, 3${die} at ×4.` });
     }
     for (const id of ["holy", "unholy", "axiomatic", "anarchic"]) {
       if (!q.ids.has(id)) continue;
@@ -158,7 +92,7 @@ registerRollEffect({
     }
     if (q.ids.has("bane")) {
       const label = q.bane ? `Bane (${foeText(q.bane)})` : "Bane";
-      const applies = q.bane ? against({ ...q.bane, alignments: [] }, foeText(q.bane)) : { applies: false, reason: "choose the designated foe in the weapon's Qualities window" };
+      const applies = q.bane ? against({ ...q.bane, alignments: [] }, foeText(q.bane)) : { applies: false, reason: "choose the designated foe in the weapon's Magic Qualities" };
       entry("bane", { label, type: "enh", atk: 2, dmg: 2, dice: { dmg: "2d6" }, showIn: ["atk", "dmg"], partLabel: { atk: label, dmg: label }, valueText: "+2, +2d6 damage", tooltip: "Against the designated foe: the enhancement bonus is +2 better, and +2d6 damage", ...applies });
     }
     if (q.ids.has("vicious")) entry("vicious", { dice: { dmg: "2d6" }, tooltip: "+2d6 to the opponent, and 1d6 to the wielder on each hit" });
@@ -268,96 +202,16 @@ Hooks.once("setup", () => {
   });
 });
 
-/* -------------------------------------------- */
-/*  The Qualities window                        */
-/* -------------------------------------------- */
-
-const OUTSIDER_OR_HUMANOID = new Set(["humanoid", "outsider"]);
-
-/**
- * Choose the weapon's qualities (and a bane weapon's designated foe). `draft` ({ list, type, subtype })
- * reopens the window with what was picked when a choice needs correcting.
- */
-export async function chooseQualities(item, draft = null) {
-  const q = qualitiesOf(item);
-  if (!q) return;
-  const picked = draft ? new Set(draft.list) : q.ids;
-  const named = Object.keys(QUALITIES).filter((id) => QUALITIES[id].re.test(item.name));
-  const types = Object.keys(pf1.config.creatureTypes ?? {}).map((k) => [typeKey(k), typeName(typeKey(k))]).sort((a, b) => a[1].localeCompare(b[1]));
-  const subtypes = Object.keys(pf1.config.creatureSubtypes ?? {}).map((k) => [typeKey(k), subtypeName(typeKey(k))]).sort((a, b) => a[1].localeCompare(b[1]));
-  const foeType = draft ? draft.type : q.bane?.types?.[0] ?? "";
-  const foeSub = draft ? draft.subtype : q.bane?.subtypes?.[0] ?? "";
-  const boxes = Object.entries(QUALITIES)
-    .map(([id, d]) => `<label data-label="${esc(d.label.toLowerCase())}" style="display:block"><input type="checkbox" name="q" value="${id}" ${picked.has(id) ? "checked" : ""}> ${esc(d.label)}${d.later ? ' <span style="opacity:0.6">(not automated yet)</span>' : ""}</label>`)
-    .join("");
-  const content = `
-    <p>${named.length ? `Read from the name: ${esc(named.map((id) => QUALITIES[id].label).join(", "))}.` : "The name names no qualities."} What's ticked here is used instead of the name.</p>
-    <input type="search" name="filter" placeholder="Search…" style="width:100%">
-    <div style="max-height:260px; overflow-y:auto; columns:2; margin:0.5em 0">${boxes}</div>
-    <fieldset><legend>Bane: designated foe</legend>
-      <select name="baneType"><option value="">Type…</option>${types.map(([k, l]) => `<option value="${k}" ${k === foeType ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
-      <select name="baneSubtype"><option value="">(no subtype)</option>${subtypes.map(([k, l]) => `<option value="${k}" ${k === foeSub ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
-      <p style="opacity:0.8; margin:0.25em 0 0">Humanoids and outsiders: pick one subtype.</p>
-    </fieldset>`;
-  const result = await foundry.applications.api.DialogV2.wait({
-    window: { title: titleFor(`${item.name}: weapon qualities`, item.actor) },
-    position: { width: 460 },
-    content,
-    render: (event, dialog) => {
-      const root = dialog.element;
-      root.querySelectorAll("select").forEach(addSearch);
-      root.querySelector("input[name=filter]")?.addEventListener("input", (e) => {
-        const text = e.target.value.trim().toLowerCase();
-        root.querySelectorAll("label[data-label]").forEach((l) => (l.style.display = !text || l.dataset.label.includes(text) ? "block" : "none"));
-      });
-    },
-    buttons: [
-      {
-        action: "save",
-        label: "Save",
-        default: true,
-        callback: (event, button) => {
-          const form = button.form;
-          return { list: [...form.querySelectorAll("input[name=q]:checked")].map((i) => i.value), type: form.elements.baneType.value, subtype: form.elements.baneSubtype.value };
-        },
-      },
-      { action: "name", label: "Use the name" },
-      { action: "cancel", label: "Cancel" },
-    ],
-    rejectClose: false,
-  });
-  if (result === "name") {
-    await item.unsetFlag(MODULE_ID, FLAG);
-    return refreshFootnotes(item);
-  }
-  if (!result || typeof result !== "object") return;
-  if (result.list.includes("bane") && OUTSIDER_OR_HUMANOID.has(result.type) && !result.subtype) {
-    ui.notifications.warn("A humanoid or outsider bane names one subtype.");
-    return chooseQualities(item, result);
-  }
-  const bane = result.type || result.subtype ? { types: result.type ? [result.type] : [], subtypes: result.subtype ? [result.subtype] : [] } : null;
-  await item.setFlag(MODULE_ID, FLAG, { list: result.list, bane });
-  refreshFootnotes(item);
-}
-
-// A Qualities button in the weapon sheet's header
-Hooks.on("getItemSheetPFHeaderButtons", (app, buttons) => {
-  if (!WEAPONS.has(app.item?.type) || !app.item.isOwner) return;
-  buttons.unshift({ label: "Qualities", class: `${MODULE_ID}-weapon-qualities`, icon: "fa-solid fa-wand-sparkles", onclick: () => chooseQualities(app.item) });
-});
-
+// On the weapon's cards and sheet: which qualities it has (hidden while unidentified)
 registerFootnote((item) => {
   const q = qualitiesOf(item);
-  if (!q?.ids.size) return null;
-  const shown = [...q.ids].filter((id) => ![...q.ids].some((o) => QUALITIES[o].base === id)); // "Flaming Burst", not also "Flaming"
-  const names = shown.map((id) => (id === "bane" && q.bane ? `Bane (${foeText(q.bane)})` : QUALITIES[id].label));
+  if (!q?.names.length || !["weapon", "attack"].includes(item.type) || item.showUnidentifiedData) return null;
+  const names = q.names.map((n) => (n.toLowerCase() === "bane" && q.bane ? `Bane (${foeText(q.bane)})` : n));
   const notes = [];
-  const later = shown.filter((id) => QUALITIES[id].later);
-  if (later.length) notes.push(`${later.map((id) => QUALITIES[id].label).join(", ")}: not automated yet.`);
-  if (q.ids.has("bane") && !q.bane) notes.push("Bane: choose the designated foe.");
-  if (q.ids.has("keen") && item.defaultAction && !keenWorks(item.defaultAction)) notes.push("Keen works only on piercing or slashing melee weapons.");
-  const text = `Weapon qualities (${q.fromName ? "from the name" : "chosen"}): ${names.join(", ")}. Their damage is added in the roll window.${notes.length ? ` ${notes.join(" ")}` : ""}`;
-  return item.isOwner ? [text, footnoteButton("Qualities…", "Choose the weapon's qualities", () => chooseQualities(item))] : [text];
+  const later = [...q.ids].filter((id) => QUALITIES[id].later);
+  if (later.length) notes.push(`${later.map((id) => QUALITIES[id].name).join(", ")}: not automated yet.`);
+  for (const id of q.ids) if (fits(id, item.defaultAction) === false) notes.push(`${QUALITIES[id].name} works only on ${limitText(id)}.`);
+  return [`Weapon qualities (${q.fromName ? "from the name" : "chosen on the Details tab"}): ${names.join(", ")}. Their damage is added in the roll window.${notes.length ? ` ${notes.join(" ")}` : ""}`];
 });
 
-export const _test = { QUALITIES, qualitiesOf, baneFromName, keenWorks, FLAG };
+export const _test = { FLAG };

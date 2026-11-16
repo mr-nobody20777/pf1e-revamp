@@ -17,6 +17,7 @@
 import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
 import { esc, classLevel, onGmRequest, equippedItem as worn, requestedByOwner } from "./util.mjs";
 import { rollPlan, registerDamageFilter } from "./roll-effects.mjs";
+import { qualitiesOf } from "./magic-arms.mjs";
 
 const KEY = `${MODULE_ID}Fortification`; // on the action use's roll data: attack index → roll
 const FLAG = "fortification";
@@ -35,8 +36,13 @@ export function fortificationOf(defender) {
   if (!defender) return null;
   const found = [];
   const level = (name) => LEVELS[name.match(/\b(light|moderate|heavy)\b/i)?.[1]?.toLowerCase()] ?? 0;
-  const armor = worn(defender, /fortification/i);
-  if (armor && level(armor.name)) found.push({ chance: level(armor.name), label: armor.name, armor: true });
+  // Armor or a shield with the quality (chosen on its Magic Qualities, or in its name)
+  for (const item of defender.itemTypes?.equipment ?? []) {
+    if (!item.system.equipped || !["armor", "shield"].includes(item.system.subType)) continue;
+    const named = qualitiesOf(item)?.names.find((n) => /^fortification \((light|moderate|heavy)\)$/i.test(n));
+    const chance = named ? level(named) : /fortification/i.test(item.name) ? level(item.name) : 0;
+    if (chance) found.push({ chance, label: item.name, armor: true });
+  }
   const quality = feat(defender, /^fortification \((light|moderate|heavy)\)/i);
   if (quality) found.push({ chance: level(quality.name), label: quality.name, armor: true });
   const monster = feat(defender, /^fortification(\s*\(\d+%\))?$/i);

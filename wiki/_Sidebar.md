@@ -10,6 +10,7 @@
 **Play**
 - [Spells and Buffs](Spells-and-Buffs)
 - [Combat Rules](Combat-Rules)
+- [Magic Items](Magic-Items)
 
 **Reference**
 - [Compatibility](Compatibility)

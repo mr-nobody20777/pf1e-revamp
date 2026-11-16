@@ -4,6 +4,7 @@
 
 import { createTestActor, cleanup, useTestScene, placeToken, deleteTokens, addItems, setTargets, useAndCollect, waitFor } from "./helpers.mjs";
 import { _test } from "../weapon-qualities.mjs";
+import * as MA from "../magic-arms.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -17,8 +18,8 @@ export function registerWeaponQualityTests(quench) {
         this.timeout(60000);
         let fighter, goblin, priest, skeleton, tokens, sceneCtl, messagesBefore;
         const originalRandom = CONFIG.Dice.randomUniform;
-        const fake = (name, flag = null) => ({ type: "weapon", name, getFlag: () => flag });
-        const ids = (name, flag) => [..._test.qualitiesOf(fake(name, flag)).ids].sort();
+        const fake = (name, flag = null) => ({ type: "weapon", name, _source: { name }, system: {}, flags: { [MODULE_ID]: { magicArms: flag } } });
+        const ids = (name, flag) => [...MA.qualitiesOf(fake(name, flag)).ids].sort();
         /** A weapon on the fighter, named for its qualities. */
         const weapon = async (base, name, extra = {}) => (await addItems(fighter, [["pf1.weapons-and-ammo", base, { name, system: { equipped: true }, ...extra }]]))[0];
         const damage = async (item, critical = false) => {
@@ -76,15 +77,15 @@ export function registerWeaponQualityTests(quench) {
         });
 
         it("reads a bane weapon's designated foe from the name", () => {
-          assert.deepEqual(_test.qualitiesOf(fake("+1 Undead Bane Longsword")).bane, { types: ["undead"], subtypes: [] });
-          assert.deepEqual(_test.qualitiesOf(fake("+1 Orc-Bane Greataxe")).bane, { types: [], subtypes: ["orc"] });
-          assert.deepEqual(_test.qualitiesOf(fake("+1 Magical Beast Bane Spear")).bane, { types: ["magicalbeast"], subtypes: [] });
-          assert.isNull(_test.qualitiesOf(fake("+1 Bane Longsword")).bane);
+          assert.deepEqual(MA.qualitiesOf(fake("+1 Undead Bane Longsword")).bane, { types: ["undead"], subtypes: [] });
+          assert.deepEqual(MA.qualitiesOf(fake("+1 Orc-Bane Greataxe")).bane, { types: [], subtypes: ["orc"] });
+          assert.deepEqual(MA.qualitiesOf(fake("+1 Magical Beast Bane Spear")).bane, { types: ["magicalbeast"], subtypes: [] });
+          assert.isNull(MA.qualitiesOf(fake("+1 Bane Longsword")).bane);
         });
 
         it("qualities chosen on the weapon win over the name", () => {
-          assert.deepEqual(ids("+1 Flaming Longsword", { list: ["frost"] }), ["frost"]);
-          assert.deepEqual(_test.qualitiesOf(fake("+1 Bane Longsword", { list: ["bane"], bane: { types: ["dragon"], subtypes: [] } })).bane, { types: ["dragon"], subtypes: [] });
+          assert.deepEqual(ids("+1 Flaming Longsword", { qualities: ["Frost"] }), ["frost"]);
+          assert.deepEqual(MA.qualitiesOf(fake("+1 Bane Longsword", { qualities: ["Bane"], bane: { types: ["dragon"], subtypes: [] } })).bane, { types: ["dragon"], subtypes: [] });
         });
 
         it("flaming: +1d6 fire in normal damage, never multiplied on a critical hit", async () => {
@@ -141,7 +142,7 @@ export function registerWeaponQualityTests(quench) {
           let card = await attackWith(sword, tokens.goblin, 17);
           assert.isOk(card.systemRolls.attacks[0].critConfirm, "17 threatens with a keen longsword (17–20)");
           const club = await weapon("Club", "+1 Keen Club");
-          assert.isFalse(_test.keenWorks(club.defaultAction));
+          assert.isFalse(MA.keenWorks(club.defaultAction));
           card = await attackWith(club, tokens.goblin, 19);
           assert.notOk(card.systemRolls.attacks[0].critConfirm, "a club stays 20 only");
         });
@@ -293,48 +294,6 @@ export function registerWeaponQualityTests(quench) {
           undo.click();
           await waitFor(() => card.getFlag(MODULE_ID, _test.FLAG)?.vicious?.applied?.[0]?.undone);
           assert.equal(fighter.system.attributes.hp.value, start);
-        });
-
-        it("the Qualities window saves a choice, warns about a humanoid bane without a subtype, and goes back to the name", async () => {
-          const { chooseQualities } = await import("../weapon-qualities.mjs");
-          const sword = await weapon("Longsword", "+1 Flaming Longsword");
-          // A new window each time: a closed one stays in the page while it fades out
-          const seen = new Set();
-          const dialog = async () => {
-            const d = await waitFor(() => [...document.querySelectorAll(".application.dialog")].find((x) => !seen.has(x) && /weapon qualities/.test(x.querySelector(".window-title")?.textContent ?? "")));
-            seen.add(d);
-            return d;
-          };
-          const tick = (d, id, on) => (d.querySelector(`input[name=q][value=${id}]`).checked = on);
-          // Choose frost instead of flaming
-          let done = chooseQualities(sword);
-          let d = await dialog();
-          tick(d, "flaming", false);
-          tick(d, "frost", true);
-          d.querySelector("button[data-action=save]").click();
-          await done;
-          assert.deepEqual(sword.getFlag(MODULE_ID, _test.FLAG).list, ["frost"]);
-          assert.deepEqual([..._test.qualitiesOf(sword).ids], ["frost"]);
-          // A humanoid bane needs a subtype: warned, and the window opens again
-          done = chooseQualities(sword);
-          d = await dialog();
-          tick(d, "bane", true);
-          d.querySelector("select[name=baneType]").value = "humanoid";
-          d.querySelector("button[data-action=save]").click();
-          const again = await dialog();
-          assert.isTrue(again.querySelector("input[name=q][value=bane]").checked, "the reopened window keeps what was ticked");
-          assert.equal(again.querySelector("select[name=baneType]").value, "humanoid");
-          again.querySelector("select[name=baneSubtype]").value = "orc";
-          again.querySelector("button[data-action=save]").click();
-          await done;
-          assert.deepEqual(sword.getFlag(MODULE_ID, _test.FLAG).bane, { types: ["humanoid"], subtypes: ["orc"] });
-          // Back to the name
-          done = chooseQualities(sword);
-          d = await dialog();
-          d.querySelector("button[data-action=name]").click();
-          await done;
-          assert.isUndefined(sword.getFlag(MODULE_ID, _test.FLAG));
-          assert.deepEqual([..._test.qualitiesOf(sword).ids], ["flaming"]);
         });
       });
     },

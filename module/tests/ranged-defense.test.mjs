@@ -24,11 +24,13 @@ export function registerRangedDefenseTests(quench) {
         };
         const buff = (name, level = 1) => ({ type: "buff", name, system: { subType: "spell", active: true, level } });
         const worn = (name, subType = "wondrous") => ({ type: "equipment", name, system: { subType, equipped: true } });
-        const bow = () => archer.items.getName("Longbow").defaultAction;
-        const sword = () => archer.items.getName("Longsword").defaultAction;
+        // By stored name: a +1 weapon shows a generated name ("+1 Longbow")
+        const stored = (name) => archer.items.find((i) => i._source.name === name);
+        const bow = () => stored("Longbow").defaultAction;
+        const sword = () => stored("Longsword").defaultAction;
         async function shoot() {
           const before = new Set(game.messages.keys());
-          await archer.items.getName("Longbow").use({ skipDialog: true });
+          await stored("Longbow").use({ skipDialog: true });
           return waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.type === "action"));
         }
 
@@ -120,11 +122,11 @@ export function registerRangedDefenseTests(quench) {
           assert.equal(goblin.system.attributes.hp.value, start - 18, "melee: no DR");
           await goblin.applyDamage(14, { action: bow(), forceDialog: false });
           assert.isFalse(ward.isActive, "discharged");
-          await archer.items.getName("Longbow").update({ "system.enh": 1 });
+          await stored("Longbow").update({ "system.enh": 1 });
           try {
             assert.isNull(defense.rangedDR(goblin, bow()), "a +1 bow overcomes /magic");
           } finally {
-            await archer.items.getName("Longbow").update({ "system.enh": 0 });
+            await stored("Longbow").update({ "system.enh": 0 });
           }
         });
 

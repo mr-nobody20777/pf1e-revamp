@@ -39,6 +39,7 @@ import { registerCriticalFeatTests } from "./critical-feats.test.mjs";
 import { registerNaturalRiderTests } from "./natural-riders.test.mjs";
 import { registerMonsterGrappleTests } from "./monster-grapple.test.mjs";
 import { registerWeaponQualityTests } from "./weapon-qualities.test.mjs";
+import { registerMagicArmsTests } from "./magic-arms.test.mjs";
 
 export function registerTests(quench) {
   registerTwoWeaponTests(quench);
@@ -58,6 +59,7 @@ export function registerTests(quench) {
   registerNaturalRiderTests(quench);
   registerMonsterGrappleTests(quench);
   registerWeaponQualityTests(quench);
+  registerMagicArmsTests(quench);
   registerQuarryTests(quench);
   registerTrueStrikeTests(quench);
   registerMissChanceTests(quench);

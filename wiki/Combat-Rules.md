@@ -138,12 +138,12 @@ When an attack threatens a critical hit, the card shows the attacker's critical 
 - PF1's own footnotes for these feats are hidden, so nothing is applied twice.
 
 ## Weapon qualities
-A weapon's magic qualities are read from its name ("+1 Flaming Burst Longsword", "+1 Undead Bane Longsword"). The **Qualities** button in the weapon sheet's header (or in its footnote) opens a list to add or correct them, for weapons whose name doesn't say, such as Frost Brand; what's ticked there is used instead of the name, and **Use the name** goes back to reading it.
+A weapon's magic qualities are chosen in the **Magic Qualities** section of its Details tab, or read from its name ("+1 Flaming Burst Longsword", "+1 Undead Bane Longsword") when nothing is chosen there. See [Magic Items](Magic-Items).
 
 - **Flaming, frost, shock, corrosive:** +1d6 fire, cold, electricity or acid on a hit.
 - **Flaming burst, icy burst, shocking burst, corrosive burst:** the base quality, plus 1d10 of the energy on a critical hit (2d10 at ×3, 3d10 at ×4), even while the base quality is off. **Thundering:** 1d8 sonic on a critical hit, by the same steps.
 - **Holy, unholy, axiomatic, anarchic:** +2d6 against creatures of the opposed alignment, and the weapon counts as good, evil, lawful or chaotic against damage reduction.
-- **Bane:** +2 on attack and damage rolls and +2d6 against the designated foe, read from the name or chosen in the Qualities window.
+- **Bane:** +2 on attack and damage rolls and +2d6 against the designated foe, read from the name or chosen with the qualities.
 - **Keen:** doubles the threat range of a piercing or slashing melee weapon (19–20 becomes 17–20), unless something else already expanded it.
 - **Vicious:** +2d6, and 1d6 to the wielder on each hit: applied when the module can tell the attack hit, with an Undo, otherwise an Apply button.
 - **Merciful:** +1d6, and all of the attack's damage is nonlethal.
