@@ -137,6 +137,21 @@ When an attack threatens a critical hit, the card shows the attacker's critical 
 - **Resolved by the GM:** Impaling, Dirty Critical Hit, Impact Critical Shot, Dispelling, Accursed, Banishing, Entreating, Blighted and Sin-Sharing Critical are offered so they count toward the limit; the card says to resolve them by hand.
 - PF1's own footnotes for these feats are hidden, so nothing is applied twice.
 
+## Weapon qualities
+A weapon's magic qualities are read from its name ("+1 Flaming Burst Longsword", "+1 Undead Bane Longsword"). The **Qualities** button in the weapon sheet's header (or in its footnote) opens a list to add or correct them, for weapons whose name doesn't say, such as Frost Brand; what's ticked there is used instead of the name, and **Use the name** goes back to reading it.
+
+- **Flaming, frost, shock, corrosive:** +1d6 fire, cold, electricity or acid on a hit.
+- **Flaming burst, icy burst, shocking burst, corrosive burst:** the base quality, plus 1d10 of the energy on a critical hit (2d10 at ×3, 3d10 at ×4), even while the base quality is off. **Thundering:** 1d8 sonic on a critical hit, by the same steps.
+- **Holy, unholy, axiomatic, anarchic:** +2d6 against creatures of the opposed alignment, and the weapon counts as good, evil, lawful or chaotic against damage reduction.
+- **Bane:** +2 on attack and damage rolls and +2d6 against the designated foe, read from the name or chosen in the Qualities window.
+- **Keen:** doubles the threat range of a piercing or slashing melee weapon (19–20 becomes 17–20), unless something else already expanded it.
+- **Vicious:** +2d6, and 1d6 to the wielder on each hit: applied when the module can tell the attack hit, with an Undo, otherwise an Apply button.
+- **Merciful:** +1d6, and all of the attack's damage is nonlethal.
+
+Each quality's damage is a row in the roll window: untick it while a quality is turned off, or to suppress merciful. Holy, bane and the others that depend on the target apply when every target qualifies, otherwise the row says why and can be ticked by hand. Extra dice are never multiplied on a critical hit and apply to each arrow of Manyshot. If the weapon's action already has the die typed into its damage, the module doesn't add it again.
+
+Not automated yet: wounding, disruption, vorpal, brilliant energy, ghost touch's damage against incorporeal creatures, seeking, speed, furious and defending (they can be marked already), qualities on ammunition, and bane's +2 against damage reduction.
+
 ## Fortification
 
 Fortification can negate a critical hit or sneak attack ("damage is instead rolled normally"). When an attack is a critical threat or a sneak attack against a target with fortification, the chance is rolled once for that attack, before its damage, and shown on the card for everyone. On a negation, the critical damage and sneak attack dice are dropped, so PF1's damage buttons apply the right amount.

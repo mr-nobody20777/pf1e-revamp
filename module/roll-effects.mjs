@@ -52,6 +52,8 @@ const providers = [];
  * `dice` adds dice instead ({ dmg: "3d6" }): a damage part of their own that isn't multiplied on a
  * critical hit (sneak attack and other precision damage), with `damageType` added to the weapon's types
  * (or `damageTypes` instead of them); `extraDamage` [{ formula, types, label }] adds more such parts.
+ * `critDamage` [{ formula, types, label }] adds parts only to a critical hit's extra damage, once per
+ * multiplier step above ×1. Dice skip Manyshot's extra arrow unless the entry is `perArrow`.
  * `partLabel` ({ atk: "Powerful Sneak" }) labels a part's number in the formula instead of `part`.
  * Attack rolls also carry `flags`, the attack window's checkboxes ({ flanking, charge, highGround,
  * manyshot, rapidShot, pointBlankShot }); the window is rebuilt, keeping the player's choices, when they change.
@@ -665,9 +667,16 @@ Hooks.once("init", () => {
     parts[0].extra.push(...partsFor(plan, "dmg", rollData));
     // Dice (sneak attack) aren't multiplied on a critical hit: only in the normal damage roll, whose
     // total PF1 adds to the separate critical damage roll. Precision damage counts once per volley, so
-    // not on Manyshot's extra arrow.
-    if (rollData.critMult > 1 || rollData[FLAGS]?.manyshotAttacks?.includes(rollData.attackCount)) return;
+    // not on Manyshot's extra arrow (entries marked `perArrow`, a flaming bow's fire, apply to each arrow).
+    // Dice dealt only on a critical hit (`critDamage`, a flaming burst's 1d10) go in the critical damage
+    // roll, which PF1 rolls once per multiplier step above ×1: 1d10 at ×2, 2d10 at ×3, 3d10 at ×4.
+    if (rollData.critMult > 1) {
+      for (const p of plan.provided) for (const x of p.critDamage ?? []) parts.push({ base: `${x.formula}[${x.label}]`, extra: [], damageType: x.types, type: "crit" });
+      return;
+    }
+    const extraArrow = !!rollData[FLAGS]?.manyshotAttacks?.includes(rollData.attackCount);
     for (const p of plan.provided) {
+      if (extraArrow && !p.perArrow) continue;
       if (p.dice?.dmg) {
         const types = p.damageTypes ?? [...new Set([...(parts[0].damageType ?? []), ...(p.damageType ? [p.damageType] : [])])];
         const formula = /[+-]/.test(p.dice.dmg) ? `(${p.dice.dmg})` : p.dice.dmg;
