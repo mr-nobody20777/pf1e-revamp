@@ -274,17 +274,21 @@ Hooks.once("setup", () => {
 
 const OUTSIDER_OR_HUMANOID = new Set(["humanoid", "outsider"]);
 
-/** Choose the weapon's qualities (and a bane weapon's designated foe). */
-export async function chooseQualities(item) {
+/**
+ * Choose the weapon's qualities (and a bane weapon's designated foe). `draft` ({ list, type, subtype })
+ * reopens the window with what was picked when a choice needs correcting.
+ */
+export async function chooseQualities(item, draft = null) {
   const q = qualitiesOf(item);
   if (!q) return;
+  const picked = draft ? new Set(draft.list) : q.ids;
   const named = Object.keys(QUALITIES).filter((id) => QUALITIES[id].re.test(item.name));
   const types = Object.keys(pf1.config.creatureTypes ?? {}).map((k) => [typeKey(k), typeName(typeKey(k))]).sort((a, b) => a[1].localeCompare(b[1]));
   const subtypes = Object.keys(pf1.config.creatureSubtypes ?? {}).map((k) => [typeKey(k), subtypeName(typeKey(k))]).sort((a, b) => a[1].localeCompare(b[1]));
-  const foeType = q.bane?.types?.[0] ?? "";
-  const foeSub = q.bane?.subtypes?.[0] ?? "";
+  const foeType = draft ? draft.type : q.bane?.types?.[0] ?? "";
+  const foeSub = draft ? draft.subtype : q.bane?.subtypes?.[0] ?? "";
   const boxes = Object.entries(QUALITIES)
-    .map(([id, d]) => `<label data-label="${esc(d.label.toLowerCase())}" style="display:block"><input type="checkbox" name="q" value="${id}" ${q.ids.has(id) ? "checked" : ""}> ${esc(d.label)}${d.later ? ' <span style="opacity:0.6">(not automated yet)</span>' : ""}</label>`)
+    .map(([id, d]) => `<label data-label="${esc(d.label.toLowerCase())}" style="display:block"><input type="checkbox" name="q" value="${id}" ${picked.has(id) ? "checked" : ""}> ${esc(d.label)}${d.later ? ' <span style="opacity:0.6">(not automated yet)</span>' : ""}</label>`)
     .join("");
   const content = `
     <p>${named.length ? `Read from the name: ${esc(named.map((id) => QUALITIES[id].label).join(", "))}.` : "The name names no qualities."} What's ticked here is used instead of the name.</p>
@@ -329,7 +333,7 @@ export async function chooseQualities(item) {
   if (!result || typeof result !== "object") return;
   if (result.list.includes("bane") && OUTSIDER_OR_HUMANOID.has(result.type) && !result.subtype) {
     ui.notifications.warn("A humanoid or outsider bane names one subtype.");
-    return chooseQualities(item);
+    return chooseQualities(item, result);
   }
   const bane = result.type || result.subtype ? { types: result.type ? [result.type] : [], subtypes: result.subtype ? [result.subtype] : [] } : null;
   await item.setFlag(MODULE_ID, FLAG, { list: result.list, bane });

@@ -146,6 +146,21 @@ export function registerWeaponQualityTests(quench) {
           assert.notOk(card.systemRolls.attacks[0].critConfirm, "a club stays 20 only");
         });
 
+        it("keen doesn't stack with Roll Bonuses' Improved Critical (17–20, not 13–20)", async function () {
+          if (!game.modules.get("ckl-roll-bonuses")?.active) this.skip();
+          const sword = await weapon("Longsword", "+1 Keen Longsword");
+          const [feat] = await addItems(fighter, [["pf1.feats", "Improved Critical"]]);
+          try {
+            if (sword.defaultAction.critRange !== 17) this.skip(); // Roll Bonuses didn't pick the feat up
+            let card = await attackWith(sword, tokens.goblin, 17);
+            assert.isOk(card.systemRolls.attacks[0].critConfirm);
+            card = await attackWith(sword, tokens.goblin, 15);
+            assert.notOk(card.systemRolls.attacks[0].critConfirm, "not doubled again");
+          } finally {
+            await feat.delete();
+          }
+        });
+
         it("merciful: +1d6 and the whole card's damage is nonlethal", async () => {
           const sword = await weapon("Longsword", "+1 Merciful Longsword");
           const card = await attackWith(sword, tokens.goblin, 10);
@@ -161,6 +176,165 @@ export function registerWeaponQualityTests(quench) {
           const applied = await waitFor(() => card.getFlag(MODULE_ID, _test.FLAG)?.vicious?.applied?.[0], { what: "vicious damage" });
           assert.isAtLeast(applied.total, 1);
           assert.equal(fighter.system.attributes.hp.value, before - applied.total);
+        });
+
+        /* Applying damage, the card's buttons, the roll window model and the Qualities window */
+
+        const cardRolls = (card) => card.systemRolls.attacks[0].damage ?? [];
+        /** Click the card's normal Apply button with `token` selected; returns the hit points it took. */
+        const applyFromCard = async (card, token, actor) => {
+          const button = await waitFor(() => document.querySelector(`[data-message-id="${card.id}"] [data-action="applyDamage"][data-type="normal"]:not([data-ratio])`) ?? document.querySelector(`[data-message-id="${card.id}"] [data-action="applyDamage"]`));
+          token.object.control({ releaseOthers: true });
+          const hp = () => actor.system.attributes.hp;
+          const start = { value: hp().value, nonlethal: hp().nonlethal ?? 0 };
+          button.click();
+          await waitFor(() => hp().value !== start.value || (hp().nonlethal ?? 0) !== start.nonlethal, { what: "damage applied" });
+          canvas.tokens.releaseAll();
+          return { lost: start.value - hp().value, nonlethal: (hp().nonlethal ?? 0) - start.nonlethal };
+        };
+        /** Plenty of hit points (PF1 derives the maximum, so a buff raises it): nonlethal damage above the maximum turns lethal. */
+        const sturdy = async (actor) => {
+          await actor.createEmbeddedDocuments("Item", [{ name: "Quench Sturdy", type: "buff", system: { active: true, changes: [{ formula: "200", target: "mhp", type: "untyped" }] } }]);
+          await actor.update({ "system.attributes.hp.offset": 0 });
+        };
+        const unsturdy = (actor) => actor.deleteEmbeddedDocuments("Item", actor.itemTypes.buff.filter((b) => b.name === "Quench Sturdy").map((b) => b.id));
+        const heal = (actor) => actor.update({ "system.attributes.hp.value": actor.system.attributes.hp.max, "system.attributes.hp.nonlethal": 0 });
+
+        it("bursts by multiplier: one 1d10 at ×2 (longsword), three at ×4 (scythe)", async () => {
+          const sword = await weapon("Longsword", "+1 Flaming Burst Longsword");
+          let card = await attackWith(sword, tokens.goblin, 20);
+          assert.equal((card.systemRolls.attacks[0].critDamage ?? []).filter((r) => /Flaming Burst/.test(r.formula)).length, 1);
+          const scythe = await weapon("Scythe", "+1 Icy Burst Scythe");
+          card = await attackWith(scythe, tokens.goblin, 20);
+          const bursts = (card.systemRolls.attacks[0].critDamage ?? []).filter((r) => /Icy Burst/.test(r.formula));
+          assert.equal(bursts.length, 3);
+          assert.deepEqual([...bursts[0].options.damageType], ["cold"]);
+        });
+
+        it("holy with mixed targets: Not Applied with the reason, so it can be ticked by hand", async () => {
+          const mace = await weapon("Heavy Mace", "+1 Holy Heavy Mace");
+          setTargets([tokens.priest, tokens.goblin]);
+          const RE = await import("../roll-effects.mjs");
+          const model = RE._test.buildModel(fighter, { kind: "attack", action: mace.defaultAction, flags: {} });
+          const holy = model.provided.find((p) => p.id === "wq-holy");
+          assert.isFalse(holy.applies);
+          assert.match(holy.reason, /only some targets are evil/);
+          assert.notMatch(text(await damage(mace)), /Holy/);
+        });
+
+        it("energy dice apply to each arrow of Manyshot (not only the first, unlike precision damage)", async () => {
+          const bow = await weapon("Longbow", "+1 Flaming Longbow");
+          const action = bow.defaultAction;
+          const data = action.getRollData();
+          Object.assign(data, { attackCount: 1, "pf1e-revampAttackFlags": { manyshotAttacks: [1] } });
+          const rolls = await action.rollDamage({ data });
+          assert.match(rolls.map((r) => r.formula).join(" + "), /1d6\[Flaming\]/);
+        });
+
+        it("applied from the card, the flaming die is reduced by fire resistance (resist fire 5)", async () => {
+          await goblin.update({ "system.traits.eres": { value: [{ amount: 5, operator: true, types: ["fire", ""] }], custom: "" } });
+          try {
+            const sword = await weapon("Longsword", "+1 Flaming Longsword");
+            const card = await attackWith(sword, tokens.goblin, 10);
+            const rolls = cardRolls(card);
+            const fire = rolls.filter((r) => [...(r.options.damageType ?? [])].includes("fire")).reduce((t, r) => t + r.total, 0);
+            const other = rolls.reduce((t, r) => t + r.total, 0) - fire;
+            assert.isAbove(fire, 0, "the card has a fire part");
+            const { lost } = await applyFromCard(card, tokens.goblin, goblin);
+            assert.equal(lost, other + Math.max(0, fire - 5));
+          } finally {
+            await goblin.update({ "system.traits.eres": { value: [], custom: "" } });
+            await heal(goblin);
+          }
+        });
+
+        it("applied from the card, a holy weapon gets through DR 5/good and a plain one doesn't", async () => {
+          await priest.update({ "system.traits.dr": { value: [{ amount: 5, operator: true, types: ["good", ""] }], custom: "" } });
+          try {
+            const holy = await weapon("Heavy Mace", "+1 Holy Heavy Mace");
+            let card = await attackWith(holy, tokens.priest, 10);
+            let total = cardRolls(card).reduce((t, r) => t + r.total, 0);
+            assert.equal((await applyFromCard(card, tokens.priest, priest)).lost, total, "holy: no DR");
+            await heal(priest);
+            const plain = await weapon("Heavy Mace", "+1 Heavy Mace", { system: { equipped: true, enh: 1 } });
+            card = await attackWith(plain, tokens.priest, 10);
+            total = cardRolls(card).reduce((t, r) => t + r.total, 0);
+            assert.equal((await applyFromCard(card, tokens.priest, priest)).lost, Math.max(0, total - 5), "plain: DR 5/good");
+          } finally {
+            await priest.update({ "system.traits.dr": { value: [], custom: "" } });
+            await heal(priest);
+          }
+        });
+
+        it("applied from the card, merciful damage is nonlethal", async () => {
+          await sturdy(goblin);
+          try {
+            const sword = await weapon("Longsword", "+1 Merciful Longsword");
+            const card = await attackWith(sword, tokens.goblin, 10);
+            const total = cardRolls(card).reduce((t, r) => t + r.total, 0);
+            const { lost, nonlethal } = await applyFromCard(card, tokens.goblin, goblin);
+            assert.equal(lost, 0, "no lethal damage");
+            assert.equal(nonlethal, total);
+          } finally {
+            await unsturdy(goblin);
+            await heal(goblin);
+          }
+        });
+
+        it("vicious without a target: the card's Apply deals the wielder 1d6, and Undo gives it back", async () => {
+          const sword = await weapon("Longsword", "+1 Vicious Longsword");
+          const start = fighter.system.attributes.hp.value;
+          const card = await attackWith(sword, null, 10);
+          const apply = await waitFor(() => [...document.querySelectorAll(`[data-message-id="${card.id}"] .${MODULE_ID}-vicious button`)].find((b) => b.textContent === "Apply"));
+          apply.click();
+          const applied = await waitFor(() => card.getFlag(MODULE_ID, _test.FLAG)?.vicious?.applied?.[0]);
+          assert.equal(fighter.system.attributes.hp.value, start - applied.total);
+          const undo = await waitFor(() => [...document.querySelectorAll(`[data-message-id="${card.id}"] .${MODULE_ID}-vicious button`)].find((b) => b.textContent === "Undo"));
+          undo.click();
+          await waitFor(() => card.getFlag(MODULE_ID, _test.FLAG)?.vicious?.applied?.[0]?.undone);
+          assert.equal(fighter.system.attributes.hp.value, start);
+        });
+
+        it("the Qualities window saves a choice, warns about a humanoid bane without a subtype, and goes back to the name", async () => {
+          const { chooseQualities } = await import("../weapon-qualities.mjs");
+          const sword = await weapon("Longsword", "+1 Flaming Longsword");
+          // A new window each time: a closed one stays in the page while it fades out
+          const seen = new Set();
+          const dialog = async () => {
+            const d = await waitFor(() => [...document.querySelectorAll(".application.dialog")].find((x) => !seen.has(x) && /weapon qualities/.test(x.querySelector(".window-title")?.textContent ?? "")));
+            seen.add(d);
+            return d;
+          };
+          const tick = (d, id, on) => (d.querySelector(`input[name=q][value=${id}]`).checked = on);
+          // Choose frost instead of flaming
+          let done = chooseQualities(sword);
+          let d = await dialog();
+          tick(d, "flaming", false);
+          tick(d, "frost", true);
+          d.querySelector("button[data-action=save]").click();
+          await done;
+          assert.deepEqual(sword.getFlag(MODULE_ID, _test.FLAG).list, ["frost"]);
+          assert.deepEqual([..._test.qualitiesOf(sword).ids], ["frost"]);
+          // A humanoid bane needs a subtype: warned, and the window opens again
+          done = chooseQualities(sword);
+          d = await dialog();
+          tick(d, "bane", true);
+          d.querySelector("select[name=baneType]").value = "humanoid";
+          d.querySelector("button[data-action=save]").click();
+          const again = await dialog();
+          assert.isTrue(again.querySelector("input[name=q][value=bane]").checked, "the reopened window keeps what was ticked");
+          assert.equal(again.querySelector("select[name=baneType]").value, "humanoid");
+          again.querySelector("select[name=baneSubtype]").value = "orc";
+          again.querySelector("button[data-action=save]").click();
+          await done;
+          assert.deepEqual(sword.getFlag(MODULE_ID, _test.FLAG).bane, { types: ["humanoid"], subtypes: ["orc"] });
+          // Back to the name
+          done = chooseQualities(sword);
+          d = await dialog();
+          d.querySelector("button[data-action=name]").click();
+          await done;
+          assert.isUndefined(sword.getFlag(MODULE_ID, _test.FLAG));
+          assert.deepEqual([..._test.qualitiesOf(sword).ids], ["flaming"]);
         });
       });
     },
