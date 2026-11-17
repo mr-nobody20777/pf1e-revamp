@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### New
+- **Weapon spells act on one weapon.** *Magic weapon*, *greater magic weapon*, *keen edge*, *align weapon* and *bless weapon* go on the target's only fitting weapon, or the first of several with a private message to choose another (also on the buff's sheet); *align weapon* asks for its alignment. *Magic weapon*'s enhancement bonus now counts for that weapon only, and not with the weapon's own (the higher applies). The weapon counts as magic against damage reduction (greater magic weapon's bonus bypasses nothing else); *keen edge* makes a piercing or slashing weapon keen; *align weapon* adds its alignment against DR, except on a weapon that already has one; *bless weapon* makes the weapon good-aligned (suppressing any other alignment), magic against evil creatures' DR, and its critical threats against an evil foe are marked confirmed on the card, unless the weapon is already keen or vorpal. What a spell adds shows in the weapon's Magic Qualities section ("For a time") and counts toward the +10 limit, but never changes the weapon's name or price. *Greater magic weapon*, *keen edge* and *align weapon* are now applied from the spell's card.
+
 ### Fixed
 - **The Magic Qualities section appears with the rest of the item sheet** instead of a moment later, and costs about 1.5 ms per sheet: it no longer loads the compendium item each time to read its price. A fourth performance review puts the module's share of a simulated session at 0.5%, now counting all of its 175 hooks and its method wrappers.
 

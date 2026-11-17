@@ -110,11 +110,23 @@ export function baneFromName(name) {
 const isArms = (item) => !!item && (WEAPONS.has(item.type) || (item.type === "equipment" && ["armor", "shield"].includes(item.system?.subType)));
 const stored = (item) => item?.flags?.[MODULE_ID]?.[FLAG] ?? null;
 
+// Temporary qualities and effects: what spells and class features put on a weapon for a time
+// (weapon-spells.mjs). They count for the automation and the +10 limit, never for the item's own list,
+// its name or its price.
+const temporary = [];
+/** fn(item) → [{ source, qualities: [names], magic, align: [alignments], bless }] for the effects on it now. */
+export function registerTemporary(fn) {
+  temporary.push(fn);
+}
+/** The effects on the weapon for a time. */
+export const temporaryOf = (item) => (item?.actor ? temporary.flatMap((fn) => fn(item) ?? []) : []);
+
 /**
- * The item's qualities: { names: [all names, as chosen], ids: Set of known ids, bane, fromName, specific }.
- * Chosen on the panel, or read from the item's name when nothing is chosen (existing and imported items).
+ * The item's qualities: { names: [its own, as chosen], ids: Set of known ids (with temporary ones), temporary:
+ * [names added for a time], bane, fromName, specific }. Chosen on the panel, or read from the item's name when
+ * nothing is chosen (existing and imported items). `own` leaves the temporary ones out.
  */
-export function qualitiesOf(item) {
+export function qualitiesOf(item, { own = false } = {}) {
   if (!isArms(item)) return null;
   const flag = stored(item);
   const fromName = !Array.isArray(flag?.qualities);
@@ -126,10 +138,11 @@ export function qualitiesOf(item) {
     const m = source.match(/\b(light|moderate|heavy) fortification\b|\bfortification \((light|moderate|heavy)\)/i);
     names = m ? [`Fortification (${(m[1] ?? m[2]).toLowerCase()})`] : [];
   }
-  const ids = new Set(names.map((n) => BY_NAME.get(n.toLowerCase())).filter(Boolean));
+  const extra = own ? [] : [...new Set(temporaryOf(item).flatMap((t) => t.qualities ?? []))].filter((n) => !names.some((x) => x.toLowerCase() === n.toLowerCase()));
+  const ids = new Set([...names, ...extra].map((n) => BY_NAME.get(n.toLowerCase())).filter(Boolean));
   for (const id of [...ids]) if (QUALITIES[id].base) ids.add(QUALITIES[id].base);
   const bane = ids.has("bane") ? flag?.bane ?? (fromName ? baneFromName(source) : null) : null;
-  return { names, ids, bane, fromName, specific: !!flag?.specific };
+  return { names, ids, temporary: extra, bane, fromName, specific: !!flag?.specific };
 }
 
 /* -------------------------------------------- */
@@ -238,7 +251,7 @@ export async function priceOf(item, base) {
   return priceFrom(item, base, await loadCatalog());
 }
 function priceFrom(item, base, cat) {
-  const q = qualitiesOf(item);
+  const q = qualitiesOf(item, { own: true });
   const armorLike = item.type === "equipment";
   const lines = [{ label: "Base item", gp: base }];
   const mat = specialMaterial(item);
@@ -318,7 +331,7 @@ function problemsFrom(item, cat) {
   const out = [];
   const enh = enhOf(item);
   if (enh < 1) out.push("A special ability needs at least a +1 enhancement bonus.");
-  const bonus = enh + q.names.reduce((t, n) => t + (cat.get(n.toLowerCase())?.price?.bonus ?? 0), 0);
+  const bonus = enh + [...q.names, ...q.temporary].reduce((t, n) => t + (cat.get(n.toLowerCase())?.price?.bonus ?? 0), 0);
   if (bonus > 10) out.push(`The total bonus is +${bonus}: no more than +10 (enhancement plus abilities).`);
   if (WEAPONS.has(item.type)) {
     for (const id of q.ids) if (fits(id, item.defaultAction) === false) out.push(`${QUALITIES[id].name} works only on ${limitText(id)}.`);
@@ -358,7 +371,7 @@ function sourceName(item) {
 
 /** The name an item with its stock name gets: "+1 Flaming Cold Iron Longsword". Null to keep its name. */
 export function generatedName(item) {
-  const q = qualitiesOf(item);
+  const q = qualitiesOf(item, { own: true });
   if (!q || q.specific) return null;
   const stock = item._source?.name;
   if (!stock || (stock !== item.system.baseTypes?.[0] && stock !== sourceName(item))) return null;
@@ -500,7 +513,7 @@ const OUTSIDER_OR_HUMANOID = new Set(["humanoid", "outsider"]);
 
 /** Save the qualities (starting from what the name gave, the first time). */
 async function saveQualities(item, update) {
-  const q = qualitiesOf(item);
+  const q = qualitiesOf(item, { own: true });
   const current = { qualities: q.names, bane: q.bane ?? null, specific: q.specific, basePrice: stored(item)?.basePrice ?? null };
   await item.setFlag(MODULE_ID, FLAG, { ...current, ...update });
 }
@@ -554,6 +567,10 @@ function panelHTML(item, cat, base) {
       ${cat2}
       <p class="hint">${q.fromName ? (q.names.length ? "Read from the item's name. Changing them here replaces the name's." : "None. Add them here, or name them in the item's name.") : "Chosen here (the name isn't read)."}</p>
       <ul style="list-style:none; margin:0.25em 0; padding:0">${chips || '<li style="opacity:0.7">No special abilities.</li>'}</ul>
+      ${(() => {
+        const temps = temporaryOf(item).filter((t) => t.label);
+        return temps.length ? `<p class="hint"><i class="fa-regular fa-hourglass-half"></i> For a time: ${temps.map((t) => `${esc(t.label)} (${esc(t.source)})`).join("; ")}</p>` : "";
+      })()}
       ${editable && cat.size ? `<div class="form-group"><label>Add an ability</label><div class="form-fields"><select data-wq-add><option value="">Choose…</option>${options}</select><button type="button" data-wq-add-button style="flex:0 0 auto; width:auto">Add</button></div></div>` : ""}
       ${bane}
       <div class="form-group"><label>Specific magic item</label><div class="form-fields"><input type="checkbox" data-wq-specific ${q.specific ? "checked" : ""} ${editable ? "" : "disabled"}></div>

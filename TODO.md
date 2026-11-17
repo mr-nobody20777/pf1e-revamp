@@ -42,7 +42,7 @@ The design reference gives every feat, trait, class and archetype feature, racia
 12. **Afflictions** (about 370 entries). Already planned under Interface (Poisons and diseases) and Effects that repeat.
 
 ### Magic items
-- **Temporary qualities from class features and spells.** Divine bond, arcane pool, sacred weapon, inquisitor bane, keen edge, align weapon and bless weapon add abilities or enhancement for a time; they count toward the +10 limit. Show them in the Magic Qualities section while active, as the PF2e system does for runes added by effects.
+- **Temporary qualities from class features.** Divine bond, arcane pool, sacred weapon and inquisitor bane add abilities or enhancement for a time; they count toward the +10 limit and show in the Magic Qualities section, as the weapon spells already do. Also: weapon spells cast on 50 projectiles.
 - **Amulet of Mighty Fists.** Its enhancement bonus and melee abilities apply to unarmed strikes and natural weapons.
 - **Ammunition.** Qualities and materials on arrows and bolts, the launcher's qualities passing to its ammunition, prices for 50 pieces, and the rule that the launcher's and ammunition's enhancement bonuses don't stack.
 - **Armor and shield abilities.** Automate the common ones beyond fortification (spell resistance, energy resistance, shadow and slick skill bonuses, arrow deflection, bashing).
@@ -120,6 +120,7 @@ The design reference gives every feat, trait, class and archetype feature, racia
 - **Test tooling.** Nevela's Automation Suite cancels targeted buff spells (such as *Haste*) cast without a target, so tests that cast spells must set a target or use a non-buff spell.
 
 ### Known issues
+- **Test flake: quick-apply energy resistance note.** The "later hooks still see the ½ ratio" test occasionally misses the resistance note during a full run (it passes on its own). Likely another batch's chat message is read in its place.
 - **Snap Shot archers don't threaten.** With Snap Shot, an archer threatens squares within 5 feet (more with Improved Snap Shot), which affects flanking and the warning for shooting while threatened. The Snap Shot feat is also missing from the installed compendiums (only the rogue talent of the same name exists).
 
 ### Release readiness

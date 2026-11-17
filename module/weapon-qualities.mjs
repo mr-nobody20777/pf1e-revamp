@@ -61,6 +61,7 @@ import { matchesCreatures, creatureTypes } from "./creature-types.mjs";
 import { hitOf } from "./natural-riders.mjs";
 import { QUALITIES, qualitiesOf, foeText, keenWorks, fits, limitText } from "./magic-arms.mjs";
 import { isRaging } from "./defenses.mjs";
+import "./weapon-spells.mjs"; // weapon spells add qualities for a time
 
 const FLAG = "weaponQualities"; // card flag: { vicious }
 const ENERGY_NAME = { fire: "fire", cold: "cold", electric: "electricity", acid: "acid", sonic: "sonic" };

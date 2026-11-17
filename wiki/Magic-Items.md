@@ -40,5 +40,15 @@ Bypassing damage reduction with cold iron, silver, adamantine and the like was a
 ## Unidentified items
 Players don't see an unidentified item's abilities: the section says *Unidentified*, the note on the item is hidden, and in the roll window its rows read *Unidentified quality*.
 
+## Weapon spells
+*Magic weapon*, *greater magic weapon*, *keen edge*, *align weapon* and *bless weapon* act on one weapon. When the buff goes on a creature with several fitting weapons, the first is chosen and the owner gets a private message with a button for each; the buff's sheet has the same buttons (and *align weapon*'s alignments). While the buff is on:
+- its enhancement bonus counts for that weapon only, and doesn't add to the weapon's own (the higher applies);
+- the weapon counts as magic against damage reduction (only magic: a +3 from *greater magic weapon* doesn't bypass cold iron);
+- *keen edge* makes a piercing or slashing weapon keen;
+- *align weapon* adds its alignment against DR, unless the weapon already has one;
+- *bless weapon* makes it good-aligned (other alignments are suppressed) and magic against evil creatures, and marks its critical threats against an evil foe as confirmed, unless the weapon is keen or vorpal.
+
+The weapon's Magic Qualities section lists them under *For a time*. They count toward the +10 limit but never change the weapon's name or price.
+
 ## Not yet
-Abilities added for a time by class features and spells (divine bond, arcane pool, keen edge), the Amulet of Mighty Fists, ammunition, double weapons, and most armor abilities beyond fortification. See the roadmap.
+Abilities added for a time by class features (divine bond, arcane pool, sacred weapon), spells on 50 projectiles, the Amulet of Mighty Fists, ammunition, double weapons, and most armor abilities beyond fortification. See the roadmap.
