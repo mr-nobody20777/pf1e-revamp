@@ -28,6 +28,13 @@
 //     button on the card, as for natural-attack riders.
 //   - Merciful: "an extra 1d6 points of damage, but all damage it deals is nonlethal damage"; suppressed on
 //     command (lethal damage, no extra die): unticking its row.
+//   - Brilliant energy: "Armor and shield bonuses to AC (including any enhancement bonuses to that armor) do
+//     not count against it because the weapon passes through armor. (Dexterity, deflection, dodge, natural
+//     armor, and other such bonuses still apply.) A brilliant energy weapon cannot harm undead, constructs,
+//     or objects." The target's armor and shield bonuses (its AC less its touch AC and natural armor) are
+//     added to the attack roll against a single target; damage applied to undead and constructs is 0.
+//   - Seeking (miss-chance.mjs), and wounding, disruption, thundering's deafness and vorpal
+//     (natural-riders.mjs) act on the hit.
 // The extra dice apply to each arrow of Manyshot (they aren't precision damage). When the action already
 // has the die typed in (PF1's suggested setup), the module doesn't add its own. A player using an
 // unidentified weapon sees its rows as "Unidentified quality".
@@ -36,7 +43,7 @@ import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
 import { esc, dealDamage, restoreDamage, rollTotal, isActiveGM, wrapMethod } from "./util.mjs";
 import { registerRollEffect, rollPlan } from "./roll-effects.mjs";
 import { registerFootnote } from "./footnote.mjs";
-import { matchesCreatures } from "./creature-types.mjs";
+import { matchesCreatures, creatureTypes } from "./creature-types.mjs";
 import { hitOf } from "./natural-riders.mjs";
 import { QUALITIES, qualitiesOf, foeText, keenWorks, fits, limitText } from "./magic-arms.mjs";
 
@@ -96,9 +103,36 @@ registerRollEffect({
       entry("bane", { label, type: "enh", atk: 2, dmg: 2, dice: { dmg: "2d6" }, showIn: ["atk", "dmg"], partLabel: { atk: label, dmg: label }, valueText: "+2, +2d6 damage", tooltip: "Against the designated foe: the enhancement bonus is +2 better, and +2d6 damage", ...applies });
     }
     if (q.ids.has("vicious")) entry("vicious", { dice: { dmg: "2d6" }, tooltip: "+2d6 to the opponent, and 1d6 to the wielder on each hit" });
+    if (q.ids.has("brilliantEnergy")) {
+      const targets = [...game.user.targets].map((t) => t.actor).filter(Boolean);
+      const through = targets.length === 1 ? armorAndShield(targets[0]) : 0;
+      const label = hidden ? "Unidentified quality" : "Brilliant energy";
+      const why = targets.length !== 1 ? (targets.length ? "more than one target: each target's armor differs" : "no target selected") : "the target has no armor or shield bonus";
+      entry("brilliantEnergy", { atk: through, dice: undefined, perArrow: false, showIn: ["atk"], partLabel: { atk: label }, applies: through > 0, reason: why, tooltip: `Passes through armor: the target's armor and shield bonuses (+${through}) don't count against it` });
+    }
     if (q.ids.has("merciful")) entry("merciful", { dice: { dmg: "1d6" }, valueText: "+1d6, nonlethal", tooltip: "+1d6, and all the weapon's damage is nonlethal. Untick it to suppress it (lethal damage, no extra die)." });
     return out;
   },
+});
+
+/** A creature's armor and shield bonuses to AC (with their enhancement): AC less touch AC and natural armor. */
+export function armorAndShield(actor) {
+  const ac = actor?.system?.attributes?.ac;
+  if (!ac) return 0;
+  return Math.max(0, (ac.normal?.total ?? 0) - (ac.touch?.total ?? 0) - (actor.system.attributes.naturalAC || 0));
+}
+
+// Brilliant energy "cannot harm undead, constructs, or objects": no damage when applied to them
+Hooks.on("pf1ApplyDamage", (actor, options) => {
+  if (!(options.value > 0) || !qualitiesOf(options.action?.item)?.ids.has("brilliantEnergy")) return;
+  const { types } = creatureTypes(actor);
+  if (!types.has("undead") && !types.has("construct")) return;
+  options.value = 0;
+  ChatMessage.implementation.create({
+    speaker: ChatMessage.implementation.getSpeaker({ actor }),
+    whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
+    content: `<p><strong>${esc(actor.name)}</strong> takes no damage: a brilliant energy weapon can't harm undead or constructs.</p>`,
+  });
 });
 
 /* -------------------------------------------- */

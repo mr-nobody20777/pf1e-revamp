@@ -147,10 +147,16 @@ A weapon's magic qualities are chosen in the **Magic Qualities** section of its 
 - **Keen:** doubles the threat range of a piercing or slashing melee weapon (19–20 becomes 17–20), unless something else already expanded it.
 - **Vicious:** +2d6, and 1d6 to the wielder on each hit: applied when the module can tell the attack hit, with an Undo, otherwise an Apply button.
 - **Merciful:** +1d6, and all of the attack's damage is nonlethal.
+- **Wounding:** 1 bleed on each hit, adding up (two hits bleed 2). Creatures immune to critical hits are immune.
+- **Disruption:** an undead hit makes a DC 14 Will save or is destroyed.
+- **Thundering:** on a confirmed critical hit, a DC 14 Fortitude save or the target is deafened permanently.
+- **Vorpal:** on a natural 20 that's confirmed, the GM gets a message and a **Sever** button on the card. Whether the creature has a head, and whether losing it matters (golems and most undead don't care), is the GM's call.
+- **Brilliant energy:** the target's armor and shield bonuses don't count against the attack, so they're added to the attack roll (against a single target). It can't harm undead or constructs: damage applied to them is 0.
+- **Seeking:** a ranged attack ignores the target's miss chances (concealment, blur, displacement).
 
-Each quality's damage is a row in the roll window: untick it while a quality is turned off, or to suppress merciful. Holy, bane and the others that depend on the target apply when every target qualifies, otherwise the row says why and can be ticked by hand. Extra dice are never multiplied on a critical hit and apply to each arrow of Manyshot. If the weapon's action already has the die typed into its damage, the module doesn't add it again.
+Wounding, disruption and thundering are applied as soon as the module can tell the attack hit, with an Undo, or by an **Apply** button when it can't, like monster attack riders. Each quality's damage is a row in the roll window: untick it while a quality is turned off, or to suppress merciful. Holy, bane and the others that depend on the target apply when every target qualifies, otherwise the row says why and can be ticked by hand. Extra dice are never multiplied on a critical hit and apply to each arrow of Manyshot. If the weapon's action already has the die typed into its damage, the module doesn't add it again.
 
-Not automated yet: wounding, disruption, vorpal, brilliant energy, ghost touch's damage against incorporeal creatures, seeking, speed, furious and defending (they can be marked already), qualities on ammunition, and bane's +2 against damage reduction.
+Not automated yet: ghost touch's full damage against incorporeal creatures, speed, furious and defending (they can be marked already), qualities on ammunition, and bane's +2 against damage reduction.
 
 ## Fortification
 

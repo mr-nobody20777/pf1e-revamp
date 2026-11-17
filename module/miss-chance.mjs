@@ -25,6 +25,7 @@
 import { MODULE_ID, MELEE_ATTACKS as MELEE, RANGED_ATTACKS as RANGED } from "./const.mjs";
 import { registerFootnote } from "./footnote.mjs";
 import { esc, tokenDistance } from "./util.mjs";
+import { qualitiesOf } from "./magic-arms.mjs";
 
 
 // Defender buffs, by name. `concealment` = Blind-Fight can reroll it.
@@ -52,7 +53,7 @@ const hasBlindFight = (actor) => (actor?.itemTypes?.feat ?? []).some((f) => /^bl
 
 /** Can this attack strike ethereal creatures (ghost touch weapon, force effect)? */
 function strikesEthereal(item) {
-  if (/ghost touch/i.test(item?.name ?? "")) return true;
+  if (qualitiesOf(item)?.ids.has("ghostTouch") || /ghost touch/i.test(item?.name ?? "")) return true;
   return (item?.system.descriptors?.names ?? []).some((d) => /force/i.test(d));
 }
 
@@ -74,6 +75,9 @@ function isTotalConcealment(actor) {
  */
 export function missChances(defender, attacker, item, actionType, { distance = null } = {}) {
   const melee = MELEE.includes(actionType);
+  // Seeking: "negating any miss chances that would otherwise apply, such as from concealment" (ranged weapons;
+  // the wielder still has to aim at the right square)
+  if (!melee && qualitiesOf(item)?.ids.has("seeking")) return [];
   const candidates = [];
 
   for (const buff of activeMissBuffs(defender)) {

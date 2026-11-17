@@ -35,6 +35,7 @@ import { missChances, seesInvisible } from "./miss-chance.mjs";
 import { isIncorporeal } from "./resistance.mjs";
 import { registerFootnote, footnoteButton } from "./footnote.mjs";
 import { riderChoice } from "./sneak-talents.mjs";
+import { qualitiesOf } from "./magic-arms.mjs";
 
 const SNEAK_TAG = /^sneakAttack/;
 // Dice progressions for Sneak Attack features without their own roll formula (archetype versions)
@@ -196,7 +197,7 @@ registerRollEffect({
     const ranged = RANGED_ATTACKS.includes(action.actionType);
 
     // A ghost touch weapon deals precision damage to an incorporeal creature: not typed precision then
-    if (isIncorporeal(target) && /ghost touch/i.test(action.item?.name ?? "")) delete base.damageType;
+    if (isIncorporeal(target) && qualitiesOf(action.item)?.ids.has("ghostTouch")) delete base.damageType;
 
     // Range: 30 ft for ranged attacks, +10 ft per Deadly Range; a Sniping weapon 45 ft (not stacking);
     // Sniper Goggles any distance

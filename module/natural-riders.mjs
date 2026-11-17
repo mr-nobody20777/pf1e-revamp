@@ -21,6 +21,16 @@
 //     than once per round": the creature's hits on a target are counted for the round (on one card outside
 //     combat) and the card that completes them offers it, as the monster's choice ("can cause").
 //     An @Use link to the ability in any note is a rider even without "plus" (the stirge's touch attack).
+//   - Weapon qualities that act on a hit (phase 4b; text in magic-arms.mjs and the rules map): wounding
+//     ("1 point of bleed damage when it hits a creature. Multiple hits from a wounding weapon increase the
+//     bleed damage ... Creatures immune to critical hits are immune to the bleed damage"); disruption ("Any
+//     undead creature struck in combat must succeed at a DC 14 Will save or be destroyed"); thundering
+//     ("Subjects dealt critical hits by a thundering weapon must make a successful DC 14 Fortitude save or be
+//     deafened permanently"); vorpal ("Upon a roll of natural 20 (followed by a successful roll to confirm
+//     the critical hit), the weapon severs the opponent's head (if it has one) ... Some creatures, such as
+//     many aberrations and all oozes, have no heads. Others, such as golems and undead creatures other than
+//     vampires, are not affected by the loss of their heads"): the GM decides, with a button (ruling
+//     2026-11-16).
 // Rulings (DECISIONS.md, 2026-11-10): automatic riders are applied when the module can tell the attack hit
 // (attack total against AC, natural 20 and 1, after miss chances), else they wait for an Apply button;
 // the creature's own entry gives the numbers, and when PF1's data disagrees with the rules text the text
@@ -32,6 +42,8 @@ import { creatureTypes } from "./creature-types.mjs";
 import { setBleed, stopBleed } from "./bleed.mjs";
 import { extinguish, setBurning } from "./burning.mjs";
 import { constrictFormula, endGrapple, maneuverCheck, recordGrapple, sizeOf, specialAttack } from "./monster-grapple.mjs";
+import { qualitiesOf, fits } from "./magic-arms.mjs";
+import { precisionImmune } from "./resistance.mjs";
 
 const FLAG = "naturalRiders";
 const SAVE_NAME = { fort: "Fortitude", ref: "Reflex", will: "Will" };
@@ -66,6 +78,25 @@ export function ridersOf(item, action) {
     }
   }
   return found;
+}
+
+// Weapon qualities that act on a hit, as riders: `critOnly` on a confirmed critical, `gm` only by the GM's
+// button (vorpal: on a natural 20 that's confirmed)
+const WEAPON_RIDERS = {
+  wounding: { key: "bleed", label: "Wounding", amount: "1", stack: true, critImmune: true },
+  disruption: { key: "disruption", label: "Disruption", save: "will", dc: 14 },
+  thundering: { key: "deafen", label: "Thundering", save: "fort", dc: 14, critOnly: true },
+  vorpal: { key: "vorpal", label: "Vorpal", gm: true },
+};
+
+/** The weapon's qualities that act on a hit (those that fit the weapon), as riders. */
+export function weaponRiders(item, action) {
+  const q = qualitiesOf(item);
+  if (!q) return [];
+  const hidden = !!item.showUnidentifiedData;
+  return Object.entries(WEAPON_RIDERS)
+    .filter(([id]) => q.ids.has(id) && fits(id, action) !== false)
+    .map(([id, r]) => ({ ...r, label: hidden ? "A quality of the weapon" : r.label, quality: id, may: false }));
 }
 
 /** The creature's own ability item for a rider ("Paralysis (Su)", "Poison", "Energy Drain (Su)"). */
@@ -133,7 +164,8 @@ export function hitOf(message, index, targetUuid) {
 /*  Applying                                    */
 /* -------------------------------------------- */
 
-function immuneTo(target, key) {
+function immuneTo(target, rider) {
+  const key = rider.key;
   const { types } = creatureTypes(target);
   const undeadOrConstruct = types.has("undead") || types.has("construct");
   const ci = target.getConditionImmunities?.() ?? new Set();
@@ -144,14 +176,25 @@ function immuneTo(target, key) {
   if (key === "disease" && (undeadOrConstruct || has("disease"))) return "immune to disease";
   if (key === "energyDrain" && (undeadOrConstruct || has("energyDrain"))) return "immune to energy drain";
   if (key === "bleed" && has("bleed")) return "immune to bleed";
+  if (rider.critImmune && precisionImmune(target)) return "immune to critical hits, so to this bleed";
+  if (key === "disruption" && !types.has("undead")) return "not undead: no effect";
+  if (key === "deafen" && (has("deaf") || has("deafened"))) return "immune to deafness";
   const di = target.system.traits?.di;
   if (key === "burn" && (di?.total ?? di?.standard)?.has?.("fire")) return "immune to fire";
   return null;
 }
 
+/** Destroyed or killed: no hit points left and the Dead condition. Returns the undo. */
+async function destroy(target) {
+  const hpValue = target.system.attributes.hp.value;
+  await target.update({ "system.attributes.hp.value": Math.min(hpValue, -Math.max(1, target.system.abilities?.con?.total ?? 0)) });
+  if (!target.statuses.has("dead")) await target.setConditions({ dead: true });
+  return { hpValue, conditions: ["dead"] };
+}
+
 /** Automatic riders: returns { text, undo }. */
 async function applyAuto(rider, { attacker, target, targetUuid, critical, message }) {
-  const immune = immuneTo(target, rider.key);
+  const immune = immuneTo(target, rider);
   if (immune) return { text: immune };
   const save = async (type) => {
     const result = await target.rollSavingThrow(type, { skipDialog: true, dc: rider.dc, reference: message.uuid });
@@ -182,8 +225,19 @@ async function applyAuto(rider, { attacker, target, targetUuid, critical, messag
     case "bleed": {
       if (!rider.amount) return { text: "bleeds (its entry gives no amount: apply it by hand)" };
       const amount = await roll(rider.amount);
-      return { text: await setBleed(target, amount, `${rider.label} (${attacker.name})`), undo: { bleed: true } };
+      return { text: await setBleed(target, amount, `${rider.label} (${attacker.name})`, { stack: !!rider.stack }), undo: { bleed: true } };
     }
+    case "disruption": {
+      if (await save("will")) return { text: `saved (Will DC ${rider.dc})` };
+      return { text: `failed (Will DC ${rider.dc}): destroyed`, undo: await destroy(target) };
+    }
+    case "deafen": {
+      if (await save("fort")) return { text: `saved (Fortitude DC ${rider.dc})` };
+      await target.setConditions({ deaf: true });
+      return { text: `failed (Fortitude DC ${rider.dc}): deafened permanently`, undo: { conditions: ["deaf"] } };
+    }
+    case "vorpal":
+      return { text: "head severed: dead", undo: await destroy(target) };
     case "energyDrain": {
       const levels = rider.count * (critical ? 2 : 1);
       await target.update({ "system.attributes.energyDrain": (target.system.attributes.energyDrain ?? 0) + levels });
@@ -250,6 +304,7 @@ async function undo(entry, data, rider) {
   if (attacker && u.grapple) await endGrapple(attacker);
   if (target && u.burning) await extinguish(target);
   if (target && u.lost) await restoreDamage(target, u.lost);
+  if (target && u.hpValue !== undefined) await target.update({ "system.attributes.hp.value": u.hpValue });
   if (target && u.conditions?.length) await target.setConditions(Object.fromEntries(u.conditions.map((c) => [c, false])));
   if (attacker && u.attackerConditions?.length) await attacker.setConditions(Object.fromEntries(u.attackerConditions.map((c) => [c, false])));
   if (target && u.bleed) await stopBleed(target);
@@ -328,6 +383,7 @@ Hooks.on("pf1PreDisplayActionUse", (use) => {
   const defender = targetToken?.actor ?? null;
   // Burn only "on a successful hit in melee"
   const riders = [...ridersOf(item, use.action)].map(([key, detail]) => ({ ...detailsOf(actor, key, detail), may: MAY.has(key) })).filter((r) => r.key !== "burn" || melee);
+  riders.push(...weaponRiders(item, use.action));
   // "Creatures that hit a burning creature with natural weapons or unarmed attacks take fire damage as though hit by the burning creature"
   const bodily = item.system.subType === "natural" || /\bunarmed\b/i.test(item.name);
   const touchBurn = melee && bodily && defender && defender !== actor ? burnsOnTouch(defender) : undefined;
@@ -406,7 +462,15 @@ Hooks.on("createChatMessage", async (message) => {
   for (let i = 0; i < attacks.length; i++) {
     const hit = hitOf(message, i, data.target);
     if (!hit.known || !hit.hit) continue;
-    for (const [r, rider] of data.riders.entries()) if (!rider.may) await runRider(message, i, r, "auto");
+    for (const [r, rider] of data.riders.entries()) {
+      if (rider.may || rider.gm || (rider.critOnly && !hit.critical)) continue;
+      await runRider(message, i, r, "auto");
+    }
+    // Vorpal: tell the GM about a natural 20 that's confirmed
+    const vorpal = data.riders.findIndex((r) => r.key === "vorpal");
+    if (vorpal >= 0 && hit.critical && attacks[i]?.attack?.dice?.[0]?.total === 20) {
+      await ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p><strong>Vorpal:</strong> ${esc(fromUuidSync(data.attacker)?.name ?? "")} rolled a natural 20 and confirmed the critical hit on ${esc(fromUuidSync(data.target)?.name ?? "the target")}. Its head is severed if it has one: use <strong>Sever</strong> on the attack card.</p>` });
+    }
   }
   if (data.rend) await countRend(message, data);
 });
@@ -447,8 +511,13 @@ Hooks.on("renderChatMessagePF", (message, html) => {
     for (const [r, rider] of data.riders.entries()) {
       const done = data.applied?.[i]?.[r];
       const line = document.createElement("div");
-      line.innerHTML = `· <strong>${esc(rider.label)}</strong>${rider.may || done ? "" : ` <span style="opacity:0.7">(automatic${rider.save ? `, ${SAVE_NAME[rider.save]} DC ${rider.dc}` : ""})</span>`}${done ? `: ${esc(done.text)}${done.constricted ? `; ${esc(done.constricted)}` : ""}` : ""}`;
-      if (canAct && !done) {
+      const how = rider.gm
+        ? "on a natural 20 that's confirmed, the GM decides: most creatures die; not those without heads (oozes, many aberrations), golems, or undead other than vampires"
+        : `${rider.critOnly ? "on a critical hit" : "automatic"}${rider.save ? `, ${SAVE_NAME[rider.save]} DC ${rider.dc}` : ""}`;
+      line.innerHTML = `· <strong>${esc(rider.label)}</strong>${rider.may || done ? "" : ` <span style="opacity:0.7">(${how})</span>`}${done ? `: ${esc(done.text)}${done.constricted ? `; ${esc(done.constricted)}` : ""}` : ""}`;
+      if (rider.gm) {
+        if (game.user.isGM && !done && attack.attack?.dice?.[0]?.total === 20) line.append(button("Sever", "The head is severed: the creature dies", () => runRider(message, i, r, "apply")));
+      } else if (canAct && !done) {
         if (rider.may) {
           line.append(button(rider.label, `${rider.label}: the creature's combat maneuver check against the target's CMD`, () => request(message, i, r, "maneuver")));
           if (rider.key === "grab") line.append(button("Hold (−20)", "Grab with the body part only: −20 on the check, and the creature isn't grappled itself", () => request(message, i, r, "hold")));
@@ -479,7 +548,8 @@ Hooks.on("renderChatMessagePF", (message, html) => {
 onGmRequest("naturalRider", async (request, { message, index, rider, how }) => {
   const card = game.messages.get(message);
   const attacker = fromUuidSync(card?.getFlag(MODULE_ID, FLAG)?.attacker);
-  if (card && requestedByOwner(request, attacker) && ["apply", "maneuver", "hold", "rend"].includes(how)) await runRider(card, index, rider, how);
+  const gmOnly = !!card?.getFlag(MODULE_ID, FLAG)?.riders?.[rider]?.gm; // vorpal: the GM's decision
+  if (card && !gmOnly && requestedByOwner(request, attacker) && ["apply", "maneuver", "hold", "rend"].includes(how)) await runRider(card, index, rider, how);
   await request.delete();
 });
 

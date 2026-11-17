@@ -115,8 +115,9 @@ export function registerResistanceTests(quench) {
           const start = hp();
           await hit(15, ["fire"], { ratio: 1.5 });
           assert.equal(start - hp(), 7, "15 − 10 resisted = 5, ×1.5 = 7");
-          const note = game.messages.contents.filter((m) => !before.has(m.id)).at(-1);
-          assert.match(note.content, /Took 7\./);
+          // Notes can arrive in either order: look for this hit's own
+          const notes = game.messages.contents.filter((m) => !before.has(m.id)).map((m) => m.content);
+          assert.isOk(notes.find((c) => /Took 7\./.test(c)), notes.join(" | "));
         });
 
         it("halved damage and healing never drop below 1 (½ button on 1 point)", async () => {

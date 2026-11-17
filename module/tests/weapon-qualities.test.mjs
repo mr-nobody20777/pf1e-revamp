@@ -295,6 +295,127 @@ export function registerWeaponQualityTests(quench) {
           await waitFor(() => card.getFlag(MODULE_ID, _test.FLAG)?.vicious?.applied?.[0]?.undone);
           assert.equal(fighter.system.attributes.hp.value, start);
         });
+
+        /* Phase 4b: qualities that act on a hit */
+
+        const RIDERS = "naturalRiders";
+        /** Saves that always fail: −30 on every save while the test runs. */
+        const doomed = async (actor) => (await actor.createEmbeddedDocuments("Item", [{ name: "Quench Doomed", type: "buff", system: { active: true, changes: [{ formula: "-30", target: "allSavingThrows", type: "untyped" }] } }]))[0];
+        const riderText = (card, key, index = 0) => {
+          const data = card.getFlag(MODULE_ID, RIDERS);
+          const r = data?.riders?.findIndex((x) => x.key === key);
+          return data?.applied?.[index]?.[r]?.text ?? null;
+        };
+        const waitRider = (card, key, index = 0) => waitFor(() => riderText(card, key, index), { what: `${key} rider`, timeout: 15000 });
+
+        it("wounding: 1 bleed per hit, adding up; creatures immune to critical hits are immune", async () => {
+          const sword = await weapon("Longsword", "+1 Wounding Longsword");
+          try {
+            let card = await attackWith(sword, tokens.goblin, 20);
+            assert.match(await waitRider(card, "bleed"), /bleeds 1/);
+            card = await attackWith(sword, tokens.goblin, 20);
+            await waitRider(card, "bleed");
+            assert.equal(goblin.getFlag(MODULE_ID, "bleed")?.amount, 2, "the second hit adds 1");
+          } finally {
+            await goblin.setCondition("bleed", false);
+            await goblin.unsetFlag(MODULE_ID, "bleed");
+          }
+          const ooze = await createTestActor("Quench WQ Ooze", { items: [["pf1.racial-hd", "Ooze", { system: { level: 1 } }]] });
+          const oozeToken = await placeToken(ooze, 1, 1, { disposition: -1 }); // within the fighter's reach
+          try {
+            const card = await attackWith(sword, oozeToken, 20);
+            assert.match(await waitRider(card, "bleed"), /immune to critical hits/);
+          } finally {
+            await deleteTokens([oozeToken]);
+            await ooze.delete();
+          }
+        });
+
+        it("disruption: an undead hit fails its DC 14 Will save and is destroyed (Undo brings it back); a living target is unaffected", async () => {
+          const mace = await weapon("Heavy Mace", "+1 Disruption Heavy Mace");
+          const buff = await doomed(skeleton);
+          try {
+            // A natural 19 hits, and the forced dice leave the save a 19 − 30 (a natural 20 would always save)
+            const card = await attackWith(mace, tokens.skeleton, 19);
+            assert.match(await waitRider(card, "disruption"), /failed \(Will DC 14\): destroyed/);
+            assert.isTrue(skeleton.statuses.has("dead"));
+            const { runRider } = await import("../natural-riders.mjs");
+            const r = card.getFlag(MODULE_ID, RIDERS).riders.findIndex((x) => x.key === "disruption");
+            await runRider(card, 0, r, "undo");
+            assert.isFalse(skeleton.statuses.has("dead"));
+            const living = await attackWith(mace, tokens.goblin, 19);
+            assert.match(await waitRider(living, "disruption"), /not undead/);
+          } finally {
+            await buff.delete();
+            await skeleton.update({ "system.attributes.hp.value": skeleton.system.attributes.hp.max });
+          }
+        });
+
+        it("thundering: a confirmed critical hit deafens on a failed DC 14 Fortitude save; a plain hit doesn't", async () => {
+          const axe = await weapon("Longsword", "+1 Thundering Longsword"); // threatens on 19–20
+          const buff = await doomed(goblin);
+          try {
+            let card = await attackWith(axe, tokens.goblin, 15); // hits, no threat
+            await new Promise((r) => setTimeout(r, 800));
+            assert.isNull(riderText(card, "deafen"), "only on a critical hit");
+            assert.isFalse(goblin.statuses.has("deaf"));
+            card = await attackWith(axe, tokens.goblin, 19); // a threat, confirmed by another 19; the save a 19 − 30
+            assert.match(await waitRider(card, "deafen"), /deafened permanently/);
+            assert.isTrue(goblin.statuses.has("deaf"));
+          } finally {
+            await buff.delete();
+            if (goblin.statuses.has("deaf")) await goblin.setCondition("deaf", false);
+          }
+        });
+
+        it("vorpal: a confirmed natural 20 tells the GM and offers Sever, which kills; nothing happens on its own", async () => {
+          const sword = await weapon("Longsword", "+5 Vorpal Longsword");
+          const before = new Set(game.messages.keys());
+          try {
+            const card = await attackWith(sword, tokens.goblin, 20);
+            const whisper = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && /Vorpal:/.test(m.content)), { what: "GM whisper" });
+            assert.isOk(whisper.whisper.length);
+            assert.isFalse(goblin.statuses.has("dead"), "not automatic");
+            const sever = await waitFor(() => [...document.querySelectorAll(`[data-message-id="${card.id}"] .${MODULE_ID}-natural-riders button`)].find((b) => b.textContent === "Sever"));
+            sever.click();
+            await waitFor(() => goblin.statuses.has("dead"), { what: "severed" });
+          } finally {
+            if (goblin.statuses.has("dead")) await goblin.setCondition("dead", false);
+            await goblin.update({ "system.attributes.hp.value": goblin.system.attributes.hp.max });
+          }
+        });
+
+        it("brilliant energy: the target's armor and shield bonuses are added to the attack; no damage to undead", async () => {
+          const sword = await weapon("Longsword", "+4 Brilliant Energy Longsword");
+          await addItems(priest, [["pf1.armors-and-shields", "Full Plate", { system: { equipped: true } }]]);
+          try {
+            const { armorAndShield } = await import("../weapon-qualities.mjs");
+            const through = armorAndShield(priest);
+            assert.equal(through, 9, "full plate's +9");
+            const card = await attackWith(sword, tokens.priest, 10);
+            assert.match(card.systemRolls.attacks[0].attack.formula, /9\[Brilliant energy\]/);
+            await skeleton.update({ "system.attributes.hp.value": 30 });
+            const instance = Object.assign(new pf1.models.action.DamagePartModel({ formula: "0", types: ["slashing"] }), { value: 12 });
+            await skeleton.applyDamage(12, { instances: [instance], action: sword.defaultAction });
+            assert.equal(skeleton.system.attributes.hp.value, 30, "a brilliant energy weapon can't harm undead");
+          } finally {
+            await priest.deleteEmbeddedDocuments("Item", priest.itemTypes.equipment.map((e) => e.id));
+            await skeleton.update({ "system.attributes.hp.value": skeleton.system.attributes.hp.max });
+          }
+        });
+
+        it("seeking: a ranged attack ignores the target's miss chances; a plain bow doesn't", async () => {
+          const { missChances } = await import("../miss-chance.mjs");
+          const [blur] = await goblin.createEmbeddedDocuments("Item", [{ name: "Blur", type: "buff", system: { active: true } }]);
+          try {
+            const seeking = await weapon("Longbow", "+1 Seeking Longbow");
+            const plain = await weapon("Longbow", "Longbow");
+            assert.deepEqual(missChances(goblin, fighter, seeking, "rwak"), []);
+            assert.isAbove(missChances(goblin, fighter, plain, "rwak").length, 0, "blur's 20%");
+          } finally {
+            await blur.delete();
+          }
+        });
       });
     },
     { displayName: "PF1e Revamp: weapon qualities" },
