@@ -44,6 +44,7 @@ import { extinguish, setBurning } from "./burning.mjs";
 import { constrictFormula, endGrapple, maneuverCheck, recordGrapple, sizeOf, specialAttack } from "./monster-grapple.mjs";
 import { qualitiesOf, fits } from "./magic-arms.mjs";
 import { precisionImmune } from "./resistance.mjs";
+import { parseAffliction, contract, undoContract } from "./afflictions.mjs";
 
 const FLAG = "naturalRiders";
 const SAVE_NAME = { fort: "Fortitude", ref: "Reflex", will: "Will" };
@@ -128,7 +129,10 @@ function detailsOf(actor, key, detail) {
   }
   if (key === "burn") out.formula = detail.match(new RegExp(DICE))?.[0] ?? text.match(new RegExp(`burn\\s*\\((${DICE})`, "i"))?.[1] ?? text.match(new RegExp(DICE))?.[0] ?? null;
   if (key === "pull" || key === "push") out.distance = Number(text.match(/(\d+)\s*(?:feet|ft)/i)?.[1]) || null;
-  if (["poison", "disease"].includes(key)) out.effect = text.match(/effect\s+([^;.]+)/i)?.[1]?.trim() ?? null;
+  if (["poison", "disease"].includes(key)) {
+    out.effect = text.match(/effect\s+([^;.]+)/i)?.[1]?.trim() ?? null;
+    out.text = text; // the whole entry, for the afflictions engine
+  }
   return out;
 }
 
@@ -247,6 +251,13 @@ async function applyAuto(rider, { attacker, target, targetUuid, critical, messag
     }
     case "poison":
     case "disease": {
+      // The afflictions engine: the contraction save, then the schedule of its periodic saves
+      const spec = parseAffliction(rider.text, { name: `${attacker?.name ?? "Creature"} ${rider.label}`, kind: rider.key });
+      if (spec && (spec.frequency || spec.onset || spec.effect || spec.initial)) {
+        spec.dc = rider.dc;
+        const r = await contract(target, spec, { source: attacker?.name ?? null, reference: message.uuid });
+        return { text: r.text, undo: r.undo ? { affliction: r.undo } : undefined };
+      }
       if (await save("fort")) return { text: `saved (Fortitude DC ${rider.dc})` };
       return { text: `failed (Fortitude DC ${rider.dc})${rider.effect ? `: ${rider.effect}` : ""}; apply the ${rider.key} by hand` };
     }
@@ -308,6 +319,7 @@ async function undo(entry, data, rider) {
   if (target && u.conditions?.length) await target.setConditions(Object.fromEntries(u.conditions.map((c) => [c, false])));
   if (attacker && u.attackerConditions?.length) await attacker.setConditions(Object.fromEntries(u.attackerConditions.map((c) => [c, false])));
   if (target && u.bleed) await stopBleed(target);
+  if (target && u.affliction) await undoContract(target, u.affliction);
   if (target && u.levels) await target.update({ "system.attributes.energyDrain": Math.max(0, (target.system.attributes.energyDrain ?? 0) - u.levels) });
   if (attacker && u.temp) await attacker.update({ "system.attributes.hp.temp": Math.max(0, (attacker.system.attributes.hp.temp ?? 0) - u.temp) });
 }

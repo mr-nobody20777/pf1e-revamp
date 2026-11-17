@@ -18,7 +18,7 @@ Next, the focus moves to:
   - **Cover-dependent abilities** (with cover deferred): Improved Precise Shot, Pinpoint Targeting (its armor and shield part is done), Lob Shot, Low Profile, Combat Sandals, Volley Fire, Covered Sniper, veering weapons.
 - **Cantrips and 1st-level spells** (research: `docs/SPELLS-RESEARCH.md`). Done for the Core Rulebook, Advanced Player's Guide, Ultimate Magic and Ultimate Combat. Still to do:
   - **Other books**: the combat-relevant spells are done; what's left is mostly utility (skill bonuses in narrow situations). Spells whose effect depends on what the creature does (Coward's Cowl, Halfling Vengeance, Veil of Heaven, Burst of Adrenaline) need a design.
-  - **Effects that repeat**: afflictions (poison, disease and curses: onset, the periodic save at each frequency interval, consecutive successful saves toward a cure, and stacking doses of the same poison), creatures entering or leaving a lasting area (emanations), Entangle's save at the end of each of the caster's turns while in the area, Grease's Acrobatics checks. Chill Touch's further touches (one per caster level).
+  - **Effects that repeat**: afflictions phase 1 is done (contracting, onset, saves on schedule, effects, cure, poison doses); phase 2: poisoned weapons (applying a dose, the 5% chance of poisoning yourself, a natural 1 exposing the attacker), the cure spells (*Neutralize Poison*, *Remove Disease*, *Remove Curse*, *Delay Poison*) and Heal checks to treat poison, no natural healing of an affliction's damage while it lasts, and *Pernicious Poison*. Also: creatures entering or leaving a lasting area (emanations), Entangle's save at the end of each of the caster's turns while in the area, Grease's Acrobatics checks. Chill Touch's further touches (one per caster level).
   - **Higher-level spells**: they already get the rows (spell resistance and saves); their effects come after the 1st-level spells are complete.
 
 ## Planned
@@ -51,7 +51,6 @@ The design reference gives every feat, trait, class and archetype feature, racia
 - **Modifiers that mattered.** Note on the card when a ticked bonus changed the outcome ("Bless made this hit", "the +2 against fear made the save").
 - **An effects panel.** The selected token's buffs and conditions with time left, click to change a value, right-click to remove, and a tooltip with the source.
 - **Concentration reminders.** For spells with a concentration duration, a reminder on the caster's turn that maintaining it is a standard action, with an End button.
-- **Poisons and diseases.** Onset, frequency, saves on schedule, cure after consecutive saves, and ability damage per failed save.
 - **Richer chat cards.** Show the margin on saves against a DC ("Success by 3"), include a draggable buff link in channel energy and spell notes, and color damage by type.
 - **Empty-slot rows and pending-choice highlights.** Show open choices on the character sheet (talent slots, combat style feats, unmade selections) rather than opening dialogs.
 - **A unified rules layer.** Several features keep their own rule tables (archetype rules, next-roll effects, buff grants, trait rules, save-bonus keywords). Merging them into one data format ("this item grants X when Y") would let new features be added as data rather than code, and would give the roll window a single source for every situational bonus.

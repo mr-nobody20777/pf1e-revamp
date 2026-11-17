@@ -24,6 +24,7 @@ import { evaluate } from "./util.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 import { parseCreatures, matchesCreatures } from "./creature-types.mjs";
 import { isWard } from "./ward.mjs";
+import { savingAgainst } from "./afflictions.mjs";
 
 // Words in a note → test against the effect
 const KEYWORDS = [
@@ -79,6 +80,12 @@ export const TYPE_WORDS = {
   racial: "racial", trait: "trait", morale: "morale", resistance: "resist", luck: "luck", sacred: "sacred", profane: "profane",
   competence: "competence", insight: "insight", circumstance: "circumstance", enhancement: "enh", dodge: "dodge", alchemical: "alchemical",
 };
+
+/** A poison, disease or curse being saved against (afflictions.mjs), as an effect. */
+function afflictionEffect() {
+  const kind = savingAgainst();
+  return kind ? { name: kind, text: kind, school: null, subschools: new Set(), descriptors: new Set([kind]), isSpell: false, isSLA: false, isPoison: kind === "poison" } : null;
+}
 
 /** What the save is against, from the chat card it was rolled from. */
 function effectOf(card) {
@@ -191,7 +198,7 @@ registerRollEffect({
   collect(actor, roll) {
     if (roll.kind !== "save") return [];
     const card = roll.reference ? fromUuidSync(roll.reference) : null;
-    const effect = effectOf(card);
+    const effect = afflictionEffect() ?? effectOf(card);
     const source = card ? ChatMessage.implementation.getSpeakerActor(card.speaker) : null;
     const id = (b) => `save-vs.${b.label}.${b.against}`;
     const applied = effect ? saveBonuses(actor, roll.saveId, effect, { source }) : [];

@@ -133,9 +133,13 @@ export function registerNaturalRiderTests(quench) {
           assert.isOk([...line.querySelectorAll("button")].find((b) => b.textContent === "Apply anyway"));
         });
 
-        it("poison: only the first save, then the effect to apply by hand", async () => {
+        it("poison: the contraction save, then its effect (afflictions engine); Undo takes it back", async () => {
+          const before = victim.system.abilities.str.damage ?? 0;
           const card = await attack(["plus poison (Fort DC 40; effect 1d2 Str damage)"], tokens.victim);
-          assert.match(entry(card, "poison").text, /failed \(Fortitude DC 40\).*apply the poison by hand/);
+          assert.match(entry(card, "poison").text, /failed \(Fortitude DC 40\).*STR damage/);
+          assert.isAbove(victim.system.abilities.str.damage ?? 0, before);
+          await _test.runRider(card, 0, riderIndex(card, "poison"), "undo");
+          assert.equal(victim.system.abilities.str.damage ?? 0, before);
         });
 
         it("grab is the monster's choice: a button; success grapples both, a hold only the target; constrict deals its damage", async () => {

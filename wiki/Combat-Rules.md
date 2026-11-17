@@ -106,7 +106,7 @@ Not automated: Ghostslayer, the Assassin's Sight, Briar Bandit, Inspired Sneak A
 
 ## Monster attack riders
 A monster's attack whose statblock says "plus grab", "plus trip", "plus poison", "plus paralysis", "plus bleed", "plus attach" or "plus energy drain" (or links the ability) shows those under each attack on its card. The numbers (save DC, duration, bleed amount, negative levels) come from the creature's own entry, or the universal monster rules' default DC (10 + half its racial Hit Dice + its Constitution modifier).
-- **Automatic, on every hit:** paralysis (Fortitude save; lasts the duration in its entry), poison and disease (the first save; apply the rest by hand for now), bleed, attach (the monster is grappled, the target isn't) and energy drain (twice as many negative levels on a confirmed critical; the monster gains 5 temporary hit points per level). They're applied as soon as the module can tell the attack hit (its total against the target's AC, natural 20 and 1, after miss chances), and an **Undo** button takes them back. When the module can't tell, an **Apply** button waits.
+- **Automatic, on every hit:** paralysis (Fortitude save; lasts the duration in its entry), poison and disease (contracted and tracked: see *Poison, disease and curses* below), bleed, attach (the monster is grappled, the target isn't) and energy drain (twice as many negative levels on a confirmed critical; the monster gains 5 temporary hit points per level). They're applied as soon as the module can tell the attack hit (its total against the target's AC, natural 20 and 1, after miss chances), and an **Undo** button takes them back. When the module can't tell, an **Apply** button waits.
 - **The monster's choice:** grab, trip, pull and push are buttons. Each rolls the monster's combat maneuver check against the target's CMD: grab with its +4 bonus (both grappled), or **Hold (−20)** (only the target grappled); trip knocks prone; pull and push give the distance for the GM to move the token. Grab, pull and push only work on creatures the monster's size or smaller, trip up to one size larger. After a successful grab, **Constrict** deals its damage.
 - **Immune:** undead and constructs to paralysis, poison, disease and energy drain, and condition immunities count.
 
@@ -161,6 +161,16 @@ A weapon's magic qualities are chosen in the **Magic Qualities** section of its 
 Wounding, disruption and thundering are applied as soon as the module can tell the attack hit, with an Undo, or by an **Apply** button when it can't, like monster attack riders. Each quality's damage is a row in the roll window: untick it while a quality is turned off, or to suppress merciful. Holy, bane and the others that depend on the target apply when every target qualifies, otherwise the row says why and can be ticked by hand. Extra dice are never multiplied on a critical hit and apply to each arrow of Manyshot. If the weapon's action already has the die typed into its damage, the module doesn't add it again.
 
 Not automated yet: qualities on ammunition, and bane's +2 against damage reduction.
+
+## Poison, disease and curses
+A poison, disease or curse a creature contracts becomes a buff on it (*Poison: Viper Poison*) that keeps its schedule, so nothing has to be counted by hand:
+- **Contracting:** a monster's "plus poison" or "plus disease", or the **Expose targets** button on the card of any poison, disease or ability that describes one (Blue Whinnis, Filth Fever, a creature's Poison ability). The first save is rolled; on a success nothing happens. Undead and constructs are immune to poison and disease.
+- **Onset:** nothing happens until it has passed. Without an onset, the failed first save applies the effect at once and counts as the first of its saves.
+- **Saves on schedule:** "/round" afflictions in combat at the start of the creature's turn, once a round; longer ones (minutes, hours, days) when game time passes their due time. A player's character gets a private card with a button to roll the save; creatures no player owns roll on their own. Outside combat, a "/round" poison offers **Resolve all**.
+- **Effects:** ability damage and drain, conditions (with their duration, or kept while the affliction lasts), and hit point or nonlethal damage are applied automatically, each with an **Undo**; the initial effect on the first failed save and the secondary effect after. Anything else in the effect is shown to apply by hand.
+- **Ending:** after the cure's number of saves in a row (the damage already taken stays), or when a limited frequency runs out. "Magic only" afflictions never end from saves; delete the buff when a spell cures it.
+- **Another dose** of an active poison raises its DC by 2 and adds half its duration; one save at the higher DC.
+- **Save bonuses** against poison, disease and curses (a dwarf's +2 vs poison) count on all of these saves.
 
 ## Incorporeal creatures
 PF1 marks incorporeal creatures with its Incorporeal condition (added on its own for the incorporeal subtype) but applies full damage to them. When damage from a card is applied to one, PF1e Revamp applies the rule and whispers why:
