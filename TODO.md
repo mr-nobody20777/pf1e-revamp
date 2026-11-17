@@ -5,11 +5,8 @@ Planned work for PF1e Revamp, grouped by status. Completed work is recorded in t
 ## In progress
 
 ### Roll windows and chat cards
-The roll-window buff manager ("Buffs on a roll") is released in the Unreleased section of the changelog. Remaining work:
-- **Debuffs cast by another creature.** Penalties from buffs cast by someone else (for example *Bane*) should be locked like conditions, so only the GM can remove them from a roll. PF1 buffs don't record their caster, so this needs a way to track the source.
-- **Compatibility with Roll Bonuses.** Confirm that bonuses added by the Roll Bonuses module are never counted twice.
-- **Clearer locked rows.** In the dark theme, a locked condition and a locked Not Applied row look alike; give locked rows a distinct style.
-- **Cleaner chat-card labels.** When a buff is turned off for a roll, the card shows both PF1's "+1 [Haste]" and the correction "−1 [Buffs: Haste off]". Both are correct, but a single line would read better.
+Remaining work on the roll-window buff manager ("Buffs on a roll"):
+- **Debuffs applied by other modules.** Penalties from another creature's spell are locked when the spell was applied by this module's spell rows; buffs applied by hand or by Nevela's Automation Suite don't record their caster, so they stay unlocked.
 
 
 ### Next priorities
@@ -119,7 +116,6 @@ The design reference gives every feat, trait, class and archetype feature, racia
 - **Test tooling.** Nevela's Automation Suite cancels targeted buff spells (such as *Haste*) cast without a target, so tests that cast spells must set a target or use a non-buff spell.
 
 ### Known issues
-- **Test flake: quick-apply energy resistance note.** The "later hooks still see the ½ ratio" test occasionally misses the resistance note during a full run (it passes on its own). Likely another batch's chat message is read in its place.
 - **Snap Shot archers don't threaten.** With Snap Shot, an archer threatens squares within 5 feet (more with Improved Snap Shot), which affects flanking and the warning for shooting while threatened. The Snap Shot feat is also missing from the installed compendiums (only the rogue talent of the same name exists).
 
 ### Release readiness

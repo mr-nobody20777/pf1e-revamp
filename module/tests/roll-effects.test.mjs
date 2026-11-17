@@ -1,5 +1,6 @@
 // Buffs on a roll: roll windows list the buffs, conditions and situational bonuses PF1 counts, and
-// changes made there apply to that one roll (corrections to PF1's totals, labeled "Buffs: ...").
+// changes made there apply to that one roll: on attacks, turned-off buffs leave PF1's own lines (one clean
+// line per bonus on the card); elsewhere, corrections to PF1's totals labeled "Buffs: ...".
 
 import { createTestActor, addItems, fromPack, cleanup, waitFor } from "./helpers.mjs";
 
@@ -82,7 +83,7 @@ export function registerRollEffectsTests(quench) {
           assert.notMatch(attack, /Buffs/, "nothing changed, nothing added");
         });
 
-        it("turning off the top bonus unlocks the next; ticked, it counts, and the roll gets one correction", async () => {
+        it("turning off the top bonus unlocks the next; ticked, it counts in PF1's own line", async () => {
           const { dialog, done } = await openAttack(sword);
           dialog.element[0].querySelector("[data-action=manage]").click();
           const manager = await managerOf();
@@ -93,7 +94,9 @@ export function registerRollEffectsTests(quench) {
           assert.isTrue(manager.element.querySelector(`input[data-key="${id("Bless")}"]`).disabled, "Bless stays locked: Heroism now beats it");
           assert.match(manager.element.textContent, /Bless · Heroism is higher/);
           const { attack, damage } = await done();
-          assert.match(attack, /-\s?2\[Buffs: Heroism, Greater off; Heroism on\]/);
+          assert.notMatch(attack, /Heroism, Greater/, "Greater Heroism's line is gone");
+          assert.match(attack, /2\[Heroism\]/, "Heroism's own +2 instead");
+          assert.notMatch(attack, /\[Buffs/, "no correction line");
           assert.notMatch(damage, /Buffs/, "neither affects damage");
         });
 
@@ -126,6 +129,37 @@ export function registerRollEffectsTests(quench) {
           await done();
         });
 
+        it("a condition turned off on an attack is still a correction (PF1 builds its own condition lines)", async () => {
+          const { dialog, done } = await openAttack(sword);
+          dialog.element[0].querySelector("[data-action=manage]").click();
+          const manager = await managerOf();
+          await toggle(manager.element, "cond.shaken");
+          const { attack } = await done();
+          assert.match(attack, /2\[Buffs: Shaken off\]/);
+        });
+
+        it("a penalty from another creature's spell is locked like a condition", async () => {
+          const [bane] = await fighter.createEmbeddedDocuments("Item", [{ name: "Quench Enemy Bane", type: "buff", system: { active: true, changes: [{ formula: "-1", target: "attack", type: "morale" }] }, flags: { [MODULE_ID]: { castBy: "Actor.someoneElse0000" } } }]);
+          try {
+            const { dialog, done } = await openAttack(sword);
+            dialog.element[0].querySelector("[data-action=manage]").click();
+            let manager = await managerOf();
+            Object.defineProperty(game.user, "isGM", { get: () => false, configurable: true });
+            try {
+              await manager.render();
+              manager = await managerOf();
+              const box = manager.element.querySelector(`input[data-key="${bane.id}"]`);
+              assert.isTrue(box.disabled, "a player can't turn it off");
+              assert.isTrue(box.closest("tr").classList.contains("locked"), "styled as locked");
+            } finally {
+              delete game.user.isGM;
+            }
+            await done();
+          } finally {
+            await bane.delete();
+          }
+        });
+
         it("at or under the threshold: chips in the window", async () => {
           await game.settings.set(MODULE_ID, SETTING, 20);
           const { dialog, done } = await openAttack(sword);
@@ -133,7 +167,8 @@ export function registerRollEffectsTests(quench) {
           assert.isOk(root.querySelector(`.${MODULE_ID}-chips`));
           await toggle(root, id("Haste"));
           const { attack } = await done();
-          assert.match(attack, /-\s?1\[Buffs: Haste off\]/);
+          assert.notMatch(attack, /\[Haste\]/, "Haste's +1 is gone");
+          assert.notMatch(attack, /\[Buffs/, "with no correction line");
         });
 
         it("saves: the window's Situational Bonus field carries the correction", async () => {

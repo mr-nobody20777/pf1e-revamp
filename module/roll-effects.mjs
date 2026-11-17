@@ -9,13 +9,17 @@
 //   - Stacking is PF1's own (getHighestChanges). A bonus beaten by a higher one of the same type is
 //     Not Applied; it can be ticked only once every bonus beating it is off, and never moves up alone.
 //   - Ability-score buffs merge into one row per ability, expanding to their sources.
-//   - Conditions are imposed: only the GM can untick them. Everything else anyone can change.
+//   - Conditions are imposed: only the GM can untick them. So are penalties from a buff another creature put
+//     on this one through a spell row (Bane cast by an enemy: flags.castBy). Everything else anyone can change.
 //   - Situational bonuses that don't apply right now (Studied Target with no studied creature
 //     targeted) are listed as Not Applied with the reason, and anyone can tick them.
 //
-// PF1 has already counted its buffs in the roll's totals, so a change is applied as one labeled
-// correction ("-2[Buffs: Greater Heroism off, Heroism on]"); situational bonuses are added as their
-// own parts. Rolls without a window use the defaults: PF1's totals plus the bonuses that apply.
+// Attack and damage rolls: buffs and conditions turned off leave PF1's own list of changes before it picks
+// the highest of each type, and bonuses switched on join it, so the card shows one clean line per bonus.
+// Saves, skills and ability checks have no such list: PF1 has already counted its buffs in their totals,
+// so a change is applied there as one labeled correction ("-2[Buffs: Greater Heroism off, Heroism on]").
+// Situational bonuses are added as their own parts. Rolls without a window use the defaults: PF1's
+// totals plus the bonuses that apply.
 
 import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
 import { esc, addSearch } from "./util.mjs";
@@ -91,7 +95,10 @@ function conditionOf(actor, change) {
 /** A buff or condition's change (not BAB, ability modifiers, feats or gear). */
 function sourceOf(actor, change) {
   if (change.operator !== "add" || !Number.isFinite(change.value) || !change.value) return null;
-  if (change.parent?.type === "buff") return { key: change.parent.id, label: change.parent.name, imposed: false };
+  if (change.parent?.type === "buff") {
+    const by = change.parent.flags?.[MODULE_ID]?.castBy;
+    return { key: change.parent.id, label: change.parent.name, imposed: !!by && by !== actor.uuid && change.value < 0 };
+  }
   const cond = conditionOf(actor, change);
   return cond ? { key: `cond.${cond.id}`, label: cond.name, imposed: true } : null;
 }
@@ -295,7 +302,48 @@ function planFor(model, state) {
     if (ability) abilities.roll = { ability, score: c.scoreDelta[ability] ?? 0 };
   }
   const provided = model.provided.filter((p) => state.provided.get(p.id)).map((p) => effective(p, state));
-  return { delta: c.delta, abilities, label, provided };
+  // Attacks: which buffs' changes leave PF1's list and which join it (by id: the plan lives in roll data).
+  // Conditions stay a correction: PF1 builds its own condition changes for damage rolls.
+  const changes = {};
+  if (model.roll.kind === "attack") {
+    const isBuff = (c) => c.change.parent?.type === "buff";
+    for (const part of model.parts) {
+      const list = model.changes[part] ?? [];
+      const included = (c) => isIncluded(model, state, c.key, c.change);
+      const withBuffsOnly = list.filter((c) => (isBuff(c) ? included(c) : !model.losers.has(c.change))).map((c) => c.change);
+      changes[part] = {
+        drop: list.filter((c) => isBuff(c) && !included(c)).map((c) => changeId(c.change)),
+        keep: list.filter((c) => isBuff(c) && included(c)).map((c) => changeId(c.change)),
+        rest: sum(highest(list.filter(included).map((c) => c.change))) - sum(highest(withBuffsOnly)), // conditions turned off
+        restLabel: (() => {
+          const off = [...model.entries.values()].filter((e) => e.key.startsWith("cond.") && state.off.has(e.key) && e.values[part] !== undefined).map((e) => `${e.label} off`);
+          return off.length ? `Buffs: ${off.join("; ")}` : null;
+        })(),
+      };
+    }
+  }
+  return { delta: c.delta, abilities, label, provided, changes };
+}
+
+/** A stable id for one of the actor's changes (its item and its own id). */
+const changeId = (c) => `${c.parent?.id ?? "-"}:${c._id ?? c.id ?? c.flavor ?? ""}:${c.target ?? ""}`;
+
+/**
+ * Turned-off buffs and conditions leave PF1's change list for this attack or damage roll, and bonuses switched
+ * on (ones a higher bonus beat) join it. Returns true when the plan was applied this way.
+ */
+function adjustChanges(plan, part, changes, actor) {
+  const ids = plan.changes?.[part];
+  if (!ids || !Array.isArray(changes)) return false;
+  const drop = new Set(ids.drop);
+  for (let i = changes.length - 1; i >= 0; i--) if (drop.has(changeId(changes[i]))) changes.splice(i, 1);
+  const have = new Set(changes.map(changeId));
+  for (const id of ids.keep) {
+    if (have.has(id)) continue;
+    const change = actor?.changes?.find((c) => changeId(c) === id);
+    if (change) changes.push(change);
+  }
+  return true;
 }
 
 /** How much an ability modifier moves when the score moves by `score`. */
@@ -309,10 +357,11 @@ export function attackAbilityMod(rollData, ability) {
 }
 
 /** Formula parts for one part of the roll ("atk", "dmg" or "roll"), given the roller's roll data. */
-function partsFor(plan, part, rollData) {
+function partsFor(plan, part, rollData, { adjusted = false } = {}) {
   const out = [];
   const abl = plan.abilities[part];
-  let correction = plan.delta[part] ?? 0;
+  // Adjusted: PF1's change list already reflects the buffs; only conditions turned off need a correction
+  let correction = adjusted ? plan.changes?.[part]?.rest ?? 0 : plan.delta[part] ?? 0;
   if (abl?.score) {
     const data = rollData.abilities?.[abl.ability] ?? {};
     const shift = modShift(data.total ?? 10, abl.score);
@@ -323,7 +372,9 @@ function partsFor(plan, part, rollData) {
       correction += ablDamage((data.mod ?? 0) + shift) - ablDamage(data.mod ?? 0);
     } else correction += shift;
   }
-  if (correction) out.push(`${correction}[${plan.label[part] ?? "Buffs"}]`);
+  // Just conditions turned off: name only them (the buffs already left PF1's own lines)
+  const label = adjusted && !abl?.score ? plan.changes?.[part]?.restLabel : null;
+  if (correction) out.push(`${correction}[${label || plan.label[part] || "Buffs"}]`);
   const stacking = STACKING();
   for (const p of plan.provided) {
     let value = p[part] ?? 0;
@@ -390,7 +441,7 @@ function rows(model, state) {
       disabled: (e.imposed && !gm) || (e.beaten && !beatersOff),
       imposed: e.imposed,
       note: e.beaten ? (state.on.has(e.key) ? "ticked for this roll" : `${names.join(", ")} ${names.length > 1 ? "are" : "is"} higher`) : "",
-      tooltip: e.imposed && !gm ? "A condition: only the GM can turn it off for this roll" : e.beaten && !beatersOff ? `Turn off ${names.join(", ")} first` : "",
+      tooltip: e.imposed && !gm ? "Imposed (a condition, or another creature's spell): only the GM can turn it off for this roll" : e.beaten && !beatersOff ? `Turn off ${names.join(", ")} first` : "",
     });
   }
   for (const a of model.abilities) {
@@ -472,7 +523,7 @@ function windowBlock(ctx) {
   if (list.length <= limit) {
     div.innerHTML = `${label}<div class="${MODULE_ID}-chips">${list
       .map((r) => {
-        const cls = [r.section === "na" ? "na" : "", r.negative ? "neg" : "", r.kind === "ability" ? "abl" : ""].join(" ");
+        const cls = [r.section === "na" ? "na" : "", r.negative ? "neg" : "", r.kind === "ability" ? "abl" : "", r.imposed ? "locked" : ""].join(" ");
         const tip = [r.type, r.note, r.tooltip].filter(Boolean).join(" · ");
         if (r.kind === "ability") return `<a class="${MODULE_ID}-chip ${cls}" data-action="manage" data-tooltip="${esc(r.sub.map((s) => s.label).join(" · "))}">${esc(r.label)} ▾</a>`;
         return `<label class="${MODULE_ID}-chip ${cls}" data-tooltip="${esc(tip)}">${checkbox(r)}${r.imposed ? "🔒 " : ""}${esc(r.label)} ${esc(r.value)}</label>${choiceSelect(r)}`;
@@ -498,9 +549,9 @@ class EffectsManager extends foundry.applications.api.ApplicationV2 {
     const list = rows(model, state);
     const row = (r) => {
       const name = `${r.imposed ? "🔒 " : ""}${esc(r.label)}${r.note ? ` <span class="${MODULE_ID}-muted">· ${esc(r.note)}</span>` : ""}${choiceSelect(r)}`;
-      const head = `<tr class="${r.section === "na" ? "na" : ""}" ${r.tooltip ? `data-tooltip="${esc(r.tooltip)}"` : ""}><td>${r.kind === "ability" ? `<a data-action="expand" data-key="${esc(r.key)}">${this.ctx.expanded?.has(r.key) ? "▾" : "▸"}</a>` : checkbox(r)}</td><td>${name}</td><td class="num">${esc(r.value)}</td><td class="${MODULE_ID}-muted">${esc(r.type)}</td></tr>`;
+      const head = `<tr class="${[r.section === "na" ? "na" : "", r.imposed ? "locked" : ""].join(" ").trim()}" ${r.tooltip ? `data-tooltip="${esc(r.tooltip)}"` : ""}><td>${r.kind === "ability" ? `<a data-action="expand" data-key="${esc(r.key)}">${this.ctx.expanded?.has(r.key) ? "▾" : "▸"}</a>` : checkbox(r)}</td><td>${name}</td><td class="num">${esc(r.value)}</td><td class="${MODULE_ID}-muted">${esc(r.type)}</td></tr>`;
       if (r.kind !== "ability" || !this.ctx.expanded?.has(r.key)) return head;
-      return head + r.sub.map((s) => `<tr class="sub" ${s.disabled ? `data-tooltip="A condition: only the GM can turn it off for this roll"` : ""}><td></td><td colspan="3"><label>${checkbox(s, true)} ${s.imposed ? "🔒 " : ""}${esc(s.label)}</label></td></tr>`).join("");
+      return head + r.sub.map((s) => `<tr class="sub${s.imposed ? " locked" : ""}" ${s.disabled ? `data-tooltip="Imposed (a condition, or another creature's spell): only the GM can turn it off for this roll"` : ""}><td></td><td colspan="3"><label>${checkbox(s, true)} ${s.imposed ? "🔒 " : ""}${esc(s.label)}</label></td></tr>`).join("");
     };
     const sections = [...SECTIONS, ["na", "Not Applied"]]
       .map(([id, title]) => {
@@ -511,7 +562,7 @@ class EffectsManager extends foundry.applications.api.ApplicationV2 {
       })
       .join("");
     return `<p class="${MODULE_ID}-totals">${summaryText(model, list)}</p><table class="${MODULE_ID}-effects-table">${sections}</table>
-      <p class="${MODULE_ID}-muted">Changes apply to this roll only.${list.some((r) => r.imposed || r.sub?.some((s) => s.imposed)) ? " 🔒 Conditions: only the GM can turn them off." : ""}</p>`;
+      <p class="${MODULE_ID}-muted">Changes apply to this roll only.${list.some((r) => r.imposed || r.sub?.some((s) => s.imposed)) ? " 🔒 Conditions and other creatures' spells: only the GM can turn them off." : ""}</p>`;
   }
 
   _replaceHTML(html, content) {
@@ -652,19 +703,21 @@ Hooks.on("pf1CreateActionUse", (use) => use.shared?.rollData && actionUses.set(u
 // Registered at init, after every module script has loaded, so other features' attack hooks (True
 // Strike's +20 insight) run first and their typed bonuses are known
 Hooks.once("init", () => {
-  Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts) => {
+  Hooks.on("pf1PreAttackRoll", (action, config, rollData, rollOptions, parts, changes) => {
     if (!ATTACK_ACTIONS.includes(action.actionType)) return;
     const shared = actionUses.get(rollData);
     rollData[FLAGS] ??= shared ? { ...useFlags(shared), manyshotAttacks: shared.attacks.flatMap((a, i) => (a.type === "manyshot" ? [i] : [])) } : {};
     rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action, flags: rollData[FLAGS] });
-    parts.push(...partsFor(rollData[KEY], "atk", rollData));
+    const adjusted = adjustChanges(rollData[KEY], "atk", changes, action.actor);
+    parts.push(...partsFor(rollData[KEY], "atk", rollData, { adjusted }));
     delete rollData[TYPED]; // per attack roll: a full attack's next attack starts fresh (no typed damage bonuses yet)
   });
 
-  Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
+  Hooks.on("pf1PreDamageRoll", (action, rollData, parts, changes) => {
     if (!ATTACK_ACTIONS.includes(action.actionType) || !parts[0]) return;
     const plan = (rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action, flags: rollData[FLAGS] ?? {} }));
-    parts[0].extra.push(...partsFor(plan, "dmg", rollData));
+    const adjusted = adjustChanges(plan, "dmg", changes, action.actor);
+    parts[0].extra.push(...partsFor(plan, "dmg", rollData, { adjusted }));
     // Dice (sneak attack) aren't multiplied on a critical hit: only in the normal damage roll, whose
     // total PF1 adds to the separate critical damage roll. Precision damage counts once per volley, so
     // not on Manyshot's extra arrow (entries marked `perArrow`, a flaming bow's fire, apply to each arrow).

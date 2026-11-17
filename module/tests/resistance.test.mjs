@@ -1,6 +1,6 @@
 // Energy resistance/immunity on quick-applied damage (PF1 only applies them in its dialog).
 
-import { createTestActor, cleanup } from "./helpers.mjs";
+import { createTestActor, cleanup, waitFor } from "./helpers.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 const SETTING = "quickApplyResistance";
@@ -116,8 +116,10 @@ export function registerResistanceTests(quench) {
           await hit(15, ["fire"], { ratio: 1.5 });
           assert.equal(start - hp(), 7, "15 − 10 resisted = 5, ×1.5 = 7");
           // Notes can arrive in either order: look for this hit's own
-          const notes = game.messages.contents.filter((m) => !before.has(m.id)).map((m) => m.content);
-          assert.isOk(notes.find((c) => /Took 7\./.test(c)), notes.join(" | "));
+          // The note is posted after the damage lands: wait for it
+          const newNotes = () => game.messages.contents.filter((m) => !before.has(m.id)).map((m) => m.content);
+          await waitFor(() => newNotes().some((c) => /Took 7\./.test(c)), { what: "the 7-damage note" }).catch(() => null);
+          assert.isOk(newNotes().find((c) => /Took 7\./.test(c)), newNotes().join(" | "));
         });
 
         it("halved damage and healing never drop below 1 (½ button on 1 point)", async () => {
