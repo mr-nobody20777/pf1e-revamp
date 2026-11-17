@@ -462,6 +462,77 @@ export function registerWeaponQualityTests(quench) {
             await ghost.delete();
           }
         });
+
+        /* Phase 4c: speed, furious, defending */
+
+        it("speed: one extra attack on a full attack (PF1's haste attack, so never two)", async () => {
+          const plain = await weapon("Longsword", "Longsword");
+          const fast = await weapon("Longsword", "+3 Speed Longsword", { system: { equipped: true, enh: 3 } });
+          const count = async (item) => (await attackWith(item, tokens.goblin, 10)).systemRolls.attacks.length;
+          const base = await count(plain);
+          assert.equal(await count(fast), base + 1);
+        });
+
+        it("furious: +2 on attack and damage only while raging", async () => {
+          const axe = await weapon("Battle Axe", "+1 Furious Battle Axe", { system: { equipped: true, enh: 1 } });
+          let card = await attackWith(axe, tokens.goblin, 10);
+          assert.notMatch(card.systemRolls.attacks[0].attack.formula, /Furious/);
+          const [rage] = await fighter.createEmbeddedDocuments("Item", [{ name: "Rage", type: "buff", system: { active: true } }]);
+          try {
+            card = await attackWith(axe, tokens.goblin, 10);
+            assert.match(card.systemRolls.attacks[0].attack.formula, /2\[Furious\]/);
+            assert.match((card.systemRolls.attacks[0].damage ?? []).map((r) => r.formula).join(" + "), /2\[Furious\]/);
+          } finally {
+            await rage.delete();
+          }
+        });
+
+        it("furious: with raging climber, the weapon's enhancement bonus on Climb even when not raging", async () => {
+          await weapon("Battle Axe", "+1 Furious Battle Axe", { system: { equipped: true, enh: 1 } });
+          const [power] = await fighter.createEmbeddedDocuments("Item", [{ name: "Raging Climber", type: "feat", system: { subType: "classFeat" } }]);
+          try {
+            const before = new Set(game.messages.keys());
+            await fighter.rollSkill("clm", { skipDialog: true });
+            const card = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.rolls?.length));
+            assert.match(card.rolls[0].formula, /1\[Furious weapon\]/);
+          } finally {
+            await power.delete();
+          }
+        });
+
+        it("defending: at the start of the turn a whisper offers the choice; it carries over; attacks lose what's moved", async () => {
+          const { setDefending, defendingAC } = await import("../weapon-qualities.mjs");
+          const sword = await weapon("Longsword", "+2 Defending Longsword", { system: { equipped: true, enh: 2 } });
+          const ac = () => fighter.system.attributes.ac.normal.total;
+          const startAC = ac();
+          const [combat] = await Combat.createDocuments([{ scene: canvas.scene.id, active: true }]);
+          try {
+            await combat.createEmbeddedDocuments("Combatant", [{ tokenId: tokens.fighter.id, sceneId: canvas.scene.id, actorId: fighter.id, initiative: 10 }]);
+            const before = new Set(game.messages.keys());
+            await combat.startCombat();
+            const offer = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && /Defending/.test(m.content)), { what: "the defending whisper" });
+            assert.isOk(offer.whisper.length, "whispered");
+            assert.equal(defendingAC(fighter, sword), 0, "nothing moved at first");
+            const plus2 = await waitFor(() => document.querySelector(`[data-message-id="${offer.id}"] [data-wq-defend="2"]`));
+            plus2.click();
+            await waitFor(() => defendingAC(fighter, sword) === 2, { what: "the AC buff" });
+            assert.equal(ac(), startAC + 2);
+            const card = await attackWith(sword, tokens.goblin, 10);
+            assert.match(card.systemRolls.attacks[0].attack.formula, /-\s*2\[Defending\]/);
+            // Next turn: the choice carries over
+            const before2 = new Set(game.messages.keys());
+            await combat.nextRound();
+            const again = await waitFor(() => game.messages.contents.find((m) => !before2.has(m.id) && /Defending/.test(m.content)));
+            assert.match(again.content, /\+2 on AC, as last turn/);
+            assert.equal(defendingAC(fighter, sword), 2);
+            await setDefending(fighter, sword, 0);
+            assert.equal(ac(), startAC);
+          } finally {
+            await combat.delete();
+            await new Promise((r) => setTimeout(r, 500));
+          }
+          assert.isUndefined(fighter.itemTypes.buff.find((b) => b.flags?.[MODULE_ID]?.defendingAC), "the buff goes with the combat");
+        });
       });
     },
     { displayName: "PF1e Revamp: weapon qualities" },

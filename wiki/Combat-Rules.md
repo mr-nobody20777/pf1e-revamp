@@ -154,10 +154,13 @@ A weapon's magic qualities are chosen in the **Magic Qualities** section of its 
 - **Brilliant energy:** the target's armor and shield bonuses don't count against the attack, so they're added to the attack roll (against a single target). It can't harm undead or constructs: damage applied to them is 0.
 - **Seeking:** a ranged attack ignores the target's miss chances (concealment, blur, displacement).
 - **Ghost touch:** full damage against incorporeal creatures (see below), and it can strike ethereal creatures.
+- **Speed:** a full attack gets one extra attack at full base attack bonus: PF1's Haste extra attack is ticked, marked *(Speed)*, so *haste* doesn't add a second one.
+- **Furious:** +2 on attack and damage rolls while raging (rage, bloodrage, inspired rage, the *rage* spell). With raging climber, raging swimmer or raging leaper, the weapon's enhancement bonus (+2 more while raging) is added to that skill while the weapon is wielded; for raging leaper, only on checks to jump (tick it).
+- **Defending:** at the start of each of the wielder's turns in combat, a private message offers buttons to move some of the weapon's enhancement bonus to AC (0 up to the bonus). Last turn's choice carries over, so ignore the message unless it changes. The AC bonus is a buff until the next turn, and the weapon's attacks lose the same amount meanwhile.
 
 Wounding, disruption and thundering are applied as soon as the module can tell the attack hit, with an Undo, or by an **Apply** button when it can't, like monster attack riders. Each quality's damage is a row in the roll window: untick it while a quality is turned off, or to suppress merciful. Holy, bane and the others that depend on the target apply when every target qualifies, otherwise the row says why and can be ticked by hand. Extra dice are never multiplied on a critical hit and apply to each arrow of Manyshot. If the weapon's action already has the die typed into its damage, the module doesn't add it again.
 
-Not automated yet: speed, furious and defending (they can be marked already), qualities on ammunition, and bane's +2 against damage reduction.
+Not automated yet: qualities on ammunition, and bane's +2 against damage reduction.
 
 ## Incorporeal creatures
 PF1 marks incorporeal creatures with its Incorporeal condition (added on its own for the incorporeal subtype) but applies full damage to them. When damage from a card is applied to one, PF1e Revamp applies the rule and whispers why:

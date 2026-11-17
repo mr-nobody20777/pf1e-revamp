@@ -160,6 +160,8 @@ function levelOf(item, def) {
 }
 
 const RAGE = /^(rage|bloodrage|inspired rage|rage \(|raging song: inspired rage)/i;
+/** Is the creature raging (rage, bloodrage, inspired rage, the rage spell)? */
+export const isRaging = (actor) => !!actor?.itemTypes?.buff?.some((b) => b.isActive && RAGE.test(b.name));
 function conditionMet(actor, when) {
   if (when === "rage") return actor.itemTypes.buff.some((b) => b.isActive && RAGE.test(b.name));
   if (when === "armor") return actor.itemTypes.equipment.some((e) => e.system.equipped && ["armor", "shield"].includes(e.system.subType));
