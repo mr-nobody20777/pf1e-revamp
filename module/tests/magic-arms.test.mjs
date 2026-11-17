@@ -194,7 +194,13 @@ export function registerMagicArmsTests(quench) {
             const panel = async () => waitFor(() => (sword.sheet.element?.[0] ?? sword.sheet.element)?.querySelector?.(`.${MODULE_ID}-magic [data-wq-add]`)?.closest(`.${MODULE_ID}-magic`));
             let p = await panel();
             assert.match(p.textContent, /Keen/);
-            p.querySelector("[data-wq-add]").value = "Flaming";
+            // Choosing from the list fires a change, which PF1's sheet would save and redraw on, losing the choice
+            const select = p.querySelector("[data-wq-add]");
+            select.value = "Flaming";
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+            await new Promise((r) => setTimeout(r, 800));
+            assert.isTrue(select.isConnected, "the sheet wasn't redrawn");
+            assert.equal(select.value, "Flaming");
             p.querySelector("[data-wq-add-button]").click();
             await waitFor(() => sword.getFlag(MODULE_ID, MA.FLAG)?.qualities?.length === 2);
             assert.deepEqual(sword.getFlag(MODULE_ID, MA.FLAG).qualities, ["Keen", "Flaming"]);

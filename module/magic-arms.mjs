@@ -580,6 +580,12 @@ Hooks.on("renderItemSheetPF", async (app, html) => {
   else tab.append(...section.children);
   const panel = tab.querySelector(`.${MODULE_ID}-magic`);
   if (!panel || !item.isOwner || item.showUnidentifiedData) return;
+  // PF1's sheet saves and redraws on any change in its form, which would wipe a choice before Add is
+  // clicked: the section's own controls handle their events, and they stop here
+  for (const type of ["change", "input"]) panel.addEventListener(type, (event) => event.stopPropagation());
+  panel.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") event.preventDefault(); // Enter in the search box would submit the sheet
+  });
   const select = panel.querySelector("[data-wq-add]");
   if (select) addSearch(select);
   panel.querySelector("[data-wq-add-button]")?.addEventListener("click", async () => {
