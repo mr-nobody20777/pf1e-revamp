@@ -48,6 +48,7 @@
 // the row says whether the creature takes full or half.
 
 import { MODULE_ID } from "./const.mjs";
+import { cureAfflictions } from "./afflictions.mjs";
 import { SPELLS } from "./spell-data.mjs";
 import { abilityDef } from "./ability-effects.mjs";
 import { creatureTypes, energyAsUndead } from "./creature-types.mjs";
@@ -555,6 +556,8 @@ async function applyEffect(actor, effect, data, caster) {
     else await actor.createEmbeddedDocuments("Item", [stamp({ name: data.name, type: "buff", img: item?.img, system: { subType: "spell", active: true, level: data.cl, changes, ...(duration ? { duration } : {}) } })]);
     out.push(effect.changes.map((c) => `${c.formula} ${c.target.replace(/^skill\./, "")}`).join(", "));
   }
+  // Neutralize poison, remove disease, remove curse: a caster level check against each affliction of the kind
+  if (effect.cure) out.push(await cureAfflictions(actor, effect.cure, data.cl ?? 1));
   if (effect.marker && !effect.buff) {
     const duration = spellDuration(item, data.cl);
     const existing = actor.itemTypes.buff.find((b) => b.name === data.name);

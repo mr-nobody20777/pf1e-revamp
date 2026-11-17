@@ -4,6 +4,8 @@
 
 import { createTestActor, cleanup, waitFor, useTestScene, placeToken, deleteTokens } from "./helpers.mjs";
 import * as AF from "../afflictions.mjs";
+import * as PW from "../poisoned-weapons.mjs";
+import { addItems, setTargets, useAndCollect } from "./helpers.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -43,7 +45,7 @@ export function registerAfflictionTests(quench) {
           for (const a of [npc, pc]) {
             const buffs = a?.itemTypes.buff.map((b) => b.id) ?? [];
             if (buffs.length) await a.deleteEmbeddedDocuments("Item", buffs);
-            await a?.update({ "system.abilities.con.damage": 0, "system.abilities.str.damage": 0, "system.abilities.dex.drain": 0 });
+            await a?.update({ "system.abilities.con.damage": 0, "system.abilities.str.damage": 0, "system.abilities.dex.drain": 0, "system.attributes.hp.value": a.system.attributes.hp.max });
           }
         });
         after(async () => {
@@ -131,6 +133,87 @@ export function registerAfflictionTests(quench) {
           } finally {
             await combat.delete();
             await deleteTokens([token]);
+            await ctl.restore();
+          }
+        });
+
+        const minutePoison = (dc = 9) => ({ ...viper(), dc, frequency: { per: 1, unit: "minute", for: { amount: "6", unit: "minute" } } });
+        const buff = async (a, name) => (await a.createEmbeddedDocuments("Item", [{ name, type: "buff", system: { active: true } }]))[0];
+
+        it("neutralize poison (and the other cures): a caster level check against each one's DC", async () => {
+          await AF.contract(npc, minutePoison(5), { failed: true });
+          await AF.contract(npc, { ...minutePoison(40), name: "Quench Strong Venom" }, { failed: true });
+          const text = await forced(0.001, () => AF.cureAfflictions(npc, "poison", 10));
+          assert.match(text, /Viper Poison ended/);
+          assert.match(text, /Strong Venom remains/);
+          assert.lengthOf(AF.afflictionsOf(npc), 1);
+          assert.match(await AF.cureAfflictions(npc, "disease", 10), /no disease/);
+        });
+
+        it("delay poison: the poison waits, then its first effect comes when the spell ends", async () => {
+          const delay = await buff(npc, "Delay Poison");
+          const r = await AF.contract(npc, minutePoison(), { failed: true });
+          assert.match(r.text, /delay poison/);
+          assert.equal(ability(npc, "con"), 0);
+          const [poison] = AF.afflictionsOf(npc);
+          await forced(0.999, () => AF._test.checkDue(npc, poison));
+          assert.equal(ability(npc, "con"), 0, "still held off");
+          await delay.delete();
+          await forced(0.999, () => AF._test.checkDue(npc, AF.afflictionsOf(npc)[0]));
+          assert.equal(ability(npc, "con"), 1, "the delayed first effect");
+        });
+
+        it("pernicious poison: poisons last 2 more saves", async () => {
+          await buff(npc, "Pernicious Poison");
+          await AF.contract(npc, minutePoison(), { failed: true });
+          assert.equal(AF.afflictionsOf(npc)[0].flags[MODULE_ID][AF.FLAG].remaining, 7, "6 + 2, less the first");
+        });
+
+        it("treated (Heal): the healer's check with each save", async () => {
+          const healer = await createTestActor("Quench Healer", { abilities: { wis: 18 } });
+          try {
+            await AF.contract(npc, minutePoison(), { failed: true });
+            const [poison] = AF.afflictionsOf(npc);
+            await AF.setTreatment(poison, healer);
+            const before = new Set(game.messages.keys());
+            await poison.update({ [`flags.${MODULE_ID}.${AF.FLAG}.dueAt`]: game.time.worldTime - 1 });
+            await forced(0.001, () => AF._test.checkDue(npc, AF.afflictionsOf(npc)[0]));
+            const result = game.messages.contents.find((m) => !before.has(m.id) && m.flags?.[MODULE_ID]?.afflictionResult);
+            assert.match(result.content, /Quench Healer's Heal \d+ \(\+4\)/);
+          } finally {
+            await cleanup([healer], new Set(game.messages.keys()));
+          }
+        });
+
+        it("resting doesn't heal an affliction's damage while it lasts", async () => {
+          await forced(0.999, () => AF.contract(npc, minutePoison(), {}));
+          assert.equal(ability(npc, "con"), 1);
+          await npc.performRest({ restoreHealth: true, hours: 8 });
+          assert.equal(ability(npc, "con"), 1, "kept: the poison still lasts");
+        });
+
+        it("a poisoned weapon: the next hit delivers the dose, which is then gone; a natural 1 exposes the wielder", async () => {
+          const ctl = await useTestScene();
+          const fighter = await createTestActor("Quench Poisoner", { abilities: { str: 16 }, items: [["pf1.classes", "Fighter", { system: { level: 5 } }]] });
+          const tokens = [await placeToken(fighter, 2, 2), await placeToken(npc, 3, 2, { disposition: -1 })];
+          try {
+            const [dagger] = await addItems(fighter, [["pf1.weapons-and-ammo", "Dagger", { system: { equipped: true } }]]);
+            const spec = AF.parseAffliction("Type injury; Save Fortitude DC 14 Frequency 1/minute for 2 minutes Effect 1 Con; Cure 1 save", { name: "Quench Blade Venom", kind: "poison" });
+            await PW._test.applyPoison(fighter, spec, dagger);
+            assert.isOk(PW.poisonOn(dagger));
+            setTargets([tokens[1]]);
+            await forced(0.001, () => useAndCollect(dagger)); // natural 20: a hit; the target's save is a natural 20 too
+            await waitFor(() => !PW.poisonOn(dagger), { what: "the dose used up" });
+            await PW._test.applyPoison(fighter, spec, dagger);
+            const before = new Set(game.messages.keys());
+            await forced(0.999, () => useAndCollect(dagger)); // natural 1
+            // The exposure runs once the card exists (its save isn't forced): wait for its report
+            await waitFor(() => game.messages.contents.some((m) => !before.has(m.id) && m.flags?.[MODULE_ID]?.afflictExposed?.actor === fighter.uuid), { what: "the wielder exposed" });
+            assert.isNotOk(PW.poisonOn(dagger));
+          } finally {
+            setTargets([]);
+            await deleteTokens(tokens);
+            await cleanup([fighter], new Set(game.messages.keys()));
             await ctl.restore();
           }
         });

@@ -27,9 +27,25 @@
 // Rulings (2026-11-17): the owner rolls each periodic save from a card (creatures no player owns: the GM's
 // client rolls them); a "/round" affliction outside combat offers "Resolve all"; effects are applied
 // automatically, with an Undo.
+//
+// Phase 2 (verbatim rules in the same file):
+//   - Cure spells: "a caster level check (1d20 + caster level) against the DC of each poison [disease, curse]
+//     affecting the target. Success means that the poison is neutralized ... the spell does not reverse
+//     instantaneous effects, such as hit point damage, temporary ability damage".
+//   - Delay poison: "Any poison in its system or any poison to which it is exposed during the spell's duration
+//     does not affect the subject until the spell's duration has expired": poison saves and effects wait.
+//   - Pernicious poison: "-4 penalty on saves against poison, and poisons affecting the target continue for
+//     another 2 frequency increments ... Attempts to cure the poisoned target with skill or magic take a -4".
+//   - Treat poison / disease (Heal): "Every time the poisoned character makes a saving throw against the
+//     poison, you make a Heal check. If your Heal check exceeds the DC of the poison, the character receives a
+//     +4 competence bonus on his saving throw". Ruling: the healer is chosen once and checks every save until
+//     they stop.
+//   - "Hit point and ability score damage caused by an affliction cannot be healed naturally while the
+//     affliction persists": PF1's rest leaves that damage (ruling: put back, with a note).
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM, onGmRequest, saveResult, rollTotal, ownerWhisper, timed, plainText } from "./util.mjs";
+import { esc, isActiveGM, onGmRequest, requestedByOwner, saveResult, rollTotal, ownerWhisper, timed, plainText } from "./util.mjs";
+import { registerFootnote, footnoteButton } from "./footnote.mjs";
 import { creatureTypes } from "./creature-types.mjs";
 
 export const FLAG = "affliction"; // buff flag: the affliction's state (below)
@@ -42,18 +58,35 @@ const CONDITIONS = { daze: "dazed", dazed: "dazed", sickened: "sickened", nausea
 const SAVES = { fort: "fort", fortitude: "fort", ref: "ref", reflex: "ref", will: "will" };
 const DICE = "\\d+d\\d+(?:\\s*[+-]\\s*\\d+)?|\\d+";
 const unitOf = (w) => w.toLowerCase().replace(/s$/, "");
+const hasBuff = (actor, re) => (actor?.itemTypes?.buff ?? []).some((b) => b.isActive && re.test(b.name));
+/** Delay poison: poisons wait. */
+export const delayed = (actor, kind) => kind === "poison" && hasBuff(actor, /^delay poison\b/i);
+/** Pernicious poison: −4 on saves against poison and on attempts to cure it. */
+const pernicious = (actor, kind) => kind === "poison" && hasBuff(actor, /^pernicious poison\b/i);
 
 // The kind of affliction a save is being rolled against, while it's rolled (save-bonuses.mjs reads it:
 // a dwarf's "+2 vs poison", a paladin's immunity aside)
 let against = null;
 export const savingAgainst = () => against;
-async function rollSave(actor, data, dc, reference) {
+async function rollSave(actor, data, dc, reference, extra = []) {
   against = data.kind;
+  const bonus = [...extra, ...(pernicious(actor, data.kind) ? ["-4[Pernicious Poison]"] : [])].join(" + ") || undefined;
   try {
-    return await actor.rollSavingThrow(data.save, { skipDialog: true, dc, reference });
+    return await actor.rollSavingThrow(data.save, { skipDialog: true, dc, reference, bonus });
   } finally {
     against = null;
   }
+}
+
+/** Treat poison / disease: the healer's Heal check against the DC; +4 competence on the save when it beats it. */
+async function treatment(actor, data) {
+  const healer = data.treatedBy ? fromUuidSync(data.treatedBy) : null;
+  if (!healer || !["poison", "disease"].includes(data.kind)) return { bonus: [], text: "" };
+  const penalty = pernicious(actor, data.kind) ? " - 4[Pernicious Poison]" : "";
+  const check = await healer.rollSkill("hea", { skipDialog: true, bonus: penalty || undefined });
+  const total = check?.rolls?.[0]?.total ?? check?.total;
+  const beats = Number.isFinite(total) && total > data.dc;
+  return { bonus: beats ? ["4[Treat " + titleCase(data.kind) + "]"] : [], text: `${healer.name}'s Heal ${total ?? "?"}${beats ? " (+4)" : ""}` };
 }
 
 /* -------------------------------------------- */
@@ -120,6 +153,14 @@ export function parseEffect(text) {
 const roundsOf = async ({ amount, unit }) => (await rollTotal(amount)) * Math.round((UNIT_SECONDS[unit] ?? 6) / 6);
 
 /** Apply an effect text to the actor. Returns { text, undo, held } (held: conditions kept while the affliction lasts). */
+/** Add an effect's damage to the affliction's record of what it dealt. */
+function recordDealt(data, undo) {
+  data.dealt ??= {};
+  // By ability ("con"), not by path: a dotted key would be expanded when the flag is saved
+  for (const a of undo?.abilities ?? []) if (a.key.endsWith(".damage")) data.dealt[a.key.split(".")[2]] = (data.dealt[a.key.split(".")[2]] ?? 0) + a.amount;
+  if (undo?.damage) data.dealt.hp = (data.dealt.hp ?? 0) + undo.damage;
+}
+
 async function applyEffect(actor, text) {
   const e = parseEffect(text);
   const parts = [];
@@ -223,7 +264,8 @@ export async function contract(target, spec, { source = null, reference = null, 
   }
 
   const now = game.time.worldTime;
-  const total = await savesFor(spec.frequency);
+  let total = await savesFor(spec.frequency);
+  if (total !== null && pernicious(target, spec.kind)) total += 2; // "another 2 frequency increments"
   const onsetSeconds = spec.onset ? (await rollTotal(spec.onset.amount)) * (UNIT_SECONDS[spec.onset.unit] ?? 6) : 0;
   const data = {
     name: spec.name, kind: spec.kind, save: spec.save, dc: spec.dc, doses: 1, source,
@@ -234,16 +276,23 @@ export async function contract(target, spec, { source = null, reference = null, 
   };
   let text = `failed (${saveText}): ${spec.name} contracted`;
   let applied = null;
+  // Delay poison: nothing happens until it ends (the first effect waits, then the schedule runs)
+  if (delayed(target, spec.kind)) {
+    data.firstWaiting = !onsetSeconds;
+    data.dueAt = now;
+    text += "; delay poison holds it off until the spell ends";
+  }
   // No onset: the failed contraction save is the first failed save, and its effect applies now
-  if (!onsetSeconds) {
+  else if (!onsetSeconds) {
     data.failures = 1;
     applied = await applyEffect(target, data.initial ?? data.effect);
     data.held = applied.held;
+    recordDealt(data, applied.undo);
     if (data.remaining !== null) data.remaining -= 1;
     text += `: ${applied.text}`;
   } else text += `; onset ${Math.round(onsetSeconds / 6)} rounds of game time`;
   // Nothing more to come (no frequency, or its last save already made)
-  if ((!spec.frequency && !onsetSeconds) || data.remaining === 0) return { text, undo: { effect: applied?.undo } };
+  if (!data.firstWaiting && ((!spec.frequency && !onsetSeconds) || data.remaining === 0)) return { text, undo: { effect: applied?.undo } };
   const [buff] = await target.createEmbeddedDocuments("Item", [{
     name: `${LABEL[spec.kind] ?? "Affliction"}: ${spec.name}`, type: "buff", img: "icons/svg/poison.svg",
     system: { subType: "temp", active: true },
@@ -290,10 +339,12 @@ function dueCount(data) {
 async function checkDue(actor, buff, { turnStart = false } = {}) {
   const data = buff.flags[MODULE_ID]?.[FLAG];
   if (!data || data.pending) return;
+  if (delayed(actor, data.kind)) return; // delay poison: its time is pushed back as game time passes (below)
   const rounds = data.frequency?.unit === "round";
   if (rounds && inCombat(actor) && !turnStart) return;
   let count = rounds && !inCombat(actor) ? data.remaining ?? 1 : dueCount(data);
   if (turnStart) count = game.time.worldTime >= data.dueAt - 0.5 ? 1 : 0;
+  if (data.firstWaiting) count = Math.max(count, 1);
   if (!count) return;
   const resolveAll = rounds && !inCombat(actor);
   if (!playerOwned(actor)) return resolve(buff, count);
@@ -315,9 +366,24 @@ async function resolve(buff, count, reference = null) {
   const lines = [];
   const undo = [];
   let ended = null;
+  // Held off by delay poison: the failed contraction save's effect comes first, without a save
+  if (data.firstWaiting) {
+    data.firstWaiting = false;
+    data.failures = 1;
+    const applied = await applyEffect(actor, data.initial ?? data.effect);
+    data.held = [...new Set([...(data.held ?? []), ...applied.held])];
+    recordDealt(data, applied.undo);
+    undo.push(applied.undo);
+    lines.push(`the delayed effect: ${applied.text}`);
+    if (data.remaining !== null) data.remaining -= 1;
+    if (data.remaining !== null && data.remaining <= 0) ended = "it has run its course";
+    count -= 1;
+  }
   for (let i = 0; i < count && !ended; i++) {
-    const result = await rollSave(actor, data, data.dc, reference);
+    const treat = await treatment(actor, data);
+    const result = await rollSave(actor, data, data.dc, reference, treat.bonus);
     const passed = saveResult(result, data.dc).passed;
+    if (treat.text) lines.push(treat.text);
     if (passed) {
       data.streak += 1;
       lines.push(`saved (${result?.rolls?.[0]?.total ?? "?"})`);
@@ -328,6 +394,7 @@ async function resolve(buff, count, reference = null) {
       const text = data.initial ? (data.failures === 1 ? data.initial : data.secondary ?? data.initial) : data.effect;
       const applied = await applyEffect(actor, text);
       data.held = [...new Set([...(data.held ?? []), ...applied.held])];
+      recordDealt(data, applied.undo);
       undo.push(applied.undo);
       lines.push(`failed (${result?.rolls?.[0]?.total ?? "?"}): ${applied.text}`);
     }
@@ -371,11 +438,125 @@ Hooks.on("updateCombat", async (combat, changes, options) => {
 });
 
 // Longer frequencies (and "/round" ones outside combat): when game time passes their due time
-Hooks.on("updateWorldTime", async () => {
+Hooks.on("updateWorldTime", async (worldTime, delta) => {
   if (!isActiveGM()) return;
   for (const actor of new Set([...game.actors, ...canvas?.scene?.tokens?.map((t) => t.actor).filter(Boolean) ?? []])) {
-    for (const buff of afflictionsOf(actor)) await checkDue(actor, buff);
+    for (const buff of afflictionsOf(actor)) {
+      const data = buff.flags[MODULE_ID][FLAG];
+      // Delay poison: the poison's clock stands still while the spell lasts
+      if (delayed(actor, data.kind) && delta > 0) await buff.update({ [`flags.${MODULE_ID}.${FLAG}.dueAt`]: data.dueAt + delta });
+      else await checkDue(actor, buff);
+    }
   }
+});
+
+/* -------------------------------------------- */
+/*  Cures, treatment, healing                   */
+/* -------------------------------------------- */
+
+/**
+ * Neutralize poison, remove disease, remove curse: a caster level check against each affliction of that kind;
+ * those beaten end (damage already dealt stays). Returns a short description.
+ */
+export async function cureAfflictions(actor, kind, cl) {
+  const list = afflictionsOf(actor).filter((b) => b.flags[MODULE_ID][FLAG].kind === kind);
+  if (!list.length) return `no ${kind} to cure`;
+  const out = [];
+  for (const buff of list) {
+    const data = buff.flags[MODULE_ID][FLAG];
+    const penalty = pernicious(actor, kind) ? 4 : 0;
+    const roll = await new Roll(`1d20 + ${cl}${penalty ? " - 4" : ""}`).evaluate();
+    if (roll.total >= data.dc) {
+      await endAffliction(buff);
+      out.push(`${data.name} ended (${roll.total} vs DC ${data.dc})`);
+    } else out.push(`${data.name} remains (${roll.total} vs DC ${data.dc})`);
+  }
+  return out.join("; ");
+}
+
+// Pernicious poison cast on a poisoned creature: its poisons last 2 more saves (once per casting)
+Hooks.on("createItem", (item, options, userId) => {
+  if (userId !== game.user.id || item.type !== "buff" || !item.isActive || !/^pernicious poison\b/i.test(item.name) || !item.actor) return;
+  for (const buff of afflictionsOf(item.actor)) {
+    const data = buff.flags[MODULE_ID][FLAG];
+    if (data.kind === "poison" && data.remaining !== null) buff.update({ [`flags.${MODULE_ID}.${FLAG}`]: { remaining: data.remaining + 2, total: (data.total ?? 0) + 2 } });
+  }
+});
+
+/** Start or stop a healer treating the affliction (Heal: treat poison or disease). */
+export async function setTreatment(buff, healer) {
+  await buff.update({ [`flags.${MODULE_ID}.${FLAG}.treatedBy`]: healer?.uuid ?? null });
+}
+
+onGmRequest("afflictTreat", async (message, data) => {
+  const buff = fromUuidSync(data.buff);
+  const healer = data.healer ? fromUuidSync(data.healer) : null;
+  if (buff && (!healer || requestedByOwner(message, healer))) await setTreatment(buff, healer);
+  await message.delete();
+});
+
+async function treat(buff, stop = false) {
+  let healer = null;
+  if (!stop) {
+    const mine = game.actors.filter((a) => a.isOwner && a.type === "character");
+    const pool = game.user.character ? [game.user.character, ...mine.filter((a) => a !== game.user.character)] : mine;
+    if (!pool.length) return ui.notifications.warn("You have no character to treat it with.");
+    if (pool.length === 1) healer = pool[0];
+    else {
+      const id = await foundry.applications.api.DialogV2.prompt({
+        window: { title: `Treat ${buff.name}` },
+        content: `<div class="form-group"><label>Healer</label><div class="form-fields"><select name="healer">${pool.map((a) => `<option value="${a.uuid}">${esc(a.name)}</option>`).join("")}</select></div></div>`,
+        ok: { label: "Treat", callback: (event, button) => button.form.elements.healer.value },
+        rejectClose: false,
+      });
+      if (!id) return;
+      healer = fromUuidSync(id);
+    }
+  }
+  if (buff.isOwner) await setTreatment(buff, healer);
+  else await ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p>${healer ? `${esc(healer.name)} treats` : "Stop treating"} ${esc(buff.actor?.name ?? "")}'s ${esc(buff.name)}…</p>`, flags: { [MODULE_ID]: { afflictTreat: { buff: buff.uuid, healer: healer?.uuid ?? null } } } });
+}
+
+// On the affliction's buff: its schedule, and the Treat button
+registerFootnote((item) => {
+  const data = item.flags?.[MODULE_ID]?.[FLAG];
+  if (!data || item.type !== "buff") return null;
+  const parts = [`${titleCase(data.kind)}: ${saveName(data.save)} DC ${data.dc}${data.doses > 1 ? ` (${data.doses} doses)` : ""}; ${data.remaining === null ? "until cured" : `${data.remaining} save${data.remaining === 1 ? "" : "s"} left`}${data.cure ? `; ${data.cure} in a row cure it (${data.streak} so far)` : "; only magic cures it"}.${delayed(item.actor, data.kind) ? " Held off by delay poison." : ""}`];
+  const healer = data.treatedBy ? fromUuidSync(data.treatedBy) : null;
+  if (healer) parts.push(`Treated by ${healer.name}: a Heal check with every save (+4 when it beats the DC).`);
+  if (["poison", "disease"].includes(data.kind)) parts.push(healer ? footnoteButton("Stop treating", "The healer stops tending it", () => treat(item, true)) : footnoteButton("Treat (Heal)…", "A healer tends it: a Heal check with each save", () => treat(item)));
+  return parts;
+});
+
+// Resting doesn't heal an affliction's damage while it lasts: PF1's rest is held back to it
+Hooks.on("pf1PreActorRest", (actor, options, updateData) => {
+  const dealt = {};
+  for (const buff of afflictionsOf(actor)) for (const [key, n] of Object.entries(buff.flags[MODULE_ID][FLAG].dealt ?? {})) dealt[key] = (dealt[key] ?? 0) + n;
+  const kept = [];
+  // PF1 builds the update flat and then merges it into a nested object: read and write either form
+  const get = (key) => (key in updateData ? updateData[key] : foundry.utils.getProperty(updateData, key));
+  const set = (key, value) => (key in updateData ? (updateData[key] = value) : foundry.utils.setProperty(updateData, key, value));
+  for (const [what, n] of Object.entries(dealt)) {
+    if (what === "hp") {
+      const hp = actor.system.attributes.hp;
+      const healed = get("system.attributes.hp.value");
+      const cap = Math.max(hp.value, hp.max - n);
+      if (healed !== undefined && healed > cap) {
+        set("system.attributes.hp.value", cap);
+        kept.push(`${Math.min(n, healed - cap)} hit points`);
+      }
+      continue;
+    }
+    const key = `system.abilities.${what}.damage`;
+    const current = foundry.utils.getProperty(actor, key) ?? 0;
+    const after = get(key);
+    const floor = Math.min(current, n);
+    if (after !== undefined && after < floor) {
+      set(key, floor);
+      kept.push(`${floor - after} ${what.toUpperCase()} damage`);
+    }
+  }
+  if (kept.length) ChatMessage.implementation.create({ speaker: ChatMessage.implementation.getSpeaker({ actor }), whisper: ownerWhisper(actor), content: `<p><strong>${esc(actor.name)}</strong> rests, but ${kept.join(", ")} from an affliction can't heal naturally while it lasts.</p>` });
 });
 
 /* -------------------------------------------- */
@@ -443,7 +624,8 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   (html.querySelector(".card-content, .message-content") ?? html).append(div);
 });
 
-async function exposeAndReport(actor, spec, message) {
+/** Expose a creature and post the result (with an Undo for the GM). */
+export async function exposeAndReport(actor, spec, message) {
   const result = await contract(actor, spec, { source: message?.speaker?.alias ?? null, reference: message?.uuid ?? null });
   await ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
@@ -471,4 +653,4 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   });
 });
 
-export const _test = { FLAG, parseEffect, dueCount, resolve, checkDue, savesFor };
+export const _test = { FLAG, parseEffect, dueCount, resolve, checkDue, savesFor, treatment };

@@ -45,6 +45,7 @@ import { constrictFormula, endGrapple, maneuverCheck, recordGrapple, sizeOf, spe
 import { qualitiesOf, fits } from "./magic-arms.mjs";
 import { precisionImmune } from "./resistance.mjs";
 import { parseAffliction, contract, undoContract } from "./afflictions.mjs";
+import "./poisoned-weapons.mjs"; // poisoned weapons use the hit detection here
 
 const FLAG = "naturalRiders";
 const SAVE_NAME = { fort: "Fortitude", ref: "Reflex", will: "Will" };

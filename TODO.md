@@ -18,7 +18,7 @@ Next, the focus moves to:
   - **Cover-dependent abilities** (with cover deferred): Improved Precise Shot, Pinpoint Targeting (its armor and shield part is done), Lob Shot, Low Profile, Combat Sandals, Volley Fire, Covered Sniper, veering weapons.
 - **Cantrips and 1st-level spells** (research: `docs/SPELLS-RESEARCH.md`). Done for the Core Rulebook, Advanced Player's Guide, Ultimate Magic and Ultimate Combat. Still to do:
   - **Other books**: the combat-relevant spells are done; what's left is mostly utility (skill bonuses in narrow situations). Spells whose effect depends on what the creature does (Coward's Cowl, Halfling Vengeance, Veil of Heaven, Burst of Adrenaline) need a design.
-  - **Effects that repeat**: afflictions phase 1 is done (contracting, onset, saves on schedule, effects, cure, poison doses); phase 2: poisoned weapons (applying a dose, the 5% chance of poisoning yourself, a natural 1 exposing the attacker), the cure spells (*Neutralize Poison*, *Remove Disease*, *Remove Curse*, *Delay Poison*) and Heal checks to treat poison, no natural healing of an affliction's damage while it lasts, and *Pernicious Poison*. Also: creatures entering or leaving a lasting area (emanations), Entangle's save at the end of each of the caster's turns while in the area, Grease's Acrobatics checks. Chill Touch's further touches (one per caster level).
+  - **Effects that repeat**: afflictions are done (contracting, onset, saves on schedule, effects, cure, poison doses, poisoned weapons, cure spells, Delay and Pernicious Poison, Heal treatment, no natural healing while afflicted); left: *Break Enchantment* against curses and neutralizing a poisonous creature or object. Also: creatures entering or leaving a lasting area (emanations), Entangle's save at the end of each of the caster's turns while in the area, Grease's Acrobatics checks. Chill Touch's further touches (one per caster level).
   - **Higher-level spells**: they already get the rows (spell resistance and saves); their effects come after the 1st-level spells are complete.
 
 ## Planned
@@ -36,7 +36,7 @@ The design reference gives every feat, trait, class and archetype feature, racia
 9. **Immediate-action reactions** (about 640 entries). Offer the reaction on the triggering event (being attacked, failing a save) with the cost and effect applied.
 10. **Activated buffs** (about 600 entries). Using the ability applies its bonus for its duration and spends the use or pool point; generalize the buff-grant engine.
 11. **Rerolls and rolling twice** (about 450 entries). Extend the next-roll engine to the remaining feats, class features and traits.
-12. **Afflictions** (about 370 entries). Already planned under Interface (Poisons and diseases) and Effects that repeat.
+12. **Afflictions** (about 370 entries). The engine is done (see Effects that repeat); individual curses with unusual effects stay manual.
 
 ### Magic items
 - **Temporary qualities from class features.** Divine bond, arcane pool, sacred weapon and inquisitor bane add abilities or enhancement for a time; they count toward the +10 limit and show in the Magic Qualities section, as the weapon spells already do. Also: weapon spells cast on 50 projectiles.

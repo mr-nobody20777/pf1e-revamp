@@ -115,6 +115,12 @@ export const SPELLS = {
   "magic fang": { effect: { buff: "Magic Fang" } },
   "magic weapon": { effect: { buff: "Magic Weapon" } },
   "magic weapon, greater": { effect: { buff: "Magic Weapon, Greater" } },
+  // Afflictions (afflictions.mjs): a caster level check against each affliction of the kind; the two buffs by name
+  "neutralize poison": { effect: { cure: "poison" } },
+  "remove disease": { effect: { cure: "disease" } },
+  "remove curse": { effect: { cure: "curse" } },
+  "delay poison": { effect: { marker: true } },
+  "pernicious poison": { effect: { marker: true } },
   "bless weapon": { effect: { buff: "Bless Weapon" } },
   "keen edge": { effect: { marker: true } },
   "align weapon": { effect: { marker: true } },

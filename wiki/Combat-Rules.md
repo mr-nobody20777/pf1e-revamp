@@ -171,6 +171,10 @@ A poison, disease or curse a creature contracts becomes a buff on it (*Poison: V
 - **Ending:** after the cure's number of saves in a row (the damage already taken stays), or when a limited frequency runs out. "Magic only" afflictions never end from saves; delete the buff when a spell cures it.
 - **Another dose** of an active poison raises its DC by 2 and adds half its duration; one save at the higher DC.
 - **Save bonuses** against poison, disease and curses (a dwarf's +2 vs poison) count on all of these saves.
+- **Poisoned weapons:** a poison's card has **Apply to a weapon…** (a 5% chance of poisoning yourself, none with Poison Use; injury and contact poisons only). The next hit delivers the dose; a natural 1 exposes the wielder. The weapon shows "Poisoned" with a **Wipe off** button.
+- **Cures:** *Neutralize Poison*, *Remove Disease* and *Remove Curse* roll a caster level check against each affliction of their kind and end the ones they beat. *Delay Poison* holds poisons off until it ends; *Pernicious Poison* gives −4 on saves against poison and on cures, and 2 more saves.
+- **Treat (Heal)…** on the affliction's buff: the chosen healer's Heal check is rolled with every save (+4 on the save when it beats the DC), until **Stop treating**.
+- **Resting** doesn't heal the damage an affliction dealt while it lasts.
 
 ## Incorporeal creatures
 PF1 marks incorporeal creatures with its Incorporeal condition (added on its own for the incorporeal subtype) but applies full damage to them. When damage from a card is applied to one, PF1e Revamp applies the rule and whispers why:
