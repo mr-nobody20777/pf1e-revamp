@@ -97,7 +97,10 @@ function sourceOf(actor, change) {
   if (change.operator !== "add" || !Number.isFinite(change.value) || !change.value) return null;
   if (change.parent?.type === "buff") {
     const by = change.parent.flags?.[MODULE_ID]?.castBy;
-    return { key: change.parent.id, label: change.parent.name, imposed: !!by && by !== actor.uuid && change.value < 0 };
+    // Another creature's debuff (every change a penalty) is locked as a whole; the same creature's own isn't
+    const foreign = !!by && by.split(".").at(-1) !== actor.id;
+    const debuff = foreign && [...(change.parent.changes ?? [])].every((c) => (c.value ?? 0) <= 0);
+    return { key: change.parent.id, label: change.parent.name, imposed: debuff };
   }
   const cond = conditionOf(actor, change);
   return cond ? { key: `cond.${cond.id}`, label: cond.name, imposed: true } : null;
@@ -310,14 +313,23 @@ function planFor(model, state) {
     for (const part of model.parts) {
       const list = model.changes[part] ?? [];
       const included = (c) => isIncluded(model, state, c.key, c.change);
-      const withBuffsOnly = list.filter((c) => (isBuff(c) ? included(c) : !model.losers.has(c.change))).map((c) => c.change);
+      // What PF1 will total: the buffs as the window has them, with every condition change it gets (attacks
+      // get them all; damage only the ones that won before the hook, as PF1 picks the highest first there)
+      const withBuffsOnly = list.filter((c) => (isBuff(c) ? included(c) : part === "atk" || !model.losers.has(c.change))).map((c) => c.change);
       changes[part] = {
         drop: list.filter((c) => isBuff(c) && !included(c)).map((c) => changeId(c.change)),
         keep: list.filter((c) => isBuff(c) && included(c)).map((c) => changeId(c.change)),
         rest: sum(highest(list.filter(included).map((c) => c.change))) - sum(highest(withBuffsOnly)), // conditions turned off
+        // The correction names only what it carries: conditions turned off or on, and ability buffs turned off
         restLabel: (() => {
-          const off = [...model.entries.values()].filter((e) => e.key.startsWith("cond.") && state.off.has(e.key) && e.values[part] !== undefined).map((e) => `${e.label} off`);
-          return off.length ? `Buffs: ${off.join("; ")}` : null;
+          const notes = [];
+          for (const e of model.entries.values()) {
+            if (!e.key.startsWith("cond.") || e.values[part] === undefined) continue;
+            if (state.off.has(e.key) && !e.beaten) notes.push(`${e.label} off`);
+            else if (state.on.has(e.key) && e.beaten) notes.push(`${e.label} on`);
+          }
+          for (const a of model.abilities) if (a.parts.includes(part)) for (const src of a.sources) if (state.off.has(src.key)) notes.push(`${src.label} off`);
+          return notes.length ? `Buffs: ${[...new Set(notes)].join("; ")}` : null;
         })(),
       };
     }
@@ -372,8 +384,8 @@ function partsFor(plan, part, rollData, { adjusted = false } = {}) {
       correction += ablDamage((data.mod ?? 0) + shift) - ablDamage(data.mod ?? 0);
     } else correction += shift;
   }
-  // Just conditions turned off: name only them (the buffs already left PF1's own lines)
-  const label = adjusted && !abl?.score ? plan.changes?.[part]?.restLabel : null;
+  // Adjusted: name only what the correction carries (the buffs already left PF1's own lines)
+  const label = adjusted ? plan.changes?.[part]?.restLabel : null;
   if (correction) out.push(`${correction}[${label || plan.label[part] || "Buffs"}]`);
   const stacking = STACKING();
   for (const p of plan.provided) {

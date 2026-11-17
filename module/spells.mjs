@@ -483,9 +483,10 @@ function tierFor(def, actor) {
 async function applyEffect(actor, effect, data, caster) {
   const out = [];
   // Who cast it, when it's another creature: its penalties are locked in roll windows, like conditions
-  const castBy = caster && caster.uuid !== actor.uuid ? caster.uuid : null;
-  const byUpdate = { [`flags.${MODULE_ID}.castBy`]: castBy };
-  const byFlags = { [MODULE_ID]: { castBy } };
+  // (by actor id: an unlinked token's own spell, cast from its sheet, names its base actor)
+  const castBy = caster && caster.id !== actor.id ? caster.uuid : null;
+  const byUpdate = { [`flags.${MODULE_ID}.castBy`]: castBy }; // for every update of a buff here
+  const stamp = (data) => (foundry.utils.setProperty(data, `flags.${MODULE_ID}.castBy`, castBy), data); // and every new one
   const rollData = { ...(data.ability ? caster?.getRollData?.() ?? {} : {}), cl: data.cl };
   for (const [key, formula] of Object.entries(effect.roll ?? {})) rollData[key] = (await new Roll(formula).evaluate()).total;
   const { types } = creatureTypes(actor);
@@ -534,7 +535,7 @@ async function applyEffect(actor, effect, data, caster) {
   else if (effect.buff) {
     const buff = await compendiumBuff(effect.buff);
     buff.system.level = data.cl;
-    foundry.utils.setProperty(buff, `flags.${MODULE_ID}.castBy`, castBy);
+    stamp(buff);
     const duration = spellDuration(item, data.cl);
     if (duration) buff.system.duration = duration;
     const existing = actor.itemTypes.buff.find((b) => b.name === buff.name);
@@ -551,15 +552,15 @@ async function applyEffect(actor, effect, data, caster) {
     const changes = effect.changes.map((c) => ({ ...c }));
     const existing = actor.itemTypes.buff.find((b) => b.name === data.name);
     if (existing) await existing.update({ "system.active": true, "system.changes": changes, ...byUpdate, ...(duration ? { "system.duration": duration } : {}) });
-    else await actor.createEmbeddedDocuments("Item", [{ name: data.name, type: "buff", img: item?.img, flags: byFlags, system: { subType: "spell", active: true, level: data.cl, changes, ...(duration ? { duration } : {}) } }]);
+    else await actor.createEmbeddedDocuments("Item", [stamp({ name: data.name, type: "buff", img: item?.img, system: { subType: "spell", active: true, level: data.cl, changes, ...(duration ? { duration } : {}) } })]);
     out.push(effect.changes.map((c) => `${c.formula} ${c.target.replace(/^skill\./, "")}`).join(", "));
   }
   if (effect.marker && !effect.buff) {
     const duration = spellDuration(item, data.cl);
     const existing = actor.itemTypes.buff.find((b) => b.name === data.name);
-    const marker = { name: data.name, type: "buff", img: item?.img, flags: byFlags, system: { subType: "spell", active: true, level: data.cl, ...(duration ? { duration } : {}) } };
+    const marker = { name: data.name, type: "buff", img: item?.img, system: { subType: "spell", active: true, level: data.cl, ...(duration ? { duration } : {}) } };
     if (existing) await existing.update({ "system.active": true, ...byUpdate, ...(duration ? { "system.duration": duration } : {}) });
-    else await actor.createEmbeddedDocuments("Item", [marker]);
+    else await actor.createEmbeddedDocuments("Item", [stamp(marker)]);
     out.push(data.name);
   }
 
@@ -576,7 +577,7 @@ async function applyEffect(actor, effect, data, caster) {
       const duration = spellDuration(item, data.cl);
       const changes = [{ formula: String(-value), target: p.target, type: "untyped" }];
       if (existing) await existing.update({ "system.changes": changes, ...byUpdate, ...(duration ? { "system.duration": duration } : {}) });
-      else await actor.createEmbeddedDocuments("Item", [{ name: data.name, type: "buff", img: item?.img, flags: byFlags, system: { subType: "spell", active: true, level: data.cl, changes, ...(duration ? { duration } : {}) } }]);
+      else await actor.createEmbeddedDocuments("Item", [stamp({ name: data.name, type: "buff", img: item?.img, system: { subType: "spell", active: true, level: data.cl, changes, ...(duration ? { duration } : {}) } })]);
       out.push(label);
     }
   }

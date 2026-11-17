@@ -120,8 +120,10 @@ export function registerRollEffectsTests(quench) {
           assert.isFalse(manager.element.querySelector(`input[data-key="${shaken}"]`).disabled, "the GM can");
           Object.defineProperty(game.user, "isGM", { get: () => false, configurable: true });
           try {
-            await manager.render();
+            await manager.render({ force: true });
             manager = await managerOf();
+            // The re-render as a player can land after render() returns: wait for it
+            await waitFor(() => manager.element.querySelector(`input[data-key="${shaken}"]`)?.disabled, { what: "the player's view" }).catch(() => null);
             assert.isTrue(manager.element.querySelector(`input[data-key="${shaken}"]`).disabled, "a player can't");
           } finally {
             delete game.user.isGM;
@@ -139,25 +141,39 @@ export function registerRollEffectsTests(quench) {
         });
 
         it("a penalty from another creature's spell is locked like a condition", async () => {
-          const [bane] = await fighter.createEmbeddedDocuments("Item", [{ name: "Quench Enemy Bane", type: "buff", system: { active: true, changes: [{ formula: "-1", target: "attack", type: "morale" }] }, flags: { [MODULE_ID]: { castBy: "Actor.someoneElse0000" } } }]);
+          const [bane, boon] = await fighter.createEmbeddedDocuments("Item", [
+            { name: "Quench Enemy Bane", type: "buff", system: { active: true, changes: [{ formula: "-1", target: "attack", type: "morale" }] }, flags: { [MODULE_ID]: { castBy: "Actor.someoneElse0000" } } },
+            { name: "Quench Mixed Gift", type: "buff", system: { active: true, changes: [{ formula: "1", target: "wdamage", type: "luck" }, { formula: "-1", target: "attack", type: "luck" }] }, flags: { [MODULE_ID]: { castBy: "Actor.someoneElse0000" } } },
+          ]);
           try {
             const { dialog, done } = await openAttack(sword);
             dialog.element[0].querySelector("[data-action=manage]").click();
             let manager = await managerOf();
             Object.defineProperty(game.user, "isGM", { get: () => false, configurable: true });
             try {
-              await manager.render();
+              await manager.render({ force: true });
               manager = await managerOf();
+              // The re-render as a player can land after render() returns: wait for it
+              await waitFor(() => manager.element.querySelector(`input[data-key="${bane.id}"]`)?.disabled, { what: "the player's view" }).catch(() => null);
               const box = manager.element.querySelector(`input[data-key="${bane.id}"]`);
               assert.isTrue(box.disabled, "a player can't turn it off");
               assert.isTrue(box.closest("tr").classList.contains("locked"), "styled as locked");
+              // A buff from another creature with a bonus in it isn't a debuff: not locked
+              const mixed = manager.element.querySelector(`input[data-key="${boon.id}"]`);
+              assert.isFalse(mixed.disabled, "a mixed buff from another creature stays the player's choice");
             } finally {
               delete game.user.isGM;
+              await done(); // always roll, so a failure here doesn't leave the window open for the next tests
             }
-            await done();
           } finally {
-            await bane.delete();
+            await fighter.deleteEmbeddedDocuments("Item", [bane.id, boon.id]);
           }
+        });
+
+        it("by default, Haste is PF1's own line on the card (what turning it off removes)", async () => {
+          const { done } = await openAttack(sword);
+          const { attack } = await done();
+          assert.match(attack, /1\[Haste\]/);
         });
 
         it("at or under the threshold: chips in the window", async () => {
