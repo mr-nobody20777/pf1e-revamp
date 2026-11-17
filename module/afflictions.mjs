@@ -498,7 +498,10 @@ onGmRequest("afflictTreat", async (message, data) => {
 async function treat(buff, stop = false) {
   let healer = null;
   if (!stop) {
-    const mine = game.actors.filter((a) => a.isOwner && a.type === "character");
+    // The user's characters; failing that, any creature they own (a GM's NPC healer, a player's companion)
+    const owned = game.actors.filter((a) => a.isOwner && (!game.user.isGM || a.hasPlayerOwner || a === game.user.character));
+    const characters = owned.filter((a) => a.type === "character");
+    const mine = characters.length ? characters : owned.length ? owned : game.actors.filter((a) => a.isOwner);
     const pool = game.user.character ? [game.user.character, ...mine.filter((a) => a !== game.user.character)] : mine;
     if (!pool.length) return ui.notifications.warn("You have no character to treat it with.");
     if (pool.length === 1) healer = pool[0];
