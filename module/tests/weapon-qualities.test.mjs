@@ -336,8 +336,12 @@ export function registerWeaponQualityTests(quench) {
           const buff = await doomed(skeleton);
           try {
             // A natural 19 hits, and the forced dice leave the save a 19 − 30 (a natural 20 would always save)
+            const saves = () => game.messages.contents.filter((m) => (m.speaker?.actor === skeleton.id || m.speaker?.alias === skeleton.name) && /Will Saving Throw/i.test(`${m.flavor ?? ""} ${m.content ?? ""} ${m.rolls?.[0]?.options?.flavor ?? ""}`)).length;
+            const savesBefore = saves();
             const card = await attackWith(mace, tokens.skeleton, 19);
             assert.match(await waitRider(card, "disruption"), /failed \(Will DC 14\): destroyed/);
+            await new Promise((r) => setTimeout(r, 800));
+            assert.equal(saves() - savesBefore, 1, "a full attack's later hits don't make a destroyed undead save again");
             assert.isTrue(skeleton.statuses.has("dead"));
             const { runRider } = await import("../natural-riders.mjs");
             const r = card.getFlag(MODULE_ID, RIDERS).riders.findIndex((x) => x.key === "disruption");

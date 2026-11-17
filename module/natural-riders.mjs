@@ -260,7 +260,7 @@ async function applyManeuver(rider, { attacker, target, targetUuid, message, ind
   if (rider.key === "trip" ? diff > 1 : diff > 0) return { text: `no effect: ${target.name} is too big` };
   const bonus = (rider.key === "grab" ? 4 : 0) + (hold ? -20 : 0);
   const check = await maneuverCheck(attacker, target, bonus, `${rider.label}${hold ? " (hold, −20)" : ""}`);
-  if (!check.success) return { text: `${check.total}: fails${rider.key === "trip" ? " (not tripped in return)" : ""}` };
+  if (!check.success) return { text: `check ${check.total}: fails${rider.key === "trip" ? " (not tripped in return)" : ""}` };
   switch (rider.key) {
     case "grab": {
       const update = [target.setConditions({ grappled: true })];
@@ -277,13 +277,13 @@ async function applyManeuver(rider, { attacker, target, targetUuid, message, ind
         formula: rolls.map((r) => `(${r.formula})`).join(" + ") || null,
         types: [...new Set(rolls.flatMap((r) => r.options?.damageType ?? []))],
       });
-      return { text: `${check.total}: grabs ${target.name}${hold ? ` (held; ${attacker.name} isn't grappled)` : " (both grappled)"}`, undo: { conditions: ["grappled"], ...(hold ? {} : { attackerConditions: ["grappled"] }), grapple: true }, success: true };
+      return { text: `check ${check.total}: grabs ${target.name}${hold ? ` (held; ${attacker.name} isn't grappled)` : " (both grappled)"}`, undo: { conditions: ["grappled"], ...(hold ? {} : { attackerConditions: ["grappled"] }), grapple: true }, success: true };
     }
     case "trip":
       await target.setConditions({ prone: true });
-      return { text: `${check.total}: ${target.name} is knocked prone`, undo: { conditions: ["prone"] }, success: true };
+      return { text: `check ${check.total}: ${target.name} is knocked prone`, undo: { conditions: ["prone"] }, success: true };
     default:
-      return { text: `${check.total}: ${rider.key === "push" ? "pushes" : "pulls"} ${target.name}${rider.distance ? ` ${rider.distance} ft` : ""} (move the token)`, success: true };
+      return { text: `check ${check.total}: ${rider.key === "push" ? "pushes" : "pulls"} ${target.name}${rider.distance ? ` ${rider.distance} ft` : ""} (move the token)`, success: true };
   }
 }
 
@@ -462,6 +462,7 @@ Hooks.on("createChatMessage", async (message) => {
   for (let i = 0; i < attacks.length; i++) {
     const hit = hitOf(message, i, data.target);
     if (!hit.known || !hit.hit) continue;
+    if (fromUuidSync(data.target)?.actor?.statuses?.has("dead")) break; // destroyed or killed by an earlier hit
     for (const [r, rider] of data.riders.entries()) {
       if (rider.may || rider.gm || (rider.critOnly && !hit.critical)) continue;
       await runRider(message, i, r, "auto");
@@ -518,10 +519,14 @@ Hooks.on("renderChatMessagePF", (message, html) => {
       if (rider.gm) {
         if (game.user.isGM && !done && attack.attack?.dice?.[0]?.total === 20) line.append(button("Sever", "The head is severed: the creature dies", () => runRider(message, i, r, "apply")));
       } else if (canAct && !done) {
+        // A miss the module can see: say so; the buttons stay for the GM's judgment
+        const seen = hitOf(message, i, data.target);
+        const missed = seen.known && !seen.hit;
+        if (missed) line.insertAdjacentHTML("beforeend", ` <span style="opacity:0.7">— missed</span>`);
         if (rider.may) {
           line.append(button(rider.label, `${rider.label}: the creature's combat maneuver check against the target's CMD`, () => request(message, i, r, "maneuver")));
           if (rider.key === "grab") line.append(button("Hold (−20)", "Grab with the body part only: −20 on the check, and the creature isn't grappled itself", () => request(message, i, r, "hold")));
-        } else line.append(button("Apply", "The attack hit: apply it", () => request(message, i, r, "apply")));
+        } else line.append(button(missed ? "Apply anyway" : "Apply", missed ? "The module counts this attack as a miss; apply the rider anyway" : "The attack hit: apply it", () => request(message, i, r, "apply")));
       }
       if (game.user.isGM && done?.success && rider.key === "grab" && data.hasConstrict && !done.constricted) line.append(button("Constrict", `Constrict damage${data.constrict ? ` (${data.constrict})` : ""}`, () => runRider(message, i, r, "constrict")));
       if (game.user.isGM && done?.undo && !done.undone) line.append(button("Undo", "Remove what this did", () => runRider(message, i, r, "undo")));

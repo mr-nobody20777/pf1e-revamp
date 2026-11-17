@@ -125,6 +125,14 @@ export function registerNaturalRiderTests(quench) {
           assert.match(entry(card, "energyDrain").text, /critical: doubled/);
         });
 
+        it("a miss the module can see: the line says so, with an Apply anyway button", async () => {
+          const card = await attack(["plus poison (Fort DC 40; effect 1d2 Str damage)"], tokens.victim, 1);
+          assert.isUndefined(entry(card, "poison"), "nothing applied on a miss");
+          const line = await waitFor(() => document.querySelector(`[data-message-id="${card.id}"] .${MODULE_ID}-natural-riders`));
+          assert.match(line.textContent, /missed/);
+          assert.isOk([...line.querySelectorAll("button")].find((b) => b.textContent === "Apply anyway"));
+        });
+
         it("poison: only the first save, then the effect to apply by hand", async () => {
           const card = await attack(["plus poison (Fort DC 40; effect 1d2 Str damage)"], tokens.victim);
           assert.match(entry(card, "poison").text, /failed \(Fortitude DC 40\).*apply the poison by hand/);
