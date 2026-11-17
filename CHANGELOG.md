@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.23.0: weapon spells, amulet of mighty fists, armor abilities
+
 ### New
 - **Amulet of mighty fists.** Its enhancement bonus now also applies to unarmed strikes (PF1 gave it to natural weapons only), and counts against damage reduction as a weapon's would: magic at +1, cold iron and silver at +3, adamantine at +4, alignments at +5 (Paizo FAQ). The amulet gets the Magic Qualities section: its abilities (flaming, holy, bane and the others the module automates) apply to the wearer's unarmed strikes and natural weapons; abilities that need piercing, slashing or ranged weapons (keen, vorpal, seeking) aren't offered, no +1 is needed first, and the total can't go above +5. It's named from its abilities ("+1 Flaming Amulet of Mighty Fists") and priced at 4,000 gp × the total bonus squared. A speed amulet gives one extra attack a round, not one per natural weapon.
 - **Armor and shield abilities.** While worn: shadow and slick add their +5, +10 or +15 competence bonus to Stealth or Escape Artist (on the character sheet's totals); energy resistance resists 10, 20 or 30 of the energy chosen in the Magic Qualities section; spell resistance (13 to 19) applies unless the wearer's own is higher; invulnerability gives DR 5/magic. They're also read from the armor's name ("+1 Greater Shadow Leather Armor", "Improved Fire Resistance Breastplate"). Resistances and DR from armor don't stack with others of their kind: the best applies.
