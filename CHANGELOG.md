@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.22.0: weapon qualities, magic arms and materials, monster attacks
+
 ### New
 - **Speed, furious and defending weapons.** A speed weapon ticks PF1's Haste extra attack on a full attack (one extra attack at full base attack bonus, never a second one with *haste*), also when the attack window is skipped. A furious weapon's enhancement bonus is +2 better while its wielder rages (rage, bloodrage, inspired rage or the *rage* spell), and with raging climber, raging swimmer or raging leaper the wielder adds the weapon's enhancement bonus to that skill while wielding it. A defending weapon's wielder gets a private message at the start of each of their turns in combat with buttons to move some of the weapon's enhancement bonus to AC; last turn's choice carries over, so nothing needs clicking unless it changes. The AC is a buff until their next turn, the weapon's attacks lose the same amount, and the buff ends with the combat.
 - **Incorporeal creatures take damage as the rules say.** PF1 marks them with its Incorporeal condition but applied full damage from everything. Damage applied from a card to an incorporeal creature is now 0 from nonmagical attacks, and half (minimum 1) from magic weapons, spells and supernatural or spell-like abilities of corporeal creatures; ghost touch weapons, force effects (*magic missile*), channel energy and other incorporeal creatures deal full damage. A whispered note says why.
