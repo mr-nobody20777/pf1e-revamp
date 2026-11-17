@@ -264,7 +264,8 @@ export async function priceOf(item, base) {
   if (mw && !included) lines.push({ label: "Masterwork", gp: mwCost });
   if (mat) {
     const extra = mat.id === "dragonhide" ? base + mwCost : matPrice(mat);
-    if (extra) lines.push({ label: mat.name, gp: extra });
+    const how = (mat.price?.multiplier ?? 1) !== 1 ? ` (×${mat.price.multiplier} the item's price)` : mat.id === "dragonhide" ? " (twice masterwork armor)" : "";
+    if (extra) lines.push({ label: `${mat.name}${how}`, gp: extra });
   }
   for (const m of addons(item)) {
     const extra = matPrice(m);
@@ -315,12 +316,11 @@ const titleCase = (s) => s.replace(/\b[a-z]/g, (c) => c.toUpperCase());
 const labelOf = (v) => game.i18n.localize(typeof v === "string" ? v : v?.label ?? "");
 const typeName = (key) => labelOf(Object.entries(pf1.config.creatureTypes ?? {}).find(([k]) => typeKey(k) === key)?.[1]) || key;
 const subtypeName = (key) => labelOf(Object.entries(pf1.config.creatureSubtypes ?? {}).find(([k]) => typeKey(k) === key)?.[1]) || key;
-/** "undead", "humanoid (orc)", "orc" */
+/** "undead", "orc" (a humanoid or outsider foe is named by its subtype, as in "orc bane") */
 export const foeText = (spec) => {
   if (!spec) return "";
-  const types = spec.types.map(typeName).join(" or ");
   const subs = spec.subtypes.map(subtypeName).join(" or ");
-  return (types && subs ? `${types} (${subs})` : types || subs).toLowerCase();
+  return (subs || spec.types.map(typeName).join(" or ")).toLowerCase();
 };
 
 /**
@@ -350,8 +350,10 @@ export function generatedName(item) {
   else if (item.system.masterwork && !mat?.masterwork) words.push("Masterwork");
   for (const name of q.fromName ? [] : q.names) {
     const level = name.match(/^(.+) \((light|moderate|heavy)\)$/i);
+    const grade = name.match(/^(.+), (lesser|improved|greater)$/i); // "Flamboyant, Greater"
     if (level) words.push(`${titleCase(level[2])} ${level[1]}`);
-    else if (name.toLowerCase() === "bane" && q.bane) words.push(`${titleCase(foeText(q.bane).replace(/[()]/g, ""))} Bane`);
+    else if (grade) words.push(`${titleCase(grade[2])} ${grade[1]}`);
+    else if (name.toLowerCase() === "bane" && q.bane) words.push(`${titleCase(foeText(q.bane))} Bane`);
     else words.push(name);
   }
   if (mat) words.push(mat.name);
@@ -439,6 +441,14 @@ Hooks.on("preUpdateItem", (item, changes) => {
   if (!shown) return;
   if (changes.name === shown) delete changes.name;
   if (foundry.utils.getProperty(changes, "system.unidentified.name") === shown) foundry.utils.setProperty(changes, "system.unidentified.name", item._source.system.unidentified?.name ?? "");
+});
+// The same for the Masterwork box, which shows a masterwork material (adamantine, mithral) as ticked
+Hooks.on("preUpdateItem", (item, changes) => {
+  if (!isArms(item) || foundry.utils.getProperty(changes, "system.masterwork") !== true || item._source.system.masterwork) return;
+  // The material the item has after this update (a sheet save always sends it along)
+  const path = item.type === "equipment" ? "system.armor.material.normal.value" : "system.material.normal.value";
+  const id = foundry.utils.getProperty(changes, path) ?? foundry.utils.getProperty(item._source, path);
+  if (id && pf1.registry.materials.get(id)?.masterwork) delete changes.system.masterwork;
 });
 
 /** Adamantine armor's DR (light 1/—, medium 2/—, heavy 3/—), for defenses.mjs. */
@@ -587,7 +597,23 @@ Hooks.on("renderItemSheetPF", async (app, html) => {
     if (event.key === "Enter") event.preventDefault(); // Enter in the search box would submit the sheet
   });
   const select = panel.querySelector("[data-wq-add]");
-  if (select) addSearch(select);
+  if (select) {
+    addSearch(select);
+    // While searching, the matches show as a list to click; the best match is chosen (the name itself, then
+    // the shortest name starting with the text: "flam" → Flaming, not Flamboyant, Greater)
+    const search = select.previousElementSibling;
+    search?.addEventListener("input", () => {
+      const q = search.value.trim().toLowerCase();
+      const shown = [...select.options].filter((o) => o.value && !o.hidden);
+      select.size = q && shown.length > 1 ? Math.min(8, shown.length + select.querySelectorAll("optgroup").length) : 0;
+      select.style.height = select.size > 1 ? "auto" : ""; // PF1's sheet fixes a dropdown's height
+      if (!q) return;
+      const named = (o) => o.value.toLowerCase();
+      const best = shown.find((o) => named(o) === q) ?? shown.filter((o) => named(o).startsWith(q)).sort((a, b) => a.value.length - b.value.length)[0] ?? shown[0];
+      if (best) select.value = best.value;
+    });
+    select.addEventListener("dblclick", () => panel.querySelector("[data-wq-add-button]")?.click());
+  }
   panel.querySelector("[data-wq-add-button]")?.addEventListener("click", async () => {
     if (!select.value) return;
     const q = qualitiesOf(item);

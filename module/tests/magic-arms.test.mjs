@@ -215,6 +215,56 @@ export function registerMagicArmsTests(quench) {
             await sword.sheet.close();
           }
         });
+
+        /* Found by testing through the sheet as a player (2026-11-16) */
+
+        it("names read naturally: 'Greater Flamboyant', 'Orc Bane' (a humanoid foe by its subtype)", async () => {
+          const sword = await weapon("Longsword", { system: { enh: 1 } });
+          await choose(sword, { qualities: ["Flamboyant, Greater"] });
+          assert.equal(sword.name, "+1 Greater Flamboyant Longsword");
+          await choose(sword, { qualities: ["Bane"], bane: { types: ["humanoid"], subtypes: ["orc"] } });
+          assert.equal(sword.name, "+1 Orc Bane Longsword");
+          assert.equal(MA.foeText({ types: ["humanoid"], subtypes: ["orc"] }), "orc");
+          assert.equal(MA.foeText({ types: ["undead"], subtypes: [] }), "undead");
+        });
+
+        it("saving the sheet doesn't store a masterwork material's Masterwork tick (back to steel, it's plain again)", async () => {
+          const plate = await armor("Full Plate", { system: { armor: { material: { normal: { value: "mithral" } } } } });
+          await plate.sheet.render(true);
+          try {
+            await waitFor(() => (plate.sheet.element?.[0] ?? plate.sheet.element)?.querySelector?.("input[name='system.masterwork']"));
+            await plate.sheet.submit();
+            assert.isFalse(plate._source.system.masterwork);
+            await plate.update({ "system.armor.material.normal.value": "" });
+            assert.isFalse(plate.system.masterwork);
+            assert.equal(plate.name, "Full Plate");
+            await plate.update({ "system.masterwork": true });
+            assert.isTrue(plate._source.system.masterwork, "a deliberate tick on plain armor still works");
+          } finally {
+            await plate.sheet.close();
+          }
+        });
+
+        it("searching the ability list picks the best match ('flam' is Flaming, not Flamboyant) and shows the matches", async () => {
+          const sword = await weapon("Longsword", { system: { enh: 1 } });
+          await sword.sheet.render(true);
+          try {
+            const select = await waitFor(() => (sword.sheet.element?.[0] ?? sword.sheet.element)?.querySelector?.(`.${MODULE_ID}-magic [data-wq-add]`));
+            const search = select.previousElementSibling;
+            search.value = "flam";
+            search.dispatchEvent(new Event("input", { bubbles: true }));
+            assert.equal(select.value, "Flaming");
+            assert.isAbove(select.size, 1, "the matches show as a list");
+          } finally {
+            await sword.sheet.close();
+          }
+        });
+
+        it("the price window says why cold iron costs what it does", async () => {
+          const sword = await weapon("Longsword", { system: { material: { normal: { value: "coldIron" } } } });
+          const p = await MA.priceOf(sword, 15);
+          assert.isOk(p.lines.find((l) => /Cold Iron \(×2 the item's price\)/.test(l.label) && l.gp === 15));
+        });
       });
     },
     { displayName: "PF1e Revamp: Magic arms and materials" },

@@ -3,9 +3,9 @@
 ## Magic Qualities on weapons, armor and shields
 Weapons, armor and shields have a **Magic Qualities** section on their Details tab, below PF1's materials.
 
-- **Abilities.** Add them from **Add an ability**: the list holds every weapon, armor and shield ability in Pathfinder 1e Content, with its price, and filters to the ones that fit the item (melee or ranged weapon abilities, armor or shield abilities). Type to search; the book icon opens an ability's full text. A gears icon marks the ones PF1e Revamp automates (see [Weapon qualities](Combat-Rules#weapon-qualities)), a clock the ones it records but doesn't automate yet. Remove one with its ✕.
+- **Abilities.** Add them from **Add an ability**: the list holds every weapon, armor and shield ability in Pathfinder 1e Content, with its price, and filters to the ones that fit the item (melee or ranged weapon abilities, armor or shield abilities). Type in the search box to list the matches (the best match is picked), then click **Add** or double-click the ability; the book icon opens its full text. A gears icon marks the ones PF1e Revamp automates (see [Weapon qualities](Combat-Rules#weapon-qualities)), a clock the ones it records but doesn't automate yet. Remove one with its ✕.
 - **From the name.** An item with nothing chosen reads its abilities from its name ("+1 Flaming Burst Longsword", "+1 Undead Bane Longsword", "+2 Moderate Fortification Full Plate"). The first change in the section starts from what the name gave.
-- **Bane.** When a weapon has bane, choose its designated foe: a creature type, plus one subtype for humanoids and outsiders.
+- **Bane.** When a weapon has bane, choose its designated foe: a creature type, plus one subtype for humanoids and outsiders (the name then reads "Orc Bane").
 - **Rules checks.** The section warns when an ability is on an item without at least a +1 enhancement bonus, when the total bonus (enhancement plus abilities) is above +10, and when an ability doesn't fit the weapon (keen on a club).
 - **Specific magic item.** Tick it for named items such as Frost Brand or a Holy Avenger: their abilities still work, but their name and price are left as they are.
 
