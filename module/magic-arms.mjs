@@ -70,7 +70,7 @@ export const QUALITIES = {
   disruption: { name: "Disruption", re: /\bdisruption\b/i, limit: "bludgeoning" },
   vorpal: { name: "Vorpal", re: /\bvorpal\b/i, limit: "slashing" },
   brilliantEnergy: { name: "Brilliant Energy", re: /\bbrilliant energy\b/i },
-  ghostTouch: { name: "Ghost Touch", re: /\bghost[\s-]touch\b/i, later: true, limit: "melee" },
+  ghostTouch: { name: "Ghost Touch", re: /\bghost[\s-]touch\b/i, limit: "melee" }, // "melee weapons and ammunition"
   seeking: { name: "Seeking", re: /\bseeking\b/i, limit: "ranged" },
   speed: { name: "Speed", re: /\bspeed\b/i, later: true },
   furious: { name: "Furious", re: /\bfurious\b/i, later: true, limit: "melee" },

@@ -153,10 +153,19 @@ A weapon's magic qualities are chosen in the **Magic Qualities** section of its 
 - **Vorpal:** on a natural 20 that's confirmed, the GM gets a message and a **Sever** button on the card. Whether the creature has a head, and whether losing it matters (golems and most undead don't care), is the GM's call.
 - **Brilliant energy:** the target's armor and shield bonuses don't count against the attack, so they're added to the attack roll (against a single target). It can't harm undead or constructs: damage applied to them is 0.
 - **Seeking:** a ranged attack ignores the target's miss chances (concealment, blur, displacement).
+- **Ghost touch:** full damage against incorporeal creatures (see below), and it can strike ethereal creatures.
 
 Wounding, disruption and thundering are applied as soon as the module can tell the attack hit, with an Undo, or by an **Apply** button when it can't, like monster attack riders. Each quality's damage is a row in the roll window: untick it while a quality is turned off, or to suppress merciful. Holy, bane and the others that depend on the target apply when every target qualifies, otherwise the row says why and can be ticked by hand. Extra dice are never multiplied on a critical hit and apply to each arrow of Manyshot. If the weapon's action already has the die typed into its damage, the module doesn't add it again.
 
-Not automated yet: ghost touch's full damage against incorporeal creatures, speed, furious and defending (they can be marked already), qualities on ammunition, and bane's +2 against damage reduction.
+Not automated yet: speed, furious and defending (they can be marked already), qualities on ammunition, and bane's +2 against damage reduction.
+
+## Incorporeal creatures
+PF1 marks incorporeal creatures with its Incorporeal condition (added on its own for the incorporeal subtype) but applies full damage to them. When damage from a card is applied to one, PF1e Revamp applies the rule and whispers why:
+- **Nonmagical attacks:** no damage ("immune to all nonmagical attack forms").
+- **Half damage** (minimum 1) from a corporeal creature's magic weapons (an enhancement bonus, or natural attacks of a creature with DR/magic), spells, and supernatural or spell-like abilities. Holy water affects incorporeal undead, at half.
+- **Full damage** from ghost touch weapons, force effects such as *magic missile*, channel energy, and other incorporeal creatures.
+
+Damage typed in by hand, bleed and burn are applied as they are, since their source isn't known.
 
 ## Fortification
 

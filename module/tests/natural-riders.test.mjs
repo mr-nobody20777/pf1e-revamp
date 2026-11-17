@@ -33,15 +33,18 @@ export function registerNaturalRiderTests(quench) {
           setTargets([target]);
           const before = new Set(game.messages.keys());
           CONFIG.Dice.randomUniform = () => (natural === 20 ? 0.001 : 0.999);
-          Hooks.once("pf1PreDisplayActionUse", () => (CONFIG.Dice.randomUniform = originalRandom)); // only the attack's rolls
+          // After the attack's own rolls, the riders' saves roll natural 1s: every test here expects a failed
+          // save against DC 40, and a real natural 20 would pass it (1 run in 20)
+          Hooks.once("pf1PreDisplayActionUse", () => (CONFIG.Dice.randomUniform = () => 0.999));
+          let card;
           try {
             await item.use({ skipDialog: true });
+            card = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.getFlag(MODULE_ID, _test.FLAG)));
+            await settled();
+            await new Promise((r) => setTimeout(r, 1500)); // the GM's automatic riders
           } finally {
             CONFIG.Dice.randomUniform = originalRandom;
           }
-          const card = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.getFlag(MODULE_ID, _test.FLAG)));
-          await settled();
-          await new Promise((r) => setTimeout(r, 1500)); // the GM's automatic riders
           await item.delete();
           return game.messages.get(card.id);
         };

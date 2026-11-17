@@ -15,6 +15,7 @@ import { MODULE_ID } from "./const.mjs";
 import { esc, wrapMethod } from "./util.mjs";
 import { creatureTypes } from "./creature-types.mjs";
 import { hasConditionalDR } from "./defenses.mjs";
+import { qualitiesOf } from "./magic-arms.mjs";
 
 const SETTING = "quickApplyResistance";
 const FROM_DIALOG = `${MODULE_ID}FromDialog`;
@@ -149,8 +150,58 @@ export function registerDamageAddition(fn) {
   additions.push(fn);
 }
 
+// Incorporeal (universal monster rules): "It can be harmed only by other incorporeal creatures, magic
+// weapons or creatures that strike as magic weapons, and spells, spell-like abilities, or supernatural
+// abilities. It is immune to all nonmagical attack forms. Even when hit by spells or magic weapons, it
+// takes only half damage from a corporeal source (except for channel energy). Although it is not a magical
+// attack, holy water can affect incorporeal undead ... Force spells and effects, such as from a magic
+// missile, affect an incorporeal creature normally." Ghost touch: "deals damage normally against
+// incorporeal creatures, regardless of its bonus." PF1 marks these creatures (the Incorporeal condition)
+// but its damage math ignores it. Applied to damage from a card, whose attack says where it came from;
+// damage applied without one (typed in, bleed, burn) is left to the GM. Halved damage keeps its minimum
+// of 1 (below), and halving comes before resistance and DR, as for any ½.
+const isChannel = (item) => /channel/i.test(item?.system?.tag ?? "") || /^channel (positive |negative )?energy/i.test(item?.name ?? "");
+/** Do this attack's weapons count as magic? (an enhancement bonus, the "magic" material, or natural attacks of a creature with DR/magic) */
+function strikesAsMagic(action) {
+  if ((action.enhancementBonus ?? 0) > 0) return true;
+  const materials = [...(action.addonMaterial ?? []), ...(action.item?.system?.material?.addon ?? [])];
+  if (materials.includes("magic")) return true;
+  const natural = action.item?.subType === "natural" || action.item?.system?.subType === "natural";
+  return natural && (action.actor?.system?.traits?.dr?.value ?? []).some((e) => (e.types ?? []).includes("magic"));
+}
+
+/** How an incorporeal creature takes this attack's damage: { ratio, why }, or null for full damage (or an unknown source). */
+export function incorporealDamage(target, action) {
+  if (!action || !isIncorporeal(target)) return null;
+  const item = action.item;
+  if (isIncorporeal(action.actor)) return null; // another incorporeal creature
+  if (qualitiesOf(item)?.ids.has("ghostTouch")) return null;
+  if ((item?.system?.descriptors?.names ?? []).some((d) => /\bforce\b/i.test(d))) return null;
+  if (isChannel(item)) return null;
+  const half = (why) => ({ ratio: 0.5, why });
+  if (item?.type === "spell") return half("half damage from a corporeal spell");
+  if (["su", "sp"].includes(item?.system?.abilityType)) return half("half damage from a corporeal supernatural or spell-like ability");
+  if (/holy water/i.test(item?.name ?? "")) return creatureTypes(target).types.has("undead") ? half("holy water affects incorporeal undead, at half damage") : { ratio: 0, why: "immune to holy water (only incorporeal undead are affected)" };
+  if (strikesAsMagic(action)) return half("half damage from a corporeal magic weapon");
+  return { ratio: 0, why: "immune to nonmagical attacks" };
+}
+
+function incorporealRule(actor, options) {
+  if (!(options.value > 0) || !actor.isOwner) return;
+  const rule = incorporealDamage(actor, options.action);
+  if (!rule) return;
+  if (rule.ratio === 0) options.value = 0;
+  else options.ratio = (options.ratio ?? 1) * rule.ratio;
+  ChatMessage.implementation.create({
+    speaker: ChatMessage.implementation.getSpeaker({ actor }),
+    whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
+    content: `<p><strong>${esc(actor.name)}</strong> is incorporeal: ${esc(rule.why)}.</p>`,
+  });
+}
+
 const ADDED = `${MODULE_ID}Added`; // options: damage the additions put on top of the card's own rolls
 Hooks.on("pf1ApplyDamage", (actor, options) => {
+  incorporealRule(actor, options); // first: halving comes before resistance and DR
   const before = options.value;
   for (const fn of additions) fn(actor, options);
   options[ADDED] = (options.value ?? 0) - (before ?? 0);

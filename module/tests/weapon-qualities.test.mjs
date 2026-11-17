@@ -416,6 +416,52 @@ export function registerWeaponQualityTests(quench) {
             await blur.delete();
           }
         });
+
+        it("incorporeal: immune to a nonmagical weapon, half from a +1 weapon, full from ghost touch (minimum 1)", async () => {
+          const ghost = await createTestActor("Quench WQ Ghost");
+          await ghost.createEmbeddedDocuments("Item", [{ name: "Quench Sturdy", type: "buff", system: { active: true, changes: [{ formula: "200", target: "mhp", type: "untyped" }] } }]);
+          await ghost.setCondition("incorporeal", true);
+          await ghost.update({ "system.attributes.hp.value": ghost.system.attributes.hp.max });
+          const hp = () => ghost.system.attributes.hp.value;
+          const part = () => Object.assign(new pf1.models.action.DamagePartModel({ formula: "0", types: ["slashing"] }), { value: 10 });
+          const hit = async (item, amount = 10) => {
+            const start = hp();
+            await ghost.applyDamage(amount, { instances: [part()], action: item.defaultAction, forceDialog: false });
+            return start - hp();
+          };
+          try {
+            assert.equal(await hit(await weapon("Longsword", "Longsword")), 0, "nonmagical");
+            assert.equal(await hit(await weapon("Longsword", "Plus One", { system: { equipped: true, enh: 1 } })), 5, "magic: half");
+            assert.equal(await hit(await weapon("Longsword", "+1 Ghost Touch Longsword", { system: { equipped: true, enh: 1 } })), 10, "ghost touch: full");
+            assert.equal(await hit(await weapon("Longsword", "Plus One Again", { system: { equipped: true, enh: 1 } }), 1), 1, "half of 1 is still 1");
+            // An incorporeal attacker deals full damage
+            await fighter.setCondition("incorporeal", true);
+            try {
+              assert.equal(await hit(await weapon("Longsword", "Longsword")), 10, "incorporeal attacker");
+            } finally {
+              await fighter.setCondition("incorporeal", false);
+            }
+          } finally {
+            await ghost.delete();
+          }
+        });
+
+        it("incorporeal: spells deal half, force spells (magic missile) full", async () => {
+          const { incorporealDamage } = await import("../resistance.mjs");
+          const ghost = await createTestActor("Quench WQ Ghost 2");
+          await ghost.setCondition("incorporeal", true);
+          // Unowned copies: a fighter has no spellbook to hold them
+          const spell = async (name) => new Item.implementation((await game.packs.get("pf1.spells").getDocuments({ name }))[0].toObject());
+          const missile = await spell("Magic Missile");
+          const hands = await spell("Burning Hands");
+          try {
+            assert.isNull(incorporealDamage(ghost, missile.defaultAction), "force: full damage");
+            assert.equal(incorporealDamage(ghost, hands.defaultAction)?.ratio, 0.5);
+            assert.isNull(incorporealDamage(goblin, hands.defaultAction), "a corporeal target: nothing changes");
+          } finally {
+            await ghost.delete();
+          }
+        });
       });
     },
     { displayName: "PF1e Revamp: weapon qualities" },
