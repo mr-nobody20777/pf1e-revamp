@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- **The Magic Qualities section appears with the rest of the item sheet** instead of a moment later, and costs about 1.5 ms per sheet: it no longer loads the compendium item each time to read its price. A fourth performance review puts the module's share of a simulated session at 0.5%, now counting all of its 175 hooks and its method wrappers.
+
 ## 0.22.0: weapon qualities, magic arms and materials, monster attacks
 
 ### New

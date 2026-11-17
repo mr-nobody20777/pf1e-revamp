@@ -216,6 +216,8 @@ export function spellbookKey(actor, classTag) {
  * wrapper is chained inside it (in registration order). Without libWrapper the method is patched directly.
  */
 const wrappers = new Map(); // path → [fn]
+/** The wrappers registered per method (for the performance benchmark, which times each one). */
+export const wrapperChains = wrappers;
 export function wrapMethod(path, fn) {
   if (wrappers.has(path)) return wrappers.get(path).push(fn);
   const chain = [fn];

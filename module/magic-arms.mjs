@@ -156,6 +156,7 @@ export function parsePrice(name, line) {
   return one(part);
 }
 
+let catalogReady = null; // the catalog once loaded, for sheet renders that don't wait
 /** Every quality in Pathfinder 1e Content's special qualities pack, with its price and category. */
 export function loadCatalog() {
   return (catalog ??= (async () => {
@@ -171,6 +172,7 @@ export function loadCatalog() {
       const price = parsePrice(e.name, text.match(/Price\s*([^;]*);/)?.[1] ?? "");
       map.set(e.name.toLowerCase(), { name: e.name, uuid: e.uuid ?? `Compendium.${PACK}.Item.${e._id}`, folder, price });
     }
+    catalogReady = map;
     return map;
   })());
 }
@@ -233,7 +235,9 @@ function priceCategory(item) {
  * Qualities without a known price are listed and left out.
  */
 export async function priceOf(item, base) {
-  const cat = await loadCatalog();
+  return priceFrom(item, base, await loadCatalog());
+}
+function priceFrom(item, base, cat) {
   const q = qualitiesOf(item);
   const armorLike = item.type === "equipment";
   const lines = [{ label: "Base item", gp: base }];
@@ -280,11 +284,24 @@ export async function priceOf(item, base) {
 }
 
 /** The plain item's price: recorded on the panel, or the compendium item it came from. */
+const sourcePrices = new Map(); // compendium uuid → its price (loading the document on every sheet render was slow)
+/** The plain item's price if it's known without waiting: a number, null (none), or undefined (not looked up yet). */
+function basePriceNow(item) {
+  const recorded = stored(item)?.basePrice;
+  if (Number.isFinite(recorded)) return recorded;
+  const uuid = item._stats?.compendiumSource;
+  return uuid ? sourcePrices.get(uuid) : null;
+}
 async function basePriceOf(item) {
   const recorded = stored(item)?.basePrice;
   if (Number.isFinite(recorded)) return recorded;
-  const source = item._stats?.compendiumSource ? await fromUuid(item._stats.compendiumSource).catch(() => null) : null;
-  return Number.isFinite(source?.system?.price) ? source.system.price : null;
+  const uuid = item._stats?.compendiumSource;
+  if (!uuid) return null;
+  if (!sourcePrices.has(uuid)) {
+    const source = await fromUuid(uuid).catch(() => null);
+    sourcePrices.set(uuid, Number.isFinite(source?.system?.price) ? source.system.price : null);
+  }
+  return sourcePrices.get(uuid);
 }
 
 /* -------------------------------------------- */
@@ -293,9 +310,11 @@ async function basePriceOf(item) {
 
 /** Problems with the item's qualities, as sentences. */
 export async function problemsOf(item) {
+  return problemsFrom(item, await loadCatalog());
+}
+function problemsFrom(item, cat) {
   const q = qualitiesOf(item);
   if (!q?.names.length || q.specific) return [];
-  const cat = await loadCatalog();
   const out = [];
   const enh = enhOf(item);
   if (enh < 1) out.push("A special ability needs at least a +1 enhancement bonus.");
@@ -490,9 +509,8 @@ function priceText(p) {
   return p ? `${gp(p.total)}${p.unknown.length ? ` (without ${p.unknown.join(", ")})` : ""}` : "set the base price";
 }
 
-async function panelHTML(item) {
+function panelHTML(item, cat, base) {
   const q = qualitiesOf(item);
-  const cat = await loadCatalog();
   const folders = foldersFor(item);
   const editable = item.isOwner;
   const priceTag = (name) => {
@@ -526,10 +544,9 @@ async function panelHTML(item) {
         <select data-wq-bane="subtype" ${editable ? "" : "disabled"}><option value="">(no subtype)</option>${subtypes.map(([k, l]) => `<option value="${k}" ${q.bane?.subtypes?.[0] === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
       </div><p class="hint">Humanoids and outsiders name one subtype.</p></div>`
     : "";
-  const problems = await problemsOf(item);
+  const problems = problemsFrom(item, cat);
   const priced = item.type !== "attack" && !q.specific; // attacks (natural, misc) have no price
-  const base = priced ? await basePriceOf(item) : null;
-  const price = base === null ? null : await priceOf(item, base);
+  const price = !priced || base === null || base === undefined ? null : priceFrom(item, base, cat);
   const cat2 = cat.size ? "" : `<p class="hint">Pathfinder 1e Content isn't active: qualities can only be read from the name.</p>`;
   return `
     <h3 class="form-header ${MODULE_ID}-magic-header">Magic Qualities (PF1e Revamp)</h3>
@@ -573,15 +590,24 @@ export async function updatePrice(item) {
   return p.total;
 }
 
-Hooks.on("renderItemSheetPF", async (app, html) => {
+// The catalog loads once, when the game is ready; a sheet opened before it's in is redrawn when it is.
+// The section is built without waiting, so it appears with the rest of the sheet.
+Hooks.once("ready", () => loadCatalog());
+Hooks.on("renderItemSheetPF", (app, html) => {
   const item = app.item;
   if (!isArms(item)) return;
+  if (!catalogReady && !item.showUnidentifiedData) return void loadCatalog().then(() => app.rendered && app.render());
   const root = html[0] ?? html;
   const tab = root.querySelector(".tab[data-tab=details]");
   if (!tab || tab.querySelector(`.${MODULE_ID}-magic`)) return;
   const section = document.createElement("div");
   if (item.showUnidentifiedData) section.innerHTML = `<h3 class="form-header ${MODULE_ID}-magic-header">Magic Qualities (PF1e Revamp)</h3><div class="${MODULE_ID}-magic"><p class="hint">Unidentified.</p></div>`;
-  else section.innerHTML = await panelHTML(item);
+  else {
+    const cat = catalogReady;
+    const base = basePriceNow(item);
+    if (base === undefined) basePriceOf(item).then(() => app.rendered && app.render()); // first time: look it up, then redraw
+    section.innerHTML = panelHTML(item, cat, base);
+  }
   // After PF1's materials (Materials, Add-on, Alignment Traits), before the next section
   const headers = [...tab.querySelectorAll(".form-header")];
   const after = headers.findLast((h) => /alignment traits|add-on|materials/i.test(h.textContent));
@@ -638,4 +664,4 @@ Hooks.on("renderItemSheetPF", async (app, html) => {
   panel.querySelector("[data-wq-price]")?.addEventListener("click", () => updatePrice(item));
 });
 
-export const _test = { qualitiesOf, baneFromName, parsePrice, priceOf, problemsOf, generatedName, materialDR, loadCatalog, saveQualities, FLAG };
+export const _test = { panelHTML, basePriceNow, qualitiesOf, baneFromName, parsePrice, priceOf, problemsOf, generatedName, materialDR, loadCatalog, saveQualities, FLAG };

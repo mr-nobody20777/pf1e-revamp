@@ -4,31 +4,77 @@
 
 import { createTestActor, addItems, fromPack, cleanup, useTestScene, placeToken, setTargets, deleteTokens, waitFor, waitForItem } from "./helpers.mjs";
 import { promptApply } from "../subclass.mjs";
+import { wrapperChains } from "../util.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
-// Identifiers that only appear in PF1e Revamp's hook handlers
-const OUR_CODE = /MODULE_ID|pf1eRevamp|getConfig\(|isPool\(|songKeyFor\(|studiedBonus\(|isQuarry\(|isImproved\(|quarryAgainstTargets|FIELD_ON|rendPending|MARK\]|buildFootnote|isBashShield\(|bashCategory|shieldBashRules|FROM_DIALOG|activeGrants|arcanaFor|kindOf\(|isArchetype\(|subclassPicker|bloodlineFeatPicker|wardBonus|acBonus|rebuildIndex|drawMarker|studiedIndex|registerTests|loadSubclassOptions|reconcile\(|unlink\(|enqueue\(|endSong\(|isActiveGM\(|armedPrescience\(|hasFortune\(|pending\.|grantFor\(|restoreResistance\(|isChannel\(|canConvert\(|clericBook\(|findPool\(|canRewind\(|defenderMissChance\(|missBuff\(|activeTrueStrike\(|wardFor\(|fixFlatWard\(|giveRules\(|alterItem\(|isPrescience\(|prescienceBuffs\(|nextRollBonuses\(|gmHandlers|partsFor\(|defaultPlan\(|attackContexts|makeContext\(|nextRollToggle\(|POWER_FIXES|variantEffect\(|browseWatch|GRANT_FLAG|SLOT_FLAG/;
+// Our hook handlers are found by their source: a handler whose text appears in one of the module's own
+// files is ours. The module's files are module.json's scripts and everything they import.
+const squash = (t) => t.replace(/\s+/g, " ");
+async function ourSources() {
+  const base = `/modules/${MODULE_ID}/`;
+  const seen = new Map();
+  const queue = [...(game.modules.get(MODULE_ID).esmodules ?? [])].map((p) => p.replace(/^\//, "").replace(/^modules\/[^/]+\//, ""));
+  while (queue.length) {
+    const path = queue.shift();
+    if (seen.has(path) || path.includes("/tests/")) continue;
+    const text = await (await fetch(base + path)).text();
+    seen.set(path, text);
+    const dir = path.split("/").slice(0, -1).join("/");
+    for (const m of text.matchAll(/from "\.\/([^"]+)"/g)) queue.push(`${dir}/${m[1]}`);
+  }
+  return seen;
+}
 
-// Hooks PF1e Revamp listens to (Hooks.events doesn't enumerate its keys in v13, so look them up by name)
-const ROLL_KINDS = ["Save", "Skill", "Ability", "Cl", "Concentration"];
-const HOOK_NAMES = [
-  "canvasReady", "combatTurnChange", "createItem", "deleteItem", "deleteToken", "pf1ApplyDamage", "pf1ApplyDamageTargetOptions",
-  "pf1ClassLevelChange", "pf1CreateActionUse", "pf1PostActionUse", "pf1PreActionUse",
-  ...ROLL_KINDS.flatMap((k) => [`pf1PreActorRoll${k}`, `pf1ActorRoll${k}`]),
-  "pf1PreAttackRoll", "pf1PreDamageRoll", "pf1PrepareDerivedActorData", "preCreateChatMessage", "createChatMessage", "renderAttackDialog",
-  "renderChatMessagePF", "renderDialogV2", "closeAttackDialog", "renderItemSheetPF", "renderActorSheetPF", "renderLevelUpForm", "renderTokenHUD", "updateItem", "updateCombatant",
-];
-
-/** Our hook registrations, found by identifiers unique to our handlers. */
-function ourHooks() {
+/** Our hook registrations: every hook our sources listen to, and the handlers whose text is ours. */
+async function ourHooks() {
+  const sources = await ourSources();
+  const all = squash([...sources.values()].join("\n"));
+  const names = new Set([...all.matchAll(/Hooks\.(?:on|once)\("([^"]+)"/g)].map((m) => m[1]));
   const found = [];
-  for (const hook of HOOK_NAMES) {
+  for (const hook of names) {
     (Hooks.events[hook] ?? []).forEach((entry, index) => {
-      if (OUR_CODE.test(entry.fn?.toString() ?? "")) found.push({ hook, entry, key: `${hook} #${index}` });
+      const text = squash(entry.fn?.toString() ?? "");
+      if (text.length > 20 && all.includes(text)) found.push({ hook, entry, key: `${hook} #${index}` });
     });
   }
   return found;
+}
+
+/** Time each of our method wrappers (libWrapper chains); returns totals and a function that unwraps them. */
+function instrumentWrappers() {
+  const totals = {};
+  const undo = [];
+  for (const [path, chain] of wrapperChains) {
+    chain.forEach((fn, i) => {
+      const label = `wrapper ${path.replace(/^pf1\./, "")} #${i}`;
+      totals[label] = { ms: 0, calls: 0 };
+      // A wrapper's own time: the call minus the time spent in the wrapped method it calls
+      chain[i] = function (wrapped, ...args) {
+        let inner = 0;
+        const timedWrapped = (...a) => {
+          const s = performance.now();
+          try {
+            const r = wrapped(...a);
+            if (r instanceof Promise) return r.finally(() => (inner += performance.now() - s));
+            inner += performance.now() - s;
+            return r;
+          } catch (err) {
+            inner += performance.now() - s;
+            throw err;
+          }
+        };
+        const start = performance.now();
+        const done = () => { totals[label].ms += performance.now() - start - inner; totals[label].calls++; };
+        const result = fn.call(this, timedWrapped, ...args);
+        if (result instanceof Promise) return result.finally(done);
+        done();
+        return result;
+      };
+      undo.push(() => (chain[i] = fn));
+    });
+  }
+  return { totals, restore: () => undo.forEach((u) => u()) };
 }
 
 /** Wrap each of our handlers with a timer; returns totals and a function that unwraps them. */
@@ -88,8 +134,21 @@ export async function runBenchmark({ rounds = 3 } = {}) {
   const cleric = await createTestActor("Bench Cleric", { abilities: { wis: 16 }, system: { details: { alignment: "ng" } }, items: [["pf1.classes", "Cleric", { system: { level: 3 } }]] });
   await addItems(cleric, ["Bless", "Shield of Faith", "Hold Person", "Aid", "Divine Favor"].map((name) => ["pf1.spells", name, { system: { spellbook: "primary", level: 1, preparation: { value: 1, max: 1 } } }]));
 
+  // Magic arms: qualities, materials, a generated name, mithral armor
+  const fighter = await createTestActor("Bench Fighter", { abilities: { str: 16 }, items: [["pf1.classes", "Fighter", { system: { level: 6 } }]] });
+  const [flaming] = await addItems(fighter, [
+    ["pf1.weapons-and-ammo", "Longsword", { system: { equipped: true, enh: 1, material: { normal: { value: "coldIron" } } }, flags: { [MODULE_ID]: { magicArms: { qualities: ["Flaming", "Keen"] } } } }],
+    ["pf1.weapons-and-ammo", "Battle Axe", { name: "+1 Frost Undead Bane Battle Axe", system: { enh: 1 } }],
+    ["pf1.weapons-and-ammo", "Longbow", { system: { enh: 2, material: { normal: { value: "darkwood" } } } }],
+    ["pf1.armors-and-shields", "Full Plate", { system: { equipped: true, armor: { enh: 1, material: { normal: { value: "mithral" } } } } }],
+    ["pf1.armors-and-shields", "Heavy Steel Shield", { system: { equipped: true } }],
+  ]);
+  const fighterToken = await placeToken(fighter, 2, 3);
+
   const workload = {
-    "actor prepare ×300": async () => { for (let i = 0; i < 150; i++) { sorc.reset(); slayer.reset(); } },
+    "actor prepare ×450": async () => { for (let i = 0; i < 150; i++) { sorc.reset(); slayer.reset(); fighter.reset(); } },
+    "magic attacks ×10": async () => { for (let i = 0; i < 10; i++) await flaming.use({ skipDialog: true }); },
+    "weapon sheet renders ×10": async () => { for (let i = 0; i < 10; i++) await flaming.sheet._render(true); await flaming.sheet.close(); },
     "buff toggles ×60": async () => { for (let i = 0; i < 60; i++) await bless.update({ "system.active": i % 2 === 0 }); },
     "chat renders ×400": async () => { for (let i = 0; i < 10; i++) for (const m of recent()) await m.renderHTML(); },
     "attacks ×15": async () => { for (let i = 0; i < 15; i++) await longsword.use({ skipDialog: true }); },
@@ -97,16 +156,19 @@ export async function runBenchmark({ rounds = 3 } = {}) {
     "cleric sheet renders ×10": async () => { for (let i = 0; i < 10; i++) await cleric.sheet._render(true); await cleric.sheet.close(); },
   };
 
-  const hooks = ourHooks();
-  const results = { ourHookCount: hooks.length, heapStartMB: heap(), workloadMs: {}, ourMsTotal: 0, handlers: [] };
+  const hooks = await ourHooks();
+  const results = { ourHookCount: hooks.length, wrapperCount: [...wrapperChains.values()].reduce((n, c) => n + c.length, 0), heapStartMB: heap(), workloadMs: {}, ourMsTotal: 0, handlers: [] };
   const { totals, restore } = instrument(hooks);
+  const wrapped = instrumentWrappers();
   try {
     for (let r = 0; r < rounds; r++) {
       for (const [name, fn] of Object.entries(workload)) results.workloadMs[name] = (results.workloadMs[name] ?? 0) + (await time(fn));
     }
   } finally {
     restore();
+    wrapped.restore();
   }
+  Object.assign(totals, wrapped.totals);
   await new Promise((r) => setTimeout(r, 1000)); // let queued syncs settle
   results.handlers = Object.entries(totals)
     .filter(([, t]) => t.calls)
@@ -116,8 +178,8 @@ export async function runBenchmark({ rounds = 3 } = {}) {
   results.totalWorkloadMs = Object.values(results.workloadMs).reduce((s, v) => s + v, 0);
   results.heapEndMB = heap();
 
-  await deleteTokens([slayerToken, goblinToken]);
-  await cleanup([sorc, slayer, goblin, cleric], messagesBefore);
+  await deleteTokens([slayerToken, goblinToken, fighterToken]);
+  await cleanup([sorc, slayer, goblin, cleric, fighter], messagesBefore);
   await sceneCtl.restore();
   return results;
 }
