@@ -23,6 +23,7 @@
 
 import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
 import { esc, addSearch } from "./util.mjs";
+import { stackHighest, pullPenalties, penaltyPart } from "./typed-penalties.mjs";
 
 const KEY = "pf1eRevampRollEffects";
 /** rollData key where features that add their own typed bonus to an attack record it: [{ type, value }] */
@@ -82,7 +83,8 @@ export function registerDamageFilter(fn) {
 /*  Model: what affects this roll               */
 /* -------------------------------------------- */
 
-const highest = (changes) => pf1.documents.actor.changes.getHighestChanges(changes, { ignoreTarget: true });
+// PF1's highest of each type, with typed penalties stacking as the rules say (typed-penalties.mjs)
+const highest = (changes) => stackHighest(changes);
 const sum = (changes) => changes.reduce((t, c) => t + (c.value ?? 0), 0);
 const signed = (n) => (n < 0 ? `−${-n}` : `+${n}`);
 
@@ -722,6 +724,8 @@ Hooks.once("init", () => {
     rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action, flags: rollData[FLAGS] });
     const adjusted = adjustChanges(rollData[KEY], "atk", changes, action.actor);
     parts.push(...partsFor(rollData[KEY], "atk", rollData, { adjusted }));
+    // Typed penalties: out of PF1's highest-of-each-type, the worst of each type as its own part
+    parts.push(...pullPenalties(changes, changes, action.actor).map(penaltyPart));
     delete rollData[TYPED]; // per attack roll: a full attack's next attack starts fresh (no typed damage bonuses yet)
   });
 
@@ -730,6 +734,11 @@ Hooks.once("init", () => {
     const plan = (rollData[KEY] ??= defaultPlan(action.actor, { kind: "attack", action, flags: rollData[FLAGS] ?? {} }));
     const adjusted = adjustChanges(plan, "dmg", changes, action.actor);
     parts[0].extra.push(...partsFor(plan, "dmg", rollData, { adjusted }));
+    // Typed penalties: PF1 has already kept only the highest of each type here, so read them from the full
+    // list (less the buffs turned off in the window)
+    const dropped = new Set(plan.changes?.dmg?.drop ?? []);
+    const all = action.item.getContextChanges(damageTargets(action)).filter((c) => !dropped.has(changeId(c)));
+    parts[0].extra.push(...pullPenalties(changes, all, action.actor).map(penaltyPart));
     // Dice (sneak attack) aren't multiplied on a critical hit: only in the normal damage roll, whose
     // total PF1 adds to the separate critical damage roll. Precision damage counts once per volley, so
     // not on Manyshot's extra arrow (entries marked `perArrow`, a flaming bow's fire, apply to each arrow).

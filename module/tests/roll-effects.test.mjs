@@ -156,7 +156,11 @@ export function registerRollEffectsTests(quench) {
               // The re-render as a player can land after render() returns: wait for it
               await waitFor(() => manager.element.querySelector(`input[data-key="${bane.id}"]`)?.disabled, { what: "the player's view" }).catch(() => null);
               const box = manager.element.querySelector(`input[data-key="${bane.id}"]`);
-              assert.isTrue(box.disabled, "a player can't turn it off");
+              const why = () => {
+                const c = fighter.changes.find((x) => x.parent?.id === bane.id);
+                return `row ${box?.closest("tr,label")?.outerHTML.slice(0, 300)} · isGM ${game.user.isGM} · value ${c?.value} · flags ${JSON.stringify(fighter.items.get(bane.id)?.flags)} · actor ${fighter.id} · threshold ${game.settings.get(MODULE_ID, SETTING)}`;
+              };
+              assert.isTrue(box.disabled, `a player can't turn it off: ${why()}`);
               assert.isTrue(box.closest("tr").classList.contains("locked"), "styled as locked");
               // A buff from another creature with a bonus in it isn't a debuff: not locked
               const mixed = manager.element.querySelector(`input[data-key="${boon.id}"]`);

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- **Typed penalties stack as the rules say.** PF1 keeps only the highest change of each type, so a typed penalty (a −1 morale penalty) disappeared next to a bonus of the same type, and of two such penalties the milder one counted; on the character sheet the result could even depend on the order the buffs were added. Now a penalty applies alongside bonuses of its type, and of two penalties of one type the worst applies, on sheet totals (saves, skills, AC, ability scores) and on attack and damage rolls, where the penalty shows as its own line. Untyped penalties are unchanged. A world setting, *Typed penalties stack as the rules say*, turns this off to keep PF1's own math.
+
 ## 0.23.0: weapon spells, amulet of mighty fists, armor abilities
 
 ### New

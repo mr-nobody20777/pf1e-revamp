@@ -116,7 +116,7 @@ The design reference gives every feat, trait, class and archetype feature, racia
 - **Test tooling.** Nevela's Automation Suite cancels targeted buff spells (such as *Haste*) cast without a target, so tests that cast spells must set a target or use a non-buff spell.
 
 ### Known issues
-- **PF1 mishandles typed penalties.** The rules say bonuses and penalties stack with each other (a penalty can cancel a bonus) and that of two penalties of the same type only the worst applies. PF1 keeps only the single highest change of each type, so a −1 morale penalty is dropped entirely next to Greater Heroism's +4 morale bonus, and of a −1 and a −2 morale penalty it keeps the −1. It affects every roll and sheet total; the roll window mirrors PF1 and lists such a penalty as Not Applied. Most penalties are untyped and unaffected. Needs a ruling on whether the module should correct PF1's totals.
+- **Test flake: the locked-penalty roll-window test.** "A penalty from another creature's spell is locked like a condition" occasionally fails in a full run (about one run in three) and passes on its own; its failure message now reports the row, the user's GM state and the change's value, to find the cause next time.
 - **Snap Shot archers don't threaten.** With Snap Shot, an archer threatens squares within 5 feet (more with Improved Snap Shot), which affects flanking and the warning for shooting while threatened. The Snap Shot feat is also missing from the installed compendiums (only the rogue talent of the same name exists).
 
 ### Release readiness
