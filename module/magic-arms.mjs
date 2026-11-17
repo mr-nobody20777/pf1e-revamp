@@ -31,6 +31,18 @@
 //     if it's heavy armor" (granted through defenses.mjs).
 //   - Alchemical silver: "a silvered slashing or piercing weapon ... –1 penalty on the damage roll (with a
 //     minimum of 1 point of damage)".
+//   - Amulet of mighty fists: "an enhancement bonus of +1 to +5 on attack and damage rolls with unarmed attacks
+//     and natural weapons ... can grant melee weapon special abilities, so long as they can be applied to
+//     unarmed attacks ... cannot have a modified bonus (enhancement bonus plus special ability bonus
+//     equivalents) higher than +5 ... does not need to have a +1 enhancement bonus to grant a melee weapon
+//     special ability." FAQ: +3 bypasses cold iron and silver DR, +4 adamantine (not hardness), +5 alignment;
+//     price 4,000 gp × bonus²; speed doesn't give one extra attack per natural weapon. PF1 gives its bonus to
+//     natural weapons only: unarmed strikes get it here. Unarmed strikes deal bludgeoning damage, so abilities
+//     limited to piercing, slashing or ranged weapons can't go on it (ruling 2026-11-16).
+//   - Armor abilities applied while worn: shadow and slick ("+5 competence bonus on Stealth" / "Escape Artist";
+//     improved +10, greater +15), energy resistance ("absorbs the first 10 points of energy damage per attack";
+//     improved 20, greater 30; one chosen energy), spell resistance (13, 15, 17, 19), invulnerability ("damage
+//     reduction 5/magic"). Resistances, SR and DR don't stack with others of their kind: the best applies.
 // Unidentified items show nothing of this to players (ruling 2026-11-16).
 
 import { MODULE_ID, MELEE_ATTACKS } from "./const.mjs";
@@ -38,7 +50,7 @@ import { esc, addSearch, openLink, titleFor, wrapMethod } from "./util.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 import { parseCreatures, typeKey } from "./creature-types.mjs";
 
-export const FLAG = "magicArms"; // item flag: { qualities?: [names], bane?: { types, subtypes }, specific?, basePrice? }
+export const FLAG = "magicArms"; // item flag: { qualities?: [names], bane?: { types, subtypes }, energy?, specific?, basePrice? }
 const PACK = "pf-content.pf-special-qualities";
 const WEAPONS = new Set(["weapon", "attack"]);
 
@@ -94,6 +106,57 @@ export const fits = (id, action) => (QUALITIES[id]?.limit ? LIMITS[QUALITIES[id]
 export const limitText = (id) => (QUALITIES[id]?.limit ? LIMITS[QUALITIES[id].limit].text : "");
 export const keenWorks = (action) => LIMITS.keen.ok(action);
 
+// An unarmed strike, for what an amulet of mighty fists can carry
+const UNARMED_ACTION = { actionType: "mwak", damage: { parts: [{ types: ["bludgeoning"] }] } };
+/** Can this ability go on an amulet of mighty fists ("so long as they can be applied to unarmed attacks")? */
+const amuletFits = (name) => {
+  const id = BY_NAME.get(name.toLowerCase());
+  return !id || !QUALITIES[id].limit || LIMITS[QUALITIES[id].limit].ok(UNARMED_ACTION);
+};
+
+// Armor and shield abilities applied while the item is worn (by Pathfinder 1e Content's names)
+const ARMOR_ABILITIES = {
+  shadow: { skill: "ste", bonus: 5 },
+  "shadow, improved": { skill: "ste", bonus: 10 },
+  "shadow, greater": { skill: "ste", bonus: 15 },
+  slick: { skill: "esc", bonus: 5 },
+  "slick, improved": { skill: "esc", bonus: 10 },
+  "slick, greater": { skill: "esc", bonus: 15 },
+  "energy resistance": { resist: 10 },
+  "energy resistance, improved": { resist: 20 },
+  "energy resistance, greater": { resist: 30 },
+  "spell resistance (13)": { sr: 13 },
+  "spell resistance (15)": { sr: 15 },
+  "spell resistance (17)": { sr: 17 },
+  "spell resistance (19)": { sr: 19 },
+  invulnerability: { dr: 5 },
+};
+const ENERGY_TYPES = { acid: "acid", cold: "cold", electric: "electricity", fire: "fire", sonic: "sonic" }; // PF1 id → word
+const FORTIFICATION = /^fortification \((light|moderate|heavy)\)$/i;
+
+/** Armor abilities in an armor's name ("+1 Greater Shadow Leather Armor", "Fire Resistance Chainmail"). */
+function armorFromName(source) {
+  const names = [];
+  const grade = (g) => (g ? `, ${g.trim().toLowerCase().replace(/^./, (c) => c.toUpperCase())}` : "");
+  const fort = source.match(/\b(light|moderate|heavy) fortification\b|\bfortification \((light|moderate|heavy)\)/i);
+  if (fort) names.push(`Fortification (${(fort[1] ?? fort[2]).toLowerCase()})`);
+  for (const [word, name] of [["shadow", "Shadow"], ["slick", "Slick"]]) {
+    const m = source.match(new RegExp(`\\b(improved |greater )?${word}\\b(?! blending)`, "i"));
+    if (m) names.push(`${name}${grade(m[1])}`);
+  }
+  const er = source.match(/\b(improved |greater )?(energy|acid|cold|electricity|fire|sonic) resistance\b/i);
+  if (er) names.push(`Energy Resistance${grade(er[1])}`);
+  const sr = source.match(/\bspell resistance \((13|15|17|19)\)|\bSR (13|15|17|19)\b/i);
+  if (sr) names.push(`Spell Resistance (${sr[1] ?? sr[2]})`);
+  if (/\binvulnerability\b/i.test(source)) names.push("Invulnerability");
+  return names;
+}
+/** The energy type in an armor's name ("Fire Resistance"), as PF1's id. */
+function energyFromName(source) {
+  const word = source.match(/\b(acid|cold|electricity|fire|sonic) resistance\b/i)?.[1]?.toLowerCase();
+  return word ? Object.keys(ENERGY_TYPES).find((k) => ENERGY_TYPES[k] === word) ?? null : null;
+}
+
 /** The designated foe in a name ("+1 Undead Bane Longsword", "Orc-Bane Greataxe"), or null. */
 export function baneFromName(name) {
   const before = name.toLowerCase().match(/([a-z' -]+?)[\s-]+bane\b/)?.[1];
@@ -107,8 +170,25 @@ export function baneFromName(name) {
   return null;
 }
 
-const isArms = (item) => !!item && (WEAPONS.has(item.type) || (item.type === "equipment" && ["armor", "shield"].includes(item.system?.subType)));
+const AMULET = /^amulet of mighty fists\b/i;
+/** An amulet of mighty fists (by its name or the compendium item it came from). */
+export const isAmulet = (item) => item?.type === "equipment" && (AMULET.test(item._source?.name ?? item.name ?? "") || (item.system?.slot === "neck" && AMULET.test(sourceName(item) ?? "")));
+const isArmor = (item) => item?.type === "equipment" && ["armor", "shield"].includes(item.system?.subType);
+const isArms = (item) => !!item && (WEAPONS.has(item.type) || isArmor(item) || isAmulet(item));
 const stored = (item) => item?.flags?.[MODULE_ID]?.[FLAG] ?? null;
+/** An unarmed strike (not a natural weapon): an attack or weapon named so. */
+export const isUnarmed = (item) => WEAPONS.has(item?.type) && item.system?.subType !== "natural" && /\bunarmed\b/i.test(`${item._source?.name ?? item.name ?? ""} ${(item.system?.baseTypes ?? []).join(" ")}`);
+/** Unarmed strikes and natural weapons: what an amulet of mighty fists enhances. */
+export const isBodily = (item) => WEAPONS.has(item?.type) && (item.system?.subType === "natural" || isUnarmed(item));
+/** The amulet of mighty fists the creature wears, or null. */
+export const wornAmulet = (actor) => actor?.itemTypes?.equipment?.find((i) => i.isActive && isAmulet(i)) ?? null;
+/** An amulet's enhancement bonus: its PF1 change on natural attacks, or the "+N" in its name. */
+function amuletEnh(item) {
+  const change = (item.system.changes ?? []).find((c) => c.target === "nattack" && c.type === "enh");
+  const n = Number(change?.formula);
+  if (Number.isFinite(n) && n > 0) return n;
+  return Number((item._source?.name ?? item.name ?? "").match(/\+(\d)\b/)?.[1]) || 0;
+}
 
 // Temporary qualities and effects: what spells and class features put on a weapon for a time
 // (weapon-spells.mjs). They count for the automation and the +10 limit, never for the item's own list,
@@ -133,16 +213,15 @@ export function qualitiesOf(item, { own = false } = {}) {
   const source = item._source?.name ?? item.name ?? "";
   let names;
   if (!fromName) names = [...flag.qualities];
-  else if (WEAPONS.has(item.type)) names = Object.values(QUALITIES).filter((q) => q.re.test(source)).map((q) => q.name);
-  else {
-    const m = source.match(/\b(light|moderate|heavy) fortification\b|\bfortification \((light|moderate|heavy)\)/i);
-    names = m ? [`Fortification (${(m[1] ?? m[2]).toLowerCase()})`] : [];
-  }
-  const extra = own ? [] : [...new Set(temporaryOf(item).flatMap((t) => t.qualities ?? []))].filter((n) => !names.some((x) => x.toLowerCase() === n.toLowerCase()));
+  else if (WEAPONS.has(item.type) || isAmulet(item)) names = Object.values(QUALITIES).filter((q) => q.re.test(source)).map((q) => q.name);
+  else names = armorFromName(source);
+  const temps = own ? [] : temporaryOf(item);
+  const extra = [...new Set(temps.flatMap((t) => t.qualities ?? []))].filter((n) => !names.some((x) => x.toLowerCase() === n.toLowerCase()));
   const ids = new Set([...names, ...extra].map((n) => BY_NAME.get(n.toLowerCase())).filter(Boolean));
   for (const id of [...ids]) if (QUALITIES[id].base) ids.add(QUALITIES[id].base);
-  const bane = ids.has("bane") ? flag?.bane ?? (fromName ? baneFromName(source) : null) : null;
-  return { names, ids, temporary: extra, bane, fromName, specific: !!flag?.specific };
+  const bane = ids.has("bane") ? flag?.bane ?? (fromName ? baneFromName(source) : null) ?? temps.find((t) => t.bane)?.bane ?? null : null;
+  const energy = isArmor(item) ? flag?.energy ?? (fromName ? energyFromName(source) : null) : null;
+  return { names, ids, temporary: extra, bane, energy, fromName, specific: !!flag?.specific };
 }
 
 /* -------------------------------------------- */
@@ -192,6 +271,7 @@ export function loadCatalog() {
 
 /** The catalog folders that apply to this item. */
 function foldersFor(item) {
+  if (isAmulet(item)) return [...FOLDERS.weapon, ...FOLDERS.melee];
   if (item.type === "equipment") return FOLDERS[item.system.subType] ?? [];
   const ranged = item.system.weaponSubtype === "ranged" || (item.type === "attack" && !isMelee(item.defaultAction));
   return [...FOLDERS.weapon, ...(ranged ? FOLDERS.ranged : FOLDERS.melee)];
@@ -231,7 +311,7 @@ function armorChanges(item) {
 /* -------------------------------------------- */
 
 const gp = (n) => `${Math.round(n * 100) / 100} gp`.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-const enhOf = (item) => (item.type === "equipment" ? item.system.armor?.enh : item.system.enh) || 0;
+const enhOf = (item) => (isAmulet(item) ? amuletEnh(item) : item.type === "equipment" ? item.system.armor?.enh : item.system.enh) || 0;
 
 /** The material's price category for this item (PF1's material price fields). */
 function priceCategory(item) {
@@ -252,6 +332,7 @@ export async function priceOf(item, base) {
 }
 function priceFrom(item, base, cat) {
   const q = qualitiesOf(item, { own: true });
+  if (isAmulet(item)) return amuletPrice(item, q, cat);
   const armorLike = item.type === "equipment";
   const lines = [{ label: "Base item", gp: base }];
   const mat = specialMaterial(item);
@@ -296,16 +377,36 @@ function priceFrom(item, base, cat) {
   return { lines, total: lines.reduce((t, l) => t + l.gp, 0), unknown };
 }
 
+/** An amulet of mighty fists: 4,000 gp × (enhancement plus ability bonuses)², plus abilities priced in gp (FAQ). */
+function amuletPrice(item, q, cat) {
+  const enh = amuletEnh(item);
+  let bonus = enh;
+  let flat = 0;
+  const unknown = [];
+  for (const name of q.names) {
+    const p = cat.get(name.toLowerCase())?.price;
+    if (p?.bonus) bonus += p.bonus;
+    else if (p?.gp) flat += p.gp;
+    else unknown.push(name);
+  }
+  const lines = [];
+  if (bonus > 0) lines.push({ label: `Bonus +${bonus}${bonus !== enh ? ` (+${enh} enhancement, +${bonus - enh} abilities)` : ""}`, gp: bonus * bonus * 4000 });
+  if (flat) lines.push({ label: "Abilities priced in gp", gp: flat });
+  return { lines, total: lines.reduce((t, l) => t + l.gp, 0), unknown };
+}
+
 /** The plain item's price: recorded on the panel, or the compendium item it came from. */
 const sourcePrices = new Map(); // compendium uuid → its price (loading the document on every sheet render was slow)
 /** The plain item's price if it's known without waiting: a number, null (none), or undefined (not looked up yet). */
 function basePriceNow(item) {
+  if (isAmulet(item)) return 0; // priced from its bonus alone
   const recorded = stored(item)?.basePrice;
   if (Number.isFinite(recorded)) return recorded;
   const uuid = item._stats?.compendiumSource;
   return uuid ? sourcePrices.get(uuid) : null;
 }
 async function basePriceOf(item) {
+  if (isAmulet(item)) return 0;
   const recorded = stored(item)?.basePrice;
   if (Number.isFinite(recorded)) return recorded;
   const uuid = item._stats?.compendiumSource;
@@ -330,6 +431,13 @@ function problemsFrom(item, cat) {
   if (!q?.names.length || q.specific) return [];
   const out = [];
   const enh = enhOf(item);
+  if (isAmulet(item)) {
+    const total = enh + q.names.reduce((t, n) => t + (cat.get(n.toLowerCase())?.price?.bonus ?? 0), 0);
+    if (total > 5) out.push(`The total bonus is +${total}: an amulet of mighty fists allows no more than +5 (enhancement plus abilities).`);
+    for (const n of q.names) if (!amuletFits(n)) out.push(`${n} can't be applied to unarmed attacks.`);
+    if (q.ids.has("bane") && !q.bane) out.push("Bane: choose the designated foe.");
+    return out;
+  }
   if (enh < 1) out.push("A special ability needs at least a +1 enhancement bonus.");
   const bonus = enh + [...q.names, ...q.temporary].reduce((t, n) => t + (cat.get(n.toLowerCase())?.price?.bonus ?? 0), 0);
   if (bonus > 10) out.push(`The total bonus is +${bonus}: no more than +10 (enhancement plus abilities).`);
@@ -337,6 +445,7 @@ function problemsFrom(item, cat) {
     for (const id of q.ids) if (fits(id, item.defaultAction) === false) out.push(`${QUALITIES[id].name} works only on ${limitText(id)}.`);
     if (q.ids.has("bane") && !q.bane) out.push("Bane: choose the designated foe.");
   }
+  if (q.names.some((n) => ARMOR_ABILITIES[n.toLowerCase()]?.resist) && !q.energy) out.push("Energy resistance: choose the energy type.");
   return out;
 }
 
@@ -374,6 +483,12 @@ export function generatedName(item) {
   const q = qualitiesOf(item, { own: true });
   if (!q || q.specific) return null;
   const stock = item._source?.name;
+  if (isAmulet(item)) {
+    // "+2 Flaming Amulet of Mighty Fists", once it has abilities chosen; a plain one keeps its name
+    if (!stock || !/^amulet of mighty fists(?: \+\d)?$/i.test(stock) || q.fromName || !q.names.length) return null;
+    const enh = amuletEnh(item);
+    return [enh > 0 ? `+${enh}` : null, ...q.names.map((n) => (n.toLowerCase() === "bane" && q.bane ? `${titleCase(foeText(q.bane))} Bane` : n)), "Amulet of Mighty Fists"].filter(Boolean).join(" ");
+  }
   if (!stock || (stock !== item.system.baseTypes?.[0] && stock !== sourceName(item))) return null;
   const enh = enhOf(item);
   const mat = specialMaterial(item);
@@ -383,7 +498,8 @@ export function generatedName(item) {
   for (const name of q.fromName ? [] : q.names) {
     const level = name.match(/^(.+) \((light|moderate|heavy)\)$/i);
     const grade = name.match(/^(.+), (lesser|improved|greater)$/i); // "Flamboyant, Greater"
-    if (level) words.push(`${titleCase(level[2])} ${level[1]}`);
+    if (ARMOR_ABILITIES[name.toLowerCase()]?.resist && q.energy) words.push(`${grade ? `${titleCase(grade[2])} ` : ""}${titleCase(ENERGY_TYPES[q.energy] ?? q.energy)} Resistance`);
+    else if (level) words.push(`${titleCase(level[2])} ${level[1]}`);
     else if (grade) words.push(`${titleCase(grade[2])} ${grade[1]}`);
     else if (name.toLowerCase() === "bane" && q.bane) words.push(`${titleCase(foeText(q.bane))} Bane`);
     else words.push(name);
@@ -453,6 +569,29 @@ Hooks.once("init", () => {
       this.system.equipmentSubtype = original;
     }
   });
+  // Amulet of mighty fists: PF1 puts its bonus on natural attacks only; unarmed strikes get it too
+  wrapMethod(`${I}.ItemPF.prototype.getContextChanges`, function (wrapped, ...args) {
+    const changes = wrapped(...args);
+    if (!this.actor || !isUnarmed(this)) return changes;
+    const stack = this.getContextStack(args[0] ?? ["attack"]);
+    const want = new Set([stack.has("attack") && "nattack", stack.has("damage") && "ndamage"].filter(Boolean));
+    if (!want.size) return changes;
+    const extra = this.actor.changes.filter((c) => want.has(c.target) && isAmulet(c.parent) && !changes.includes(c));
+    return extra.length ? [...changes, ...extra] : changes;
+  });
+  // Shadow and slick armor: their competence bonus as PF1 changes on the armor (counted while it's worn)
+  wrapMethod(`${I}.ItemPF.prototype._prepareChanges`, function (wrapped, ...args) {
+    const result = wrapped(...args);
+    if (!isArmor(this) || !this.changes) return result;
+    const q = qualitiesOf(this, { own: true });
+    q?.names.forEach((n) => {
+      const a = ARMOR_ABILITIES[n.toLowerCase()];
+      if (!a?.skill) return;
+      const _id = `revampArmorSkl${a.skill}`.slice(0, 16);
+      this.changes.set(_id, new pf1.components.ItemChange({ _id, formula: String(a.bonus), target: `skill.${a.skill}`, type: "competence", operator: "add", priority: 0 }, { parent: this, strict: false }));
+    });
+    return result;
+  });
   // The generated name, while the item keeps its stock name (identified data only)
   wrapMethod(`${I}.ItemPhysicalPF.prototype.prepareDerivedData`, function (wrapped, ...args) {
     const result = wrapped(...args);
@@ -494,6 +633,52 @@ export function materialDR(actor) {
   return out;
 }
 
+/** Energy resistance, spell resistance and invulnerability from worn armor and shields, for defenses.mjs. */
+export function armorGrants(actor) {
+  const out = [];
+  for (const item of actor?.itemTypes?.equipment ?? []) {
+    if (!item.isActive || !isArmor(item)) continue;
+    const q = qualitiesOf(item, { own: true });
+    for (const n of q?.names ?? []) {
+      const a = ARMOR_ABILITIES[n.toLowerCase()];
+      if (a?.resist && q.energy) out.push({ trait: "eres", type: q.energy, amount: a.resist, source: item.name });
+      if (a?.dr) out.push({ trait: "dr", amount: a.dr, types: ["magic", ""], operator: true, source: item.name });
+      if (a?.sr) out.push({ trait: "sr", amount: a.sr, source: item.name });
+    }
+  }
+  return out;
+}
+
+// The worn amulet of mighty fists on unarmed strikes and natural weapons: its abilities, and its enhancement
+// bonus against DR (PF1 adds the bonus itself to natural attacks; unarmed strikes get it above)
+registerTemporary((item) => {
+  if (!isBodily(item)) return [];
+  const amulet = wornAmulet(item.actor);
+  if (!amulet) return [];
+  const q = qualitiesOf(amulet, { own: true });
+  const names = q.names.filter(amuletFits);
+  const enh = amuletEnh(amulet);
+  const parts = [enh > 0 ? `+${enh} enhancement` : null, ...names.map((n) => (n.toLowerCase() === "bane" && q.bane ? `Bane (${foeText(q.bane)})` : n))].filter(Boolean);
+  return [{ source: amulet.name, worn: true, qualities: names, bane: q.bane, penetrates: enh, label: parts.join(", ") || null }];
+});
+
+/** Does something worn or cast on the weapon make it magic (an amulet's bonus, magic weapon)? */
+export const strikesMagically = (item) => temporaryOf(item).some((t) => t.magic || t.penetrates > 0);
+
+Hooks.once("setup", () => {
+  // FAQ: the amulet's bonus bypasses DR as a weapon's would (+1 magic, +3 cold iron and silver, +4
+  // adamantine, +5 alignment)
+  wrapMethod("pf1.applications.ApplyDamage.prototype._evaluateAttack", function (wrapped, ...args) {
+    const result = wrapped(...args);
+    const n = Math.max(0, ...temporaryOf(this.options?.action?.item).map((t) => t.penetrates ?? 0));
+    if (n > 0) {
+      this.isMagic = true;
+      for (let i = 0; i <= n; i++) for (const id of pf1.config.enhancementMaterialPenetration?.[i] ?? []) this.materials?.add(id);
+    }
+    return result;
+  });
+});
+
 // Alchemical silver: −1 damage with a silvered slashing or piercing weapon (imposed: only the GM unticks it)
 registerRollEffect({
   collect(actor, roll) {
@@ -514,7 +699,7 @@ const OUTSIDER_OR_HUMANOID = new Set(["humanoid", "outsider"]);
 /** Save the qualities (starting from what the name gave, the first time). */
 async function saveQualities(item, update) {
   const q = qualitiesOf(item, { own: true });
-  const current = { qualities: q.names, bane: q.bane ?? null, specific: q.specific, basePrice: stored(item)?.basePrice ?? null };
+  const current = { qualities: q.names, bane: q.bane ?? null, energy: q.energy ?? null, specific: q.specific, basePrice: stored(item)?.basePrice ?? null };
   await item.setFlag(MODULE_ID, FLAG, { ...current, ...update });
 }
 
@@ -532,7 +717,8 @@ function panelHTML(item, cat, base) {
   };
   const automated = (name) => {
     const id = BY_NAME.get(name.toLowerCase());
-    return id ? (QUALITIES[id].later ? "recorded" : "automated") : null;
+    if (id) return QUALITIES[id].later ? "recorded" : "automated";
+    return ARMOR_ABILITIES[name.toLowerCase()] || FORTIFICATION.test(name) ? "automated" : null;
   };
   const chips = q.names.map((name, i) => {
     const entry = cat.get(name.toLowerCase());
@@ -546,17 +732,21 @@ function panelHTML(item, cat, base) {
     </li>`;
   }).join("");
   const options = folders.map((folder) => {
-    const list = [...cat.values()].filter((e) => e.folder === folder && !q.names.some((n) => n.toLowerCase() === e.name.toLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
+    const list = [...cat.values()].filter((e) => e.folder === folder && !q.names.some((n) => n.toLowerCase() === e.name.toLowerCase()) && (!isAmulet(item) || amuletFits(e.name))).sort((a, b) => a.name.localeCompare(b.name));
     return list.length ? `<optgroup label="${esc(folder)}">${list.map((e) => `<option value="${esc(e.name)}">${esc(e.name)}${e.price ? ` (${e.price.bonus ? `+${e.price.bonus}` : gp(e.price.gp)})` : ""}${automated(e.name) === "automated" ? " ⚙" : ""}</option>`).join("")}</optgroup>` : "";
   }).join("");
   const types = Object.keys(pf1.config.creatureTypes ?? {}).map((k) => [typeKey(k), typeName(typeKey(k))]).sort((a, b) => a[1].localeCompare(b[1]));
   const subtypes = Object.keys(pf1.config.creatureSubtypes ?? {}).map((k) => [typeKey(k), subtypeName(typeKey(k))]).sort((a, b) => a[1].localeCompare(b[1]));
-  const bane = q.ids.has("bane") && WEAPONS.has(item.type)
+  const bane = q.ids.has("bane") && (WEAPONS.has(item.type) || isAmulet(item))
     ? `<div class="form-group stacked"><label>Bane: designated foe</label><div class="form-fields" style="flex-wrap:wrap; gap:4px">
         <select data-wq-bane="type" ${editable ? "" : "disabled"}><option value="">Type…</option>${types.map(([k, l]) => `<option value="${k}" ${q.bane?.types?.[0] === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
         <select data-wq-bane="subtype" ${editable ? "" : "disabled"}><option value="">(no subtype)</option>${subtypes.map(([k, l]) => `<option value="${k}" ${q.bane?.subtypes?.[0] === k ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>
       </div><p class="hint">Humanoids and outsiders name one subtype.</p></div>`
     : "";
+  const energy = q.names.some((n) => ARMOR_ABILITIES[n.toLowerCase()]?.resist)
+    ? `<div class="form-group"><label>Energy resistance: energy</label><div class="form-fields"><select data-wq-energy ${editable ? "" : "disabled"}><option value="">Choose…</option>${Object.entries(ENERGY_TYPES).map(([k, l]) => `<option value="${k}" ${q.energy === k ? "selected" : ""}>${l}</option>`).join("")}</select></div></div>`
+    : "";
+  const amuletHint = isAmulet(item) ? `<p class="hint">Its enhancement bonus (set in its Changes) and abilities apply to the wearer's unarmed strikes and natural weapons; abilities that need piercing, slashing or ranged weapons can't go on it, and no +1 is needed first.</p>` : "";
   const problems = problemsFrom(item, cat);
   const priced = item.type !== "attack" && !q.specific; // attacks (natural, misc) have no price
   const price = !priced || base === null || base === undefined ? null : priceFrom(item, base, cat);
@@ -569,10 +759,17 @@ function panelHTML(item, cat, base) {
       <ul style="list-style:none; margin:0.25em 0; padding:0">${chips || '<li style="opacity:0.7">No special abilities.</li>'}</ul>
       ${(() => {
         const temps = temporaryOf(item).filter((t) => t.label);
-        return temps.length ? `<p class="hint"><i class="fa-regular fa-hourglass-half"></i> For a time: ${temps.map((t) => `${esc(t.label)} (${esc(t.source)})`).join("; ")}</p>` : "";
+        const worn = temps.filter((t) => t.worn);
+        const timed = temps.filter((t) => !t.worn);
+        return [
+          worn.length ? `<p class="hint"><i class="fa-solid fa-gem"></i> From ${worn.map((t) => `the worn ${esc(t.source)}: ${esc(t.label)}`).join("; ")}</p>` : "",
+          timed.length ? `<p class="hint"><i class="fa-regular fa-hourglass-half"></i> For a time: ${timed.map((t) => `${esc(t.label)} (${esc(t.source)})`).join("; ")}</p>` : "",
+        ].join("");
       })()}
       ${editable && cat.size ? `<div class="form-group"><label>Add an ability</label><div class="form-fields"><select data-wq-add><option value="">Choose…</option>${options}</select><button type="button" data-wq-add-button style="flex:0 0 auto; width:auto">Add</button></div></div>` : ""}
+      ${amuletHint}
       ${bane}
+      ${energy}
       <div class="form-group"><label>Specific magic item</label><div class="form-fields"><input type="checkbox" data-wq-specific ${q.specific ? "checked" : ""} ${editable ? "" : "disabled"}></div>
         <p class="hint">A named item (Frost Brand, Holy Avenger): its abilities still work, but its name and price aren't worked out.</p></div>
       ${problems.map((p) => `<p class="notification warning" style="margin:0.25em 0">${esc(p)}</p>`).join("")}
@@ -677,8 +874,9 @@ Hooks.on("renderItemSheetPF", (app, html) => {
       await saveQualities(item, { bane: type || subtype ? { types: type ? [type] : [], subtypes: subtype ? [subtype] : [] } : null });
     });
   });
+  panel.querySelector("[data-wq-energy]")?.addEventListener("change", (e) => saveQualities(item, { energy: e.target.value || null }));
   panel.querySelector("[data-wq-specific]")?.addEventListener("change", (e) => saveQualities(item, { specific: e.target.checked }));
   panel.querySelector("[data-wq-price]")?.addEventListener("click", () => updatePrice(item));
 });
 
-export const _test = { panelHTML, basePriceNow, qualitiesOf, baneFromName, parsePrice, priceOf, problemsOf, generatedName, materialDR, loadCatalog, saveQualities, FLAG };
+export const _test = { panelHTML, basePriceNow, qualitiesOf, baneFromName, parsePrice, priceOf, problemsOf, generatedName, materialDR, armorGrants, armorFromName, amuletFits, loadCatalog, saveQualities, FLAG };

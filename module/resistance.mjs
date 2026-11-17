@@ -15,7 +15,7 @@ import { MODULE_ID } from "./const.mjs";
 import { esc, wrapMethod } from "./util.mjs";
 import { creatureTypes } from "./creature-types.mjs";
 import { hasConditionalDR } from "./defenses.mjs";
-import { qualitiesOf } from "./magic-arms.mjs";
+import { qualitiesOf, strikesMagically } from "./magic-arms.mjs";
 
 const SETTING = "quickApplyResistance";
 const FROM_DIALOG = `${MODULE_ID}FromDialog`;
@@ -163,7 +163,7 @@ export function registerDamageAddition(fn) {
 const isChannel = (item) => /channel/i.test(item?.system?.tag ?? "") || /^channel (positive |negative )?energy/i.test(item?.name ?? "");
 /** Do this attack's weapons count as magic? (an enhancement bonus, the "magic" material, or natural attacks of a creature with DR/magic) */
 function strikesAsMagic(action) {
-  if ((action.enhancementBonus ?? 0) > 0) return true;
+  if ((action.enhancementBonus ?? 0) > 0 || strikesMagically(action.item)) return true;
   const materials = [...(action.addonMaterial ?? []), ...(action.item?.system?.material?.addon ?? [])];
   if (materials.includes("magic")) return true;
   const natural = action.item?.subType === "natural" || action.item?.system?.subType === "natural";

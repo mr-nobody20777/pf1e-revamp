@@ -40,6 +40,19 @@ Bypassing damage reduction with cold iron, silver, adamantine and the like was a
 ## Unidentified items
 Players don't see an unidentified item's abilities: the section says *Unidentified*, the note on the item is hidden, and in the roll window its rows read *Unidentified quality*.
 
+## Amulet of mighty fists
+The amulet's enhancement bonus applies to unarmed strikes as well as natural weapons, and counts against damage reduction as a weapon's would (magic at +1, cold iron and silver at +3, adamantine at +4, alignments at +5). It has the Magic Qualities section too: the abilities chosen there apply to every unarmed strike and natural weapon while it's worn, and show on those attacks as *From the worn amulet*. Only abilities that can be applied to unarmed attacks are offered (not keen, vorpal or seeking), no +1 is needed first, and the total can't go above +5. It's named from its abilities ("+1 Flaming Amulet of Mighty Fists") and priced at 4,000 gp × the total bonus squared. A speed amulet gives one extra attack a round, not one per natural weapon.
+
+## Armor and shield abilities
+While the armor or shield is worn:
+- **Shadow** and **slick**: +5 (improved +10, greater +15) competence bonus on Stealth or Escape Artist, in the sheet's totals.
+- **Energy resistance**: resists 10 (improved 20, greater 30) of the energy chosen in the section.
+- **Spell resistance** (13, 15, 17 or 19), unless the wearer's own is higher.
+- **Invulnerability**: DR 5/magic.
+- **Fortification**: see Combat Rules.
+
+They're also read from the armor's name ("+1 Greater Shadow Leather Armor", "Improved Fire Resistance Breastplate"). Resistances and DR don't stack with others of their kind: the best applies.
+
 ## Weapon spells
 *Magic weapon*, *greater magic weapon*, *keen edge*, *align weapon* and *bless weapon* act on one weapon. When the buff goes on a creature with several fitting weapons, the first is chosen and the owner gets a private message with a button for each; the buff's sheet has the same buttons (and *align weapon*'s alignments). While the buff is on:
 - its enhancement bonus counts for that weapon only, and doesn't add to the weapon's own (the higher applies);
@@ -51,4 +64,4 @@ Players don't see an unidentified item's abilities: the section says *Unidentifi
 The weapon's Magic Qualities section lists them under *For a time*. They count toward the +10 limit but never change the weapon's name or price.
 
 ## Not yet
-Abilities added for a time by class features (divine bond, arcane pool, sacred weapon), spells on 50 projectiles, the Amulet of Mighty Fists, ammunition, double weapons, and most armor abilities beyond fortification. See the roadmap.
+Abilities added for a time by class features (divine bond, arcane pool, sacred weapon), spells on 50 projectiles, ammunition, double weapons, and armor abilities beyond those above (champion, arrow deflection, bashing, ghost touch, wild). See the roadmap.

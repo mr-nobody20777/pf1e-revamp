@@ -182,9 +182,20 @@ registerRollEffect({
 /*  Speed and defending                         */
 /* -------------------------------------------- */
 
-// Speed: tick PF1's Haste extra attack (one extra attack at full BAB on a full attack, never two)
+// Speed: tick PF1's Haste extra attack (one extra attack at full BAB on a full attack, never two). From an
+// amulet of mighty fists, once a round in combat, not once per natural weapon (FAQ).
+const amuletSpeed = new Map(); // actor uuid → "combat id:round" its amulet's extra attack was made
+const roundKey = () => (game.combat?.started ? `${game.combat.id}:${game.combat.round}` : null);
+const speedFromAmulet = (item) => !qualitiesOf(item, { own: true })?.ids.has("speed");
 Hooks.on("pf1CreateActionUse", (use) => {
-  if (qualitiesOf(use.item)?.ids.has("speed") && use.shared?.useOptions) use.shared.useOptions.haste ??= true;
+  if (!qualitiesOf(use.item)?.ids.has("speed") || !use.shared?.useOptions) return;
+  if (speedFromAmulet(use.item) && roundKey() && amuletSpeed.get(use.actor?.uuid) === roundKey()) return;
+  use.shared.useOptions.haste ??= true;
+});
+Hooks.on("pf1PostActionUse", (use) => {
+  const key = roundKey();
+  if (!key || !use.shared?.attacks?.some((a) => a.type === "haste-attack") || !qualitiesOf(use.item)?.ids.has("speed") || !speedFromAmulet(use.item)) return;
+  amuletSpeed.set(use.actor?.uuid, key);
 });
 // PF1 only adds the extra attack through its attack window; without the window (skipDialog), add it here,
 // once, after the first attack, as PF1 does

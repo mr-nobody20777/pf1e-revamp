@@ -43,9 +43,8 @@ The design reference gives every feat, trait, class and archetype feature, racia
 
 ### Magic items
 - **Temporary qualities from class features.** Divine bond, arcane pool, sacred weapon and inquisitor bane add abilities or enhancement for a time; they count toward the +10 limit and show in the Magic Qualities section, as the weapon spells already do. Also: weapon spells cast on 50 projectiles.
-- **Amulet of Mighty Fists.** Its enhancement bonus and melee abilities apply to unarmed strikes and natural weapons.
 - **Ammunition.** Qualities and materials on arrows and bolts, the launcher's qualities passing to its ammunition, prices for 50 pieces, and the rule that the launcher's and ammunition's enhancement bonuses don't stack.
-- **Armor and shield abilities.** Automate the common ones beyond fortification (spell resistance, energy resistance, shadow and slick skill bonuses, arrow deflection, bashing).
+- **More armor and shield abilities.** Fortification, shadow, slick, energy resistance, spell resistance and invulnerability are done; next are champion, arrow deflection (with immediate-action reactions), bashing, ghost touch armor and wild.
 - **Double weapons.** Each end has its own enhancement, abilities and material (a double weapon with one cold iron end costs 50% more).
 - **Adamantine against hardness.** Adamantine weapons ignore hardness below 20 when sundering or attacking objects.
 - **Mithral and darkwood on other items.** Priced by weight (500 gp and 10 gp per pound) on items that aren't weapons or armor.

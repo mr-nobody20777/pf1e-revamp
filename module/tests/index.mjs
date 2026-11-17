@@ -41,6 +41,7 @@ import { registerMonsterGrappleTests } from "./monster-grapple.test.mjs";
 import { registerWeaponQualityTests } from "./weapon-qualities.test.mjs";
 import { registerMagicArmsTests } from "./magic-arms.test.mjs";
 import { registerWeaponSpellTests } from "./weapon-spells.test.mjs";
+import { registerWornMagicTests } from "./worn-magic.test.mjs";
 
 export function registerTests(quench) {
   registerTwoWeaponTests(quench);
@@ -62,6 +63,7 @@ export function registerTests(quench) {
   registerWeaponQualityTests(quench);
   registerMagicArmsTests(quench);
   registerWeaponSpellTests(quench);
+  registerWornMagicTests(quench);
   registerQuarryTests(quench);
   registerTrueStrikeTests(quench);
   registerMissChanceTests(quench);

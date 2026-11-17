@@ -19,7 +19,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { evaluate, classLevel, esc, titleFor, wrapMethod } from "./util.mjs"; // classLevel: flag grants
-import { materialDR } from "./magic-arms.mjs";
+import { materialDR, armorGrants } from "./magic-arms.mjs";
 
 const PF1 = "Compendium.pf1.class-abilities.Item.";
 const TPL = "Compendium.pf1.monster-templates.Item.";
@@ -231,6 +231,7 @@ Hooks.on("pf1PrepareDerivedActorData", (actor) => {
     for (const g of activeGrants(item)) grants.push({ ...g, source: item.name });
   }
   grants.push(...materialDR(actor)); // adamantine armor
+  grants.push(...armorGrants(actor)); // energy resistance, spell resistance and invulnerability armor
 
   // A bare prepareData() keeps the arrays from last time: drop what this module added then
   traits.eres ??= { value: [], custom: "" };
@@ -244,6 +245,11 @@ Hooks.on("pf1PrepareDerivedActorData", (actor) => {
     else if (g.trait === "dr" && g.against) conditional.push(g);
     else if (g.trait === "dr") traits.dr.value.push({ amount: g.amount, operator: g.operator, types: [...g.types], [OURS]: true });
     else if (g.trait === "immune") extra.add(g.type);
+    else if (g.trait === "sr") {
+      // Spell resistance doesn't stack: the best applies
+      const sr = actor.system.attributes?.sr;
+      if (sr && g.amount > (sr.total ?? 0)) sr.total = g.amount;
+    }
     else if (traits[g.trait]) {
       const trait = traits[g.trait];
       // PF1 keeps immunities as Sets (its old `value` array is deprecated and warns when read)
