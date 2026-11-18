@@ -18,7 +18,7 @@ Next, the focus moves to:
   - **Cover-dependent abilities** (with cover deferred): Improved Precise Shot, Pinpoint Targeting (its armor and shield part is done), Lob Shot, Low Profile, Combat Sandals, Volley Fire, Covered Sniper, veering weapons.
 - **Cantrips and 1st-level spells** (research: `docs/SPELLS-RESEARCH.md`). Done for the Core Rulebook, Advanced Player's Guide, Ultimate Magic and Ultimate Combat. Still to do:
   - **Other books**: the combat-relevant spells are done; what's left is mostly utility (skill bonuses in narrow situations). Spells whose effect depends on what the creature does (Coward's Cowl, Halfling Vengeance, Veil of Heaven, Burst of Adrenaline) need a design.
-  - **Effects that repeat**: afflictions are done (contracting, onset, saves on schedule, effects, cure, poison doses, poisoned weapons, cure spells, Delay and Pernicious Poison, Heal treatment, no natural healing while afflicted); left: *Break Enchantment* against curses and neutralizing a poisonous creature or object. Lasting areas phase 1 is done (Entangle, Stinking Cloud, Cloudkill, Black Tentacles, Web, Solid Fog, Silence); phase 2: Grease, Sleet Storm and Spike Growth (movement through the area), Create Pit, fog concealment in the miss chances, Wall of Fire, and Silence centered on a moving creature. Chill Touch's further touches (one per caster level).
+  - **Effects that repeat**: afflictions are done (contracting, onset, saves on schedule, effects, cure, poison doses, poisoned weapons, cure spells, Delay and Pernicious Poison, Heal treatment, no natural healing while afflicted); left: *Break Enchantment* against curses and neutralizing a poisonous creature or object. Lasting areas: phase 1 is done (Entangle, Stinking Cloud, Cloudkill, Black Tentacles, Web, Solid Fog, Silence); phase 2 is done (Grease, Sleet Storm, Spike Growth, Create Pit, fog concealment); left: Wall of Fire, and Silence centered on a moving creature. Chill Touch's further touches (one per caster level).
   - **Higher-level spells**: they already get the rows (spell resistance and saves); their effects come after the 1st-level spells are complete.
 
 ## Planned
@@ -115,7 +115,7 @@ The design reference gives every feat, trait, class and archetype feature, racia
 - **Test tooling.** Nevela's Automation Suite cancels targeted buff spells (such as *Haste*) cast without a target, so tests that cast spells must set a target or use a non-buff spell.
 
 ### Known issues
-- **Test flake: the locked-penalty roll-window test.** "A penalty from another creature's spell is locked like a condition" occasionally fails in a full run (about one run in three) and passes on its own; its failure message now reports the row, the user's GM state and the change's value, to find the cause next time.
+- **Test flake: Staggering Critical's added duration.** "Another hit adds to it" failed once in a full run (5 rounds where at least 6 were expected) and passes on its own; possibly game time moving between the two hits during a full run.
 - **Snap Shot archers don't threaten.** With Snap Shot, an archer threatens squares within 5 feet (more with Improved Snap Shot), which affects flanking and the warning for shooting while threatened. The Snap Shot feat is also missing from the installed compendiums (only the rogue talent of the same name exists).
 
 ### Release readiness

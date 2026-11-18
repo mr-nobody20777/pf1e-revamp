@@ -43,6 +43,13 @@ const BUFFS = {
 };
 const ARROW_COLLECTING = /arrow-collecting/i;
 
+// Other features' miss chances that depend on where the creatures are (fogs: lasting-areas.mjs):
+// fn(defenderToken, attackerToken, { melee, distance }) → [{ chance, label, concealment }]
+const placeSources = [];
+export function registerMissSource(fn) {
+  placeSources.push(fn);
+}
+
 const missBuff = (item) => (item.type === "buff" ? BUFFS[item.name.toLowerCase()] ?? null : null);
 const activeMissBuffs = (actor) => (actor?.itemTypes?.buff ?? []).filter((b) => b.isActive && missBuff(b));
 const hasBuff = (actor, re) => (actor?.itemTypes?.buff ?? []).some((b) => b.isActive && re.test(b.name));
@@ -73,7 +80,7 @@ function isTotalConcealment(actor) {
  * Every miss chance a defender has against this attack.
  * @returns {Array<{ chance: number, label: string, concealment?: boolean, nevela?: boolean }>}
  */
-export function missChances(defender, attacker, item, actionType, { distance = null } = {}) {
+export function missChances(defender, attacker, item, actionType, { distance = null, defenderToken = null, attackerToken = null } = {}) {
   const melee = MELEE.includes(actionType);
   // Seeking: "negating any miss chances that would otherwise apply, such as from concealment" (ranged weapons;
   // the wielder still has to aim at the right square)
@@ -102,6 +109,8 @@ export function missChances(defender, attacker, item, actionType, { distance = n
   else if (defender.statuses.has("invisible") && !seesInvisible(attacker)) {
     candidates.push({ chance: 50, label: "Invisible", concealment: true });
   }
+  // Where they stand (fog between them)
+  if (defenderToken && attackerToken) for (const fn of placeSources) candidates.push(...(fn(defenderToken, attackerToken, { melee, distance }) ?? []));
   // PF1's Concealed condition: Nevela rolls it when present, otherwise we do
   if (defender.statuses.has("concealed")) {
     candidates.push({ chance: nevelaActive() && isTotalConcealment(defender) ? 50 : 20, label: "Concealed", concealment: true, nevela: nevelaActive() });
@@ -191,7 +200,7 @@ Hooks.on("preCreateChatMessage", (message) => {
       for (const token of targets) {
         if (isSpell && hasBuff(token.actor, /^blink$/i)) continue; // spell failure below instead
         const distance = attackerToken?.object && token.object ? tokenDistance(attackerToken.object, token.object) : null;
-        const list = missChances(token.actor, attacker, item, actionType, { distance });
+        const list = missChances(token.actor, attacker, item, actionType, { distance, defenderToken: token, attackerToken });
         if (list.negatedNevela && nevelaActive()) result.nevelaSuperseded = true; // Nevela still rolls its Concealed
         const best = list.reduce((b, c) => (!b || c.chance > b.chance || (c.chance === b.chance && c.nevela) ? c : b), null);
         if (!best) continue;

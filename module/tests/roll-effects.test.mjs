@@ -141,10 +141,13 @@ export function registerRollEffectsTests(quench) {
         });
 
         it("a penalty from another creature's spell is locked like a condition", async () => {
-          const [bane, boon] = await fighter.createEmbeddedDocuments("Item", [
+          const created = await fighter.createEmbeddedDocuments("Item", [
             { name: "Quench Enemy Bane", type: "buff", system: { active: true, changes: [{ formula: "-1", target: "attack", type: "morale" }] }, flags: { [MODULE_ID]: { castBy: "Actor.someoneElse0000" } } },
             { name: "Quench Mixed Gift", type: "buff", system: { active: true, changes: [{ formula: "1", target: "wdamage", type: "luck" }, { formula: "-1", target: "attack", type: "luck" }] }, flags: { [MODULE_ID]: { castBy: "Actor.someoneElse0000" } } },
           ]);
+          // By name: the created documents don't always come back in the order given
+          const bane = created.find((b) => b.name === "Quench Enemy Bane");
+          const boon = created.find((b) => b.name === "Quench Mixed Gift");
           try {
             const { dialog, done } = await openAttack(sword);
             dialog.element[0].querySelector("[data-action=manage]").click();

@@ -3,6 +3,7 @@
 
 import { createTestActor, cleanup, useTestScene, placeToken, deleteTokens, waitFor } from "./helpers.mjs";
 import * as LA from "../lasting-areas.mjs";
+import { missChances } from "../miss-chance.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -47,7 +48,7 @@ export function registerLastingAreaTests(quench) {
           for (const t of templates.splice(0)) if (canvas.scene.templates.has(t.id)) await t.delete();
           await out(tokens.walker);
           for (const a of [walker, small, undead]) {
-            await a.setConditions({ entangled: false, nauseated: false, grappled: false, dead: false });
+            await a.setConditions({ entangled: false, nauseated: false, grappled: false, dead: false, prone: false });
             const buffs = a.itemTypes.buff.map((b) => b.id);
             if (buffs.length) await a.deleteEmbeddedDocuments("Item", buffs);
             await a.update({ "system.abilities.con.damage": 0, "system.attributes.hp.value": a.system.attributes.hp.max });
@@ -115,7 +116,8 @@ export function registerLastingAreaTests(quench) {
           const hp = walker.system.attributes.hp.value;
           await into(tokens.walker);
           await waitFor(() => walker.statuses.has("grappled"), { what: "grappled" });
-          assert.isBelow(walker.system.attributes.hp.value, hp - 4);
+          // The 1d6+4 lands just after the grapple: wait for it
+          await waitFor(() => walker.system.attributes.hp.value < hp - 4, { what: "the tentacles' damage" });
         });
 
         it("solid fog: −2 on melee attacks and damage while inside, gone on leaving", async () => {
@@ -127,11 +129,50 @@ export function registerLastingAreaTests(quench) {
           await waitFor(() => !walker.itemTypes.buff.some((b) => /Solid Fog/.test(b.name)), { what: "the buff gone" });
         });
 
+        it("grease: moving in needs DC 10 Acrobatics; failing by 5 or more is a fall", async () => {
+          await area("grease", "Grease");
+          forceDice(0.999);
+          await into(tokens.walker);
+          await waitFor(() => walker.statuses.has("prone"), { what: "fell" });
+        });
+
+        it("spike growth: piercing damage for the feet moved through it, then a Reflex save or half speed", async () => {
+          await area("spikeGrowth", "Spike Growth");
+          const hp = walker.system.attributes.hp.value;
+          forceDice(0.999);
+          await into(tokens.walker);
+          await waitFor(() => walker.itemTypes.buff.some((b) => /Spike Growth injury/.test(b.name)), { what: "slowed" });
+          assert.isBelow(walker.system.attributes.hp.value, hp);
+        });
+
+        it("create pit: a creature walking in falls (1d6 per 10 feet of depth) and is prone", async () => {
+          await area("createPit", "Create Pit");
+          const hp = walker.system.attributes.hp.value;
+          await into(tokens.walker);
+          await waitFor(() => walker.statuses.has("prone"), { what: "in the pit" });
+          assert.isBelow(walker.system.attributes.hp.value, hp);
+        });
+
+        it("fog: 20% concealment within 5 feet, 50% beyond, also seen through the fog", async () => {
+          await area("fogCloud", "Fog Cloud");
+          await into(tokens.walker);
+          await waitFor(() => LA._test.zoneOf(templates.at(-1))?.inside?.length || true);
+          const near = missChances(walker, small, null, "mwak", { distance: 5, defenderToken: tokens.walker, attackerToken: tokens.small }).find((c) => /Fog Cloud/.test(c.label));
+          const far = missChances(walker, caster, null, "rwak", { distance: 30, defenderToken: tokens.walker, attackerToken: tokens.caster }).find((c) => /Fog Cloud/.test(c.label));
+          assert.equal(near?.chance, 20);
+          assert.equal(far?.chance, 50);
+          await out(tokens.walker);
+          const clear = missChances(walker, caster, null, "rwak", { distance: 15, defenderToken: tokens.walker, attackerToken: tokens.caster }).find((c) => /Fog Cloud/.test(c.label));
+          assert.isUndefined(clear, "no fog between them");
+        });
+
         it("the spell ends: its template goes and what it held is released", async () => {
           const t = await area("entangle", "Entangle");
           forceDice(0.999);
           await into(tokens.walker);
           await waitFor(() => walker.statuses.has("entangled"), { what: "entangled" });
+          // The area records what it holds just after applying it: wait for that
+          await waitFor(() => Object.values(LA._test.zoneOf(canvas.scene.templates.get(t.id))?.creatures ?? {}).some((c) => c.held?.includes("entangled")), { what: "the area's record" });
           CONFIG.Dice.randomUniform = originalRandom;
           await LA._test.endZone(canvas.scene.templates.get(t.id));
           assert.isFalse(canvas.scene.templates.has(t.id));

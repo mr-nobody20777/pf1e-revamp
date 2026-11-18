@@ -32,6 +32,21 @@
 //   - Solid fog: "Creatures moving through a solid fog move at half their normal speed and take a -2 penalty on
 //     all melee attack and melee damage rolls ... A creature cannot take a 5-foot-step while in solid fog."
 //   - Silence: "spells with verbal components cannot be cast" in the area.
+//   - Grease: "Any creature in the area when the spell is cast must make a successful Reflex save or fall. A
+//     creature can walk within or through the area of grease at half normal speed with a DC 10 Acrobatics
+//     check. Failure means it can't move that round (and must then make a Reflex save or fall), while failure
+//     by 5 or more means it falls". Sleet storm: the same check, without the Reflex save; "blocks all sight".
+//   - Spike growth: "Any creature moving on foot into or through the spell's area takes 1d4 points of piercing
+//     damage for each 5 feet of movement through the spiked area. Any creature that takes damage from this
+//     spell must also succeed on a Reflex save or suffer injuries to its feet and legs that slow its land speed
+//     by half. This speed penalty lasts for 24 hours".
+//   - Create pit: "Any creature standing in the area where you first conjured the pit must make a Reflex saving
+//     throw to avoid falling into it ... any creature ending its turn on a square adjacent to the pit must make
+//     a Reflex saving throw with a +2 bonus to avoid falling into it ... Creatures who fall into the pit take
+//     falling damage as normal." Depth: 10 feet per two caster levels (maximum 30 feet).
+//   - Fog cloud (obscuring mist, solid fog, stinking cloud, cloudkill): "A creature within 5 feet has
+//     concealment (attacks have a 20% miss chance). Creatures farther away have total concealment (50% miss
+//     chance". Fog between the two counts as well as fog around either.
 // Rulings (2026-11-17): the template is removed when the spell ends, with a note to the GM; entering creatures'
 // saves and checks are rolled automatically, with an Undo; (phase 2, movement through an area: the straight
 // line from where the move started to where it ended).
@@ -39,6 +54,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { esc, isActiveGM, saveResult, rollTotal, timed } from "./util.mjs";
 import { creatureTypes } from "./creature-types.mjs";
+import { registerMissSource } from "./miss-chance.mjs";
 
 const FLAG = "lastingArea"; // template flag: the area's state (below)
 const LINK = "lastingAreaLink"; // buff flag: the template's uuid
@@ -65,12 +81,14 @@ const SPELLS = {
   },
   stinkingCloud: {
     names: ["stinking cloud"],
+    fog: "fog",
     enter: async (c) => (!living(c.actor) ? c.note("not living: unaffected") : poisonImmune(c.actor) ? c.note("immune to poison") : c.saveOrHold("fort", ["nauseated"])),
     casterTurnStart: async (c) => (!living(c.actor) || poisonImmune(c.actor) || c.holds("nauseated") ? null : c.saveOrHold("fort", ["nauseated"])),
     leave: async (c) => c.release(["nauseated"], "1d4+1"),
   },
   cloudkill: {
     names: ["cloudkill"],
+    fog: "fog",
     enter: async (c) => {
       if (!living(c.actor) || poisonImmune(c.actor)) return c.note("unaffected (not living, or immune to poison)");
       const hd = hdOf(c.actor);
@@ -104,8 +122,32 @@ const SPELLS = {
     enter: async (c) => (c.atCasting ? c.saveOrHold("ref", ["grappled"]) : c.webMove()),
     leave: async (c) => c.release(["grappled"]),
   },
+  grease: {
+    names: ["grease"],
+    enter: async (c) => (c.atCasting ? c.saveOrFall("ref") : c.footing({ save: true })),
+    moved: async (c) => c.footing({ save: true }),
+  },
+  sleetStorm: {
+    names: ["sleet storm"],
+    fog: "total",
+    enter: async (c) => (c.atCasting ? null : c.footing({ save: false })),
+    moved: async (c) => c.footing({ save: false }),
+  },
+  spikeGrowth: {
+    names: ["spike growth"],
+    enter: async (c) => (c.atCasting ? null : c.spikes()),
+    moved: async (c) => c.spikes(),
+  },
+  createPit: {
+    names: ["create pit"],
+    enter: async (c) => (c.atCasting ? c.saveOrPit(0) : c.pit("walked into the pit")),
+    adjacentTurnEnd: async (c) => c.saveOrPit(2),
+  },
+  fogCloud: { names: ["fog cloud"], fog: "fog" },
+  obscuringMist: { names: ["obscuring mist"], fog: "fog" },
   solidFog: {
     names: ["solid fog"],
+    fog: "fog",
     buff: { changes: [{ formula: "-2", target: "mattack", type: "untyped" }, { formula: "-2", target: "mdamage", type: "untyped" }], note: "half speed; no 5-foot step; ranged weapon attacks don't work (rays do)" },
   },
   silence: {
@@ -123,23 +165,47 @@ export const LASTING_SPELLS = new Set(BY_NAME.keys());
 
 /** Is the token's center inside the template? Circles and rectangles by their numbers; other shapes by the canvas. */
 export function insideTemplate(template, token) {
+  const size = template.parent.grid.size;
+  return insidePoint(template, token.x + (token.width * size) / 2, token.y + (token.height * size) / 2);
+}
+/** Is a point (canvas pixels) inside the template? `pad` widens it (pixels): next to the area. */
+export function insidePoint(template, cx, cy, pad = 0) {
   const scene = template.parent;
-  const size = scene.grid.size;
-  const toPx = (d) => (d / scene.grid.distance) * size;
-  const cx = token.x + (token.width * size) / 2;
-  const cy = token.y + (token.height * size) / 2;
+  const toPx = (d) => (d / scene.grid.distance) * scene.grid.size;
   const t = template.t;
-  if (t === "circle") return Math.hypot(cx - template.x, cy - template.y) <= toPx(template.distance) + 1;
+  if (t === "circle") return Math.hypot(cx - template.x, cy - template.y) <= toPx(template.distance) + 1 + pad;
   if (t === "rect") {
     const len = toPx(template.distance);
     const a = Math.toRadians(template.direction);
     const x2 = template.x + len * Math.cos(a);
     const y2 = template.y + len * Math.sin(a);
-    return cx >= Math.min(template.x, x2) - 1 && cx <= Math.max(template.x, x2) + 1 && cy >= Math.min(template.y, y2) - 1 && cy <= Math.max(template.y, y2) + 1;
+    const p = 1 + pad;
+    return cx >= Math.min(template.x, x2) - p && cx <= Math.max(template.x, x2) + p && cy >= Math.min(template.y, y2) - p && cy <= Math.max(template.y, y2) + p;
   }
   const shape = template.object?.shape;
   return !!shape?.contains?.(cx - template.x, cy - template.y);
 }
+
+/** How many feet of the straight line from (x1, y1) to (x2, y2) run inside the template. */
+function feetInside(template, x1, y1, x2, y2) {
+  const scene = template.parent;
+  const len = Math.hypot(x2 - x1, y2 - y1);
+  if (!len) return 0;
+  const steps = Math.max(1, Math.ceil(len / (scene.grid.size / 10)));
+  let inside = 0;
+  for (let i = 0; i < steps; i++) {
+    const f = (i + 0.5) / steps;
+    if (insidePoint(template, x1 + (x2 - x1) * f, y1 + (y2 - y1) * f)) inside++;
+  }
+  return (inside / steps) * (len / scene.grid.size) * scene.grid.distance;
+}
+
+// Where each token stood at the last recheck: the start of its next move (for Spike Growth)
+const lastPos = new Map(); // token uuid → { x, y } (center)
+const centerOf = (token) => {
+  const size = token.parent.grid.size;
+  return { x: token.x + (token.width * size) / 2, y: token.y + (token.height * size) / 2 };
+};
 
 const zoneOf = (template) => template?.flags?.[MODULE_ID]?.[FLAG] ?? null;
 const zonesIn = (scene) => (scene?.templates ?? []).filter((t) => zoneOf(t));
@@ -150,7 +216,7 @@ const tokenActor = (token) => token?.actor ?? null;
 /* -------------------------------------------- */
 
 /** The context a spell's handlers get for one creature; collects what happened for the card and its Undo. */
-function context(template, zone, token, { atCasting = false, lines, undo }) {
+function context(template, zone, token, { atCasting = false, lines, undo, ...opts }) {
   const actor = tokenActor(token);
   const state = (zone.creatures ??= {})[token.id] ??= { held: [], marks: [] };
   const record = { actor: actor.uuid, conditions: [], damage: 0, con: 0 };
@@ -226,6 +292,55 @@ function context(template, zone, token, { atCasting = false, lines, undo }) {
       if (total < zone.dc) await c.hold(["grappled"]);
     },
     enter: () => SPELLS[zone.key].enter?.(c),
+    async fall(text) {
+      if (!actor.statuses.has("prone")) {
+        await actor.setConditions({ prone: true });
+        record.conditions.push("prone");
+      }
+      line(text);
+    },
+    async saveOrFall(type) {
+      if (!(await c.save(type))) await c.fall("falls prone");
+    },
+    /** Grease, sleet storm: DC 10 Acrobatics to move; failing stops it (and with grease a Reflex save or a fall), by 5 or more it falls. */
+    async footing({ save }) {
+      const check = await actor.rollSkill("acr", { skipDialog: true });
+      const total = check?.rolls?.[0]?.total ?? check?.total ?? 0;
+      line(`Acrobatics ${total} vs DC 10`);
+      if (total >= 10) return;
+      if (total <= 5) return c.fall("fails by 5 or more: falls prone");
+      line("can't move this round");
+      if (save) await c.saveOrFall("ref");
+    },
+    /** Spike growth: 1d4 piercing per 5 feet moved through the area, then a Reflex save or half land speed for 24 hours. */
+    async spikes() {
+      const to = centerOf(token);
+      const from = opts.from ?? to;
+      const feet = Math.max(5, Math.round(feetInside(template, from.x, from.y, to.x, to.y)));
+      const n = Math.max(1, Math.floor(feet / 5));
+      const dmg = await rollTotal(`${n}d4`);
+      await actor.applyDamage(dmg, { forceDialog: false });
+      record.damage += dmg;
+      line(`${feet} feet through the spikes: ${dmg} piercing damage`);
+      if (actor.itemTypes.buff.some((b) => b.isActive && /^spike growth injury/i.test(b.name))) return;
+      if (await c.save("ref")) return;
+      await actor.createEmbeddedDocuments("Item", [{ name: "Spike Growth injury", type: "buff", img: "icons/svg/trap.svg", system: { active: true, subType: "temp", duration: { value: "24", units: "hour" }, contextNotes: [{ text: "Land speed halved (feet and legs injured by spike growth) until the 24 hours pass or a cure spell heals it", target: "attack" }] } }]);
+      line("land speed halved for 24 hours");
+    },
+    /** Create pit: falling in (1d6 per 10 feet of depth) and prone. */
+    async pit(text) {
+      const depth = Math.min(30, 10 * Math.max(1, Math.floor(zone.cl / 2)));
+      const dmg = await rollTotal(`${depth / 10}d6`);
+      await actor.applyDamage(dmg, { forceDialog: false });
+      record.damage += dmg;
+      await c.fall(`${text}: falls ${depth} feet, ${dmg} damage, prone`);
+    },
+    async saveOrPit(bonus) {
+      const result = await actor.rollSavingThrow("ref", { skipDialog: true, dc: zone.dc, reference: zone.message, bonus: bonus ? `${bonus}[Pit's edge]` : undefined });
+      const r = saveResult(result, zone.dc);
+      line(`Reflex ${r.total ?? "?"} vs DC ${zone.dc}${bonus ? " (+2 at the edge)" : ""}: ${r.passed ? "saved" : "failed"}`);
+      if (!r.passed) await c.pit("falls into the pit");
+    },
   };
   return c;
 }
@@ -316,10 +431,20 @@ async function recheck(template) {
   const now = template.parent.tokens.filter((t) => tokenActor(t) && !t.hidden && insideTemplate(template, t)).map((t) => t.id);
   const entered = now.filter((id) => !zone.inside.includes(id)).map((id) => template.parent.tokens.get(id));
   const left = zone.inside.filter((id) => !now.includes(id)).map((id) => template.parent.tokens.get(id)).filter(Boolean);
-  if (!entered.length && !left.length) return;
-  await template.update({ [`flags.${MODULE_ID}.${FLAG}.inside`]: now });
+  // Creatures that stayed inside but moved (grease, sleet storm, spike growth)
+  const pos = zone.pos ?? {};
+  const key = (t) => `${Math.round(t.x)},${Math.round(t.y)}`;
+  const moved = SPELLS[zone.key].moved ? now.filter((id) => zone.inside.includes(id) && pos[id] && pos[id] !== key(template.parent.tokens.get(id))).map((id) => template.parent.tokens.get(id)) : [];
+  const nextPos = Object.fromEntries(now.map((id) => [id, key(template.parent.tokens.get(id))]));
+  if (!entered.length && !left.length && !moved.length) {
+    if (JSON.stringify(nextPos) !== JSON.stringify(pos)) await template.update({ [`flags.${MODULE_ID}.${FLAG}.pos`]: nextPos });
+    return;
+  }
+  await template.update({ [`flags.${MODULE_ID}.${FLAG}.inside`]: now, [`flags.${MODULE_ID}.${FLAG}.-=pos`]: null });
+  await template.update({ [`flags.${MODULE_ID}.${FLAG}.pos`]: nextPos });
   if (left.length) await act(template, left, "leave", "left the area");
-  if (entered.length) await act(template, entered, "enter", "entered the area");
+  for (const token of entered) await act(template, [token], "enter", "entered the area", { from: lastPos.get(token.uuid) });
+  for (const token of moved) await act(template, [token], "moved", "moved in the area", { from: lastPos.get(token.uuid) });
 }
 
 const pending = new Map(); // scene id → timer: one recheck after a burst of movement
@@ -329,6 +454,7 @@ function soon(scene) {
   pending.set(scene.id, setTimeout(async () => {
     pending.delete(scene.id);
     for (const template of zonesIn(scene)) await recheck(template);
+    for (const token of scene.tokens) lastPos.set(token.uuid, centerOf(token));
   }, 300));
 }
 Hooks.on("updateToken", (token, changes) => {
@@ -351,6 +477,12 @@ Hooks.on("updateCombat", async (combat, changes, options) => {
     const zone = zoneOf(template);
     const inside = zone.inside.map((id) => scene.tokens.get(id)).filter(Boolean);
     const spell = SPELLS[zone.key];
+    // Create pit: a creature ending its turn next to the pit (not in it)
+    if (spell.adjacentTurnEnd && ended) {
+      const pad = scene.grid.size;
+      const next = scene.tokens.filter((t) => t.actor === ended && !zone.inside.includes(t.id) && insidePoint(template, centerOf(t).x, centerOf(t).y, pad));
+      if (next.length) await act(template, next, "adjacentTurnEnd", "ended its turn at the edge");
+    }
     if (ended?.uuid === zone.caster && spell.casterTurnEnd && inside.length) await act(template, inside, "casterTurnEnd", "end of the caster's turn");
     if (started?.uuid === zone.caster && (spell.casterTurnStart || spell.roll) && inside.length) await act(template, inside, "casterTurnStart", "the caster's turn", { newRound: true });
   }
@@ -408,4 +540,24 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   });
 });
 
-export const _test = { FLAG, SPELLS, insideTemplate, recheck, endZone, act, zoneOf };
+// Fogs: concealment for creatures in, or seen through, a fog's area (miss-chance.mjs rolls it)
+registerMissSource((defender, attacker, { distance }) => {
+  const scene = defender.parent;
+  if (!scene || attacker.parent !== scene) return [];
+  const a = centerOf(attacker);
+  const d = centerOf(defender);
+  const out = [];
+  for (const template of zonesIn(scene)) {
+    const zone = zoneOf(template);
+    const fog = SPELLS[zone.key]?.fog;
+    if (!fog) continue;
+    const through = insidePoint(template, a.x, a.y) || insidePoint(template, d.x, d.y) || feetInside(template, a.x, a.y, d.x, d.y) > 0;
+    if (!through) continue;
+    const near = (distance ?? Infinity) <= 5;
+    const chance = fog === "total" || !near ? 50 : 20;
+    out.push({ chance, label: `${zone.name} (${chance === 50 ? "total concealment" : "concealment"})`, concealment: true });
+  }
+  return out;
+});
+
+export const _test = { FLAG, SPELLS, insideTemplate, insidePoint, feetInside, recheck, endZone, act, zoneOf };

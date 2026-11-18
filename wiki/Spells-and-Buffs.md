@@ -76,6 +76,9 @@ With **Nevela's Automation Suite**, a spell buff that Nevela applies itself is l
 - **Every round:** on the caster's turn, *Entangle* (end of the turn) and *Stinking Cloud* give another save to those who saved and stayed; *Cloudkill* deals 1d4 Con; *Black Tentacles* rolls once for everyone inside.
 - **While inside:** *Solid Fog* gives −2 on melee attacks and damage, and *Silence* a reminder that spells with verbal components can't be cast, as a buff that goes when the creature leaves. Entangled, grappled and nauseated end on leaving (*Stinking Cloud*'s nausea lasts 1d4+1 rounds more).
 - **Ending:** when the spell's duration has passed, its template is removed and everyone it held is released; deleting the template by hand does the same.
+- **Moving through:** *Grease* and *Sleet Storm* ask for DC 10 Acrobatics each time a creature moves in them (failing stops it; failing by 5 or more, or a failed Reflex save on *Grease*, is a fall). *Spike Growth* deals 1d4 piercing per 5 feet moved through it (the straight line of the move), then a Reflex save or half land speed for 24 hours.
+- ***Create Pit*:** creatures in it at the casting save or fall in (1d6 per 10 feet of depth, prone); one walking in falls; one ending its turn next to it saves at +2.
+- **Fog:** *Fog Cloud*, *Obscuring Mist*, *Solid Fog*, *Stinking Cloud* and *Cloudkill* give concealment (20% within 5 feet, 50% beyond) when either creature is in the fog or it lies between them; *Sleet Storm* gives 50%. The miss chance is rolled with the others.
 
 ## Saves against abilities
 Abilities that aren't spells but have a saving throw (class abilities and hexes, monster and template abilities, racial traits, alchemical items and technology) get the same rows when used with targets: each creature rolls its save from its row, and a failed save applies what the ability's text describes.

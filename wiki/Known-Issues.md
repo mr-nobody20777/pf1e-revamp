@@ -4,7 +4,7 @@ Current limitations. If you hit something not listed here, please [open an issue
 
 ## Spells
 - **Players can see an NPC's save total** on a spell's row, and on PF1's save card when the GM rolls publicly. Roll NPC saves as a GM or blind roll to keep them private. Hiding the number from players is planned.
-- **Grease**'s and **Sleet Storm**'s Acrobatics checks, **Spike Growth**'s damage while moving, **Command**'s chosen command and splitting **Magic Missile** between targets are left to the GM.
+- **Wall of Fire**, **Silence** centered on a moving creature, **Command**'s chosen command and splitting **Magic Missile** between targets are left to the GM.
 - **New saves to end an effect** (Hideous Laughter, Mudball and others) are offered on the creature's turn in combat only.
 
 ## Rules the module can't judge
