@@ -44,6 +44,7 @@ import { registerWeaponSpellTests } from "./weapon-spells.test.mjs";
 import { registerWornMagicTests } from "./worn-magic.test.mjs";
 import { registerTypedPenaltyTests } from "./typed-penalties.test.mjs";
 import { registerAfflictionTests } from "./afflictions.test.mjs";
+import { registerLastingAreaTests } from "./lasting-areas.test.mjs";
 
 export function registerTests(quench) {
   registerTwoWeaponTests(quench);
@@ -68,6 +69,7 @@ export function registerTests(quench) {
   registerWornMagicTests(quench);
   registerTypedPenaltyTests(quench);
   registerAfflictionTests(quench);
+  registerLastingAreaTests(quench);
   registerQuarryTests(quench);
   registerTrueStrikeTests(quench);
   registerMissChanceTests(quench);

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### New
+- **Lasting areas.** *Entangle*, *Stinking Cloud*, *Cloudkill*, *Black Tentacles*, *Web*, *Solid Fog* and *Silence* keep working on the creatures in their area for the spell's duration. Creatures inside at the casting and those moving in later make the spell's save (or the tentacles' grapple check, or a check to move into a web), with a card and an Undo; on the caster's turn, those who saved and stayed in *Entangle* or *Stinking Cloud* save again, *Cloudkill* deals its Constitution damage and *Black Tentacles* rolls once for everyone inside. *Solid Fog*'s −2 and *Silence* apply while inside; entangled, grappled and nauseated end on leaving (*Stinking Cloud*'s nausea lasts 1d4+1 rounds more). When the duration ends the template is removed and everyone is released.
+
 ## 0.24.0: poison, disease and curses; typed penalties
 
 ### New

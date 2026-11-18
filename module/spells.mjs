@@ -49,6 +49,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { cureAfflictions } from "./afflictions.mjs";
+import { LASTING_SPELLS } from "./lasting-areas.mjs";
 import { SPELLS } from "./spell-data.mjs";
 import { abilityDef } from "./ability-effects.mjs";
 import { creatureTypes, energyAsUndead } from "./creature-types.mjs";
@@ -122,7 +123,8 @@ Hooks.on("preCreateChatMessage", (message) => {
   if (message.type !== "action") return;
   const item = message.itemSource;
   const spellName = spellNameOf(item);
-  if (spellName && HANDLED_ELSEWHERE.has(spellName.toLowerCase())) return;
+  // Lasting areas (lasting-areas.mjs) act on the creatures inside at the casting and on those entering later
+  if (spellName && (HANDLED_ELSEWHERE.has(spellName.toLowerCase()) || LASTING_SPELLS.has(spellName.toLowerCase()))) return;
   const action = item?.actions?.get(message.system.action?.id);
   const save = message.system.save?.type ? { type: message.system.save.type, dc: message.system.save.dc } : null;
   // An ability that isn't a spell: only with a save PF1 worked out, and not channel energy (its own flow)

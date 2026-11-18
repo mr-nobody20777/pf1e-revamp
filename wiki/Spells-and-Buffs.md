@@ -70,6 +70,13 @@ Not automated: Entangle's saves while a creature stays in the area, Grease's Acr
 
 With **Nevela's Automation Suite**, a spell buff that Nevela applies itself is left to Nevela, and the row says so. PF1e Revamp applies the buffs Nevela doesn't have. See [Compatibility](Compatibility).
 
+## Lasting areas
+*Entangle*, *Stinking Cloud*, *Cloudkill*, *Black Tentacles*, *Web*, *Solid Fog* and *Silence* keep working for their whole duration. Their template is tracked from the casting, and the GM's game checks who is inside whenever a token or the template moves:
+- **Casting and entering:** creatures inside when the spell is cast, and those that move in later, make its save (or, for *Black Tentacles*, face the tentacles' grapple check; for *Web*, a combat maneuver or Escape Artist check when moving in), and the result is applied. A card lists what happened, with an **Undo** for the GM.
+- **Every round:** on the caster's turn, *Entangle* (end of the turn) and *Stinking Cloud* give another save to those who saved and stayed; *Cloudkill* deals 1d4 Con; *Black Tentacles* rolls once for everyone inside.
+- **While inside:** *Solid Fog* gives −2 on melee attacks and damage, and *Silence* a reminder that spells with verbal components can't be cast, as a buff that goes when the creature leaves. Entangled, grappled and nauseated end on leaving (*Stinking Cloud*'s nausea lasts 1d4+1 rounds more).
+- **Ending:** when the spell's duration has passed, its template is removed and everyone it held is released; deleting the template by hand does the same.
+
 ## Saves against abilities
 Abilities that aren't spells but have a saving throw (class abilities and hexes, monster and template abilities, racial traits, alchemical items and technology) get the same rows when used with targets: each creature rolls its save from its row, and a failed save applies what the ability's text describes.
 - **Read from the text**: the condition and its duration ("Fortitude save or be paralyzed for 1d4 rounds", "staggers creatures for 1 round and deafens them for 1d4 rounds"), permanent effects, and what a successful save leaves ("reduces this to dazzled for 1d4 rounds"). The item's note shows what its rows will apply.
