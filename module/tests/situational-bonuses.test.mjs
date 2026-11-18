@@ -102,6 +102,16 @@ export function registerSituationalBonusTests(quench) {
           await actor.items.getName("Pure Faith").delete();
         });
 
+        it("description skill bonuses are listed to tick on the skill (Maze Expert on Survival)", async () => {
+          await actor.createEmbeddedDocuments("Item", [{ name: "Maze Expert", type: "feat", system: { subType: "feat" } }]);
+          const e = entry(SB._test.collect(actor, { kind: "skill", skillId: "sur" }), "Maze Expert");
+          assert.isOk(e);
+          assert.isFalse(e.applies);
+          assert.equal(e.roll, 4);
+          assert.isUndefined(entry(SB._test.collect(actor, { kind: "skill", skillId: "per" }), "Maze Expert"), "only on Survival");
+          await actor.items.getName("Maze Expert").delete();
+        });
+
         it("features the module automates on their own are skipped (no double count)", async () => {
           await feat("Studied Target", "+[[1]] to attack and damage against studied target", "meleeWeapon");
           assert.isUndefined(entry(attack(), "Studied Target"));
