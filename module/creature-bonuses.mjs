@@ -21,7 +21,7 @@
 // it's counted once.
 
 import { MODULE_ID, MELEE_ATTACKS, RANGED_ATTACKS } from "./const.mjs";
-import { esc, evaluate, titleFor, addSearch } from "./util.mjs";
+import { esc, evaluate, titleFor, addSearch, notesOf } from "./util.mjs";
 import { registerRollEffect, rollPlan, highestOfType } from "./roll-effects.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { parseCreatures, matchesCreatures, mentionsCreatures, creatureTypes, typeKey } from "./creature-types.mjs";
@@ -92,9 +92,10 @@ export function creatureBonuses(actor, noteTargets) {
   const out = [];
   const racialSeen = new Set();
   for (const item of actor?.items ?? []) {
-    if (item.isActive === false || !item.system.contextNotes?.length || isWard(item)) continue;
+    const notes = notesOf(item);
+    if (item.isActive === false || !notes.length || isWard(item)) continue;
     const racialSource = item.type === "race" || item.system.subType === "racial";
-    for (const note of item.system.contextNotes) {
+    for (const note of notes) {
       if (!noteTargets.includes(note.target)) continue;
       for (const line of noteLines(note.text ?? "")) {
         const p = parseLine(line);

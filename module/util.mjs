@@ -1,6 +1,7 @@
 // Helpers shared across PF1e Revamp's features.
 
 import { MODULE_ID } from "./const.mjs";
+import { DESCRIPTION_NOTES } from "./situational-data.mjs";
 
 /** A window title naming the creature it acts for, like PF1's own ("Attack (Longsword) – Kestrel"). */
 export const titleFor = (title, actor) => (actor?.name ? `${title} – ${actor.name}` : title);
@@ -273,6 +274,16 @@ export function registerHandledFeatures(...patterns) {
 }
 /** Does another feature of the module already apply this item's bonuses? */
 export const handledFeature = (item) => handled.some((re) => re.test(item?.name ?? ""));
+
+/**
+ * An item's notes: its own context notes, and the ones its description states that PF1 left out
+ * (situational-data.mjs, reviewed by hand). Every note reader goes through this.
+ */
+export function notesOf(item) {
+  const own = item?.system?.contextNotes ?? [];
+  const extra = DESCRIPTION_NOTES[item?.name?.toLowerCase?.() ?? ""];
+  return extra ? [...own, ...extra] : own;
+}
 
 /** The creature's active buff whose name matches (Rage, Delay Poison, Blur...), or null. */
 export const activeBuff = (actor, re) => (actor?.itemTypes?.buff ?? []).find((b) => b.isActive && re.test(b.name)) ?? null;

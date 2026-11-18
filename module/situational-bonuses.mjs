@@ -11,15 +11,15 @@
 // automates (util.handledFeature) are skipped, so nothing counts twice.
 
 import { MODULE_ID, MELEE_ATTACKS } from "./const.mjs";
-import { evaluate, handledFeature, tokenDistance } from "./util.mjs";
+import { evaluate, handledFeature, tokenDistance, notesOf } from "./util.mjs";
 import { registerRollEffect, highestOfType } from "./roll-effects.mjs";
 import { TYPE_WORDS, noteLines } from "./save-bonuses.mjs";
 import { mentionsCreatures } from "./creature-types.mjs";
 import { isRaging } from "./defenses.mjs";
 
-const MANEUVERS = { grapple: /\bgrappl/, trip: /\btrip\b/, disarm: /\bdisarm/, sunder: /\bsunder/, bullRush: /\bbull rush/, overrun: /\boverrun/, reposition: /\breposition/, drag: /\bdrag\b/, dirtyTrick: /\bdirty trick/, steal: /\bsteal\b/ };
-const TARGET_CONDITIONS = ["grappled", "prone", "helpless", "stunned", "blinded", "entangled", "dazzled", "shaken", "frightened", "sickened", "flat-footed"];
-const STATUS = { blinded: "blind", "flat-footed": "flatFooted" };
+const MANEUVERS = { grapple: /\bgrappl\w*/, trip: /\btrip(s|ping)?\b/, disarm: /\bdisarm\w*/, sunder: /\bsunder\w*/, bullRush: /\bbull rush\w*/, overrun: /\boverrun\w*/, reposition: /\breposition\w*/, drag: /\bdrag(s|ging)?\b/, dirtyTrick: /\bdirty tricks?\b/, steal: /\bsteal(s|ing)?\b/ };
+const TARGET_CONDITIONS = ["grappled", "prone", "helpless", "stunned", "blinded", "entangled", "dazzled", "shaken", "frightened", "sickened", "flat-footed", "bleeding"];
+const STATUS = { blinded: "blind", "flat-footed": "flatFooted", bleeding: "bleed" };
 
 /** The tokens of the roller and its targets, and the roll's window flags. */
 function context(actor, roll) {
@@ -43,7 +43,7 @@ export const SITUATIONS = [
   { id: "noAllyNear", test: (t) => t.match(/\bno (conscious )?all(y|ies) within (\d+) f(ee)?t/), check: (c, m) => { const near = friendsNear(c, Number(m[3]), { conscious: !!m[1] }); return near === null ? null : !near; }, label: (m) => `with no${m[1] ? " conscious" : ""} ally within ${m[3]} feet` },
   { id: "allyAdjacent", test: (t) => t.match(/\b(an )?adjacent all(y|ies)\b|\ball(y|ies) (is |are )?adjacent\b/), check: (c) => friendsNear(c, 5, { conscious: false }), label: () => "with an ally adjacent" },
   { id: "targetCondition", test: (t) => t.match(new RegExp(`\\b(against|vs\\.?) (an? )?(${TARGET_CONDITIONS.join("|")}) (foe|foes|opponent|opponents|creature|creatures|target|targets|enem(y|ies))\\b`)), check: (c, m) => (c.targets.length ? c.targets.every((t) => t.actor.statuses.has(STATUS[m[3]] ?? m[3])) : null), label: (m) => `against ${m[3]} foes` },
-  { id: "maneuver", test: (t) => { const id = Object.keys(MANEUVERS).find((k) => MANEUVERS[k].test(t)); return id ? [id, id] : null; }, check: (c, m) => (c.roll.maneuver ? c.roll.maneuver === m[1] : null), label: (m) => `to ${m[1].replace(/[A-Z]/g, (ch) => ` ${ch.toLowerCase()}`)}` },
+  { id: "maneuver", test: (t) => { const id = Object.keys(MANEUVERS).find((k) => MANEUVERS[k].test(t)); return id ? [t.match(MANEUVERS[id])[0], id] : null; }, check: (c, m) => (c.roll.maneuver ? c.roll.maneuver === m[1] : null), label: (m) => `to ${m[1].replace(/[A-Z]/g, (ch) => ` ${ch.toLowerCase()}`)}` },
 ];
 
 /** The situations a note's wording names: [{ situation, match }], and whether anything else conditions it. */
@@ -59,7 +59,7 @@ export function situationsIn(text) {
 
 const NOTE = /([+-])?\s*\[\[\s*(.+?)\s*\]\]\s*([A-Za-z]+)?\s*(.*)$/;
 // The plain wording of a bonus: anything else in a note is a condition
-const FRAME = /^(bonus(es)?|penalty|penalties|on|to|all|the|your|any|a|an|melee|ranged|weapon|attack|attacks|rolls?|checks?|ac|armor|class|combat|maneuver|cmb|cmd|and|damage|made|skill|it|saves?|saving|throws?|n)$/;
+const FRAME = /^(bonus(es)?|penalty|penalties|on|to|all|the|your|any|a|an|melee|ranged|weapon|attack|attacks|rolls?|checks?|ac|armor|class|combat|maneuver|cmb|cmd|and|damage|made|make|perform|attempts?|skill|it|saves?|saving|throws?|n|when|while|whenever|if|against|vs|you|are|is|at|or|with|in|by|of|that|who|as|for|morale|competence|luck|insight|sacred|profane|dodge|circumstance|racial|trait|untyped)$/;
 const parsed = new Map();
 /** "+[[1]] on attack rolls when flanking." → { formula, type, part, rest, situations } or null (not situational). */
 function parseLine(line) {
@@ -72,6 +72,11 @@ function parseLine(line) {
     // The words after the bonus, with the type word unless it's a bonus type ("+[[4]] to jump": "to" isn't one)
     const rest = `${TYPE_WORDS[typeWord] ? "" : `${m[3] ?? ""} `}${m[4] ?? ""}`.trim();
     const situations = situationsIn(rest);
+    // Anything left once the recognized situations and a bonus's plain wording are taken out is a condition
+    // the module can't check: then the note stays to tick, even when part of it is recognized
+    let left = rest.toLowerCase();
+    for (const { match } of situations) left = left.replace(match[0], " ");
+    const unchecked = left.replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean).some((w) => !FRAME.test(w));
     // Situational when anything is left beyond the plain wording of a bonus ("+[[2]] Competence on attack
     // rolls" isn't: PF1 already counts it)
     const conditional = situations.length || rest.toLowerCase().replace(/[^a-z\s]/g, " ").split(/\s+/).filter(Boolean).some((w) => !FRAME.test(w));
@@ -83,6 +88,7 @@ function parseLine(line) {
         both: /\battack(s)?( rolls?)? and damage\b/i.test(rest),
         rest,
         situations,
+        unchecked,
       };
     }
   }
@@ -110,8 +116,9 @@ const provider = {
     const ctx = context(actor, roll);
     const out = [];
     for (const item of actor.items) {
-      if (item.isActive === false || !item.system.contextNotes?.length || handledFeature(item)) continue;
-      for (const note of item.system.contextNotes) {
+      const notes = notesOf(item);
+      if (item.isActive === false || !notes.length || handledFeature(item)) continue;
+      for (const note of notes) {
         if (!targets.includes(note.target)) continue;
         for (const line of noteLines(note.text ?? "")) {
           const p = parseLine(line);
@@ -120,7 +127,7 @@ const provider = {
           if (!value) continue;
           const parts = roll.kind === "attack" ? (p.both ? ["atk", "dmg"] : [p.part]) : ["roll"];
           const results = p.situations.map(({ situation, match }) => ({ label: situation.label(match), ok: situation.check(ctx, match) }));
-          const known = p.situations.length && results.every((r) => r.ok !== null);
+          const known = p.situations.length && !p.unchecked && results.every((r) => r.ok !== null);
           const applies = known && results.every((r) => r.ok);
           const above = value > 0 ? value - highestOfType(actor, roll, p.type) : value;
           const entry = { id: `situational.${item.id}.${note.target}.${line.length}`, label: item.name, part: item.name, type: p.type, tooltip: line.replace(/\[\[|\]\]/g, "") };

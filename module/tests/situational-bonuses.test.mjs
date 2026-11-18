@@ -2,6 +2,8 @@
 
 import { createTestActor, cleanup, addItems } from "./helpers.mjs";
 import * as SB from "../situational-bonuses.mjs";
+import { creatureBonuses } from "../creature-bonuses.mjs";
+import { notesOf } from "../util.mjs";
 
 export function registerSituationalBonusTests(quench) {
   quench.registerBatch(
@@ -65,6 +67,32 @@ export function registerSituationalBonusTests(quench) {
           const e = entry(attack(), "Quench Opportunist");
           assert.isFalse(e.applies);
           assert.match(e.reason, /tick it/);
+        });
+
+        it("description bonuses (reviewed table): Night Stalker against a flat-footed target", async () => {
+          await actor.createEmbeddedDocuments("Item", [{ name: "Night Stalker", type: "feat", system: { subType: "feat" } }]);
+          assert.lengthOf(notesOf(actor.items.getName("Night Stalker")), 1, "the table's note");
+          const e = entry(attack(), "Night Stalker");
+          assert.isFalse(e.applies, "no target");
+          await actor.items.getName("Night Stalker").delete();
+        });
+
+        it("description bonuses against creatures go to the creature reader (Ancient Tradition vs magical beasts)", async () => {
+          await actor.createEmbeddedDocuments("Item", [{ name: "Ancient Tradition", type: "feat", system: { subType: "feat" } }]);
+          const b = creatureBonuses(actor, ["attack"]).find((x) => x.item.name === "Ancient Tradition");
+          assert.isOk(b);
+          assert.equal(b.part, "dmg");
+          assert.deepEqual(b.spec.types, ["magicalbeast"]);
+          assert.isUndefined(entry(attack(), "Ancient Tradition"), "not listed twice");
+          await actor.items.getName("Ancient Tradition").delete();
+        });
+
+        it("a recognized situation with something else in the note stays to tick (sunder, but only against larger targets)", () => {
+          const p = SB._test.parseLine("+[[4]] on sunder checks against targets larger than you");
+          assert.deepEqual(p.situations.map((s) => s.situation.id), ["maneuver"]);
+          assert.isTrue(p.unchecked);
+          assert.isFalse(SB._test.parseLine("+[[2]] on combat maneuver checks to grapple").unchecked);
+          assert.isFalse(SB._test.parseLine("+[[1]] on attack rolls when flanking.").unchecked);
         });
 
         it("features the module automates on their own are skipped (no double count)", async () => {
