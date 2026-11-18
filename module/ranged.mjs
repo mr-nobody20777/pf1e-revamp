@@ -35,12 +35,12 @@
 // Left for later (they depend on something the module can't see yet): see TODO.md.
 
 import { MODULE_ID, RANGED_ATTACKS } from "./const.mjs";
-import { classLevel, equippedItem, tokenDistance } from "./util.mjs";
+import { classLevel, equippedItem, tokenDistance, activeBuff } from "./util.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 import { CRIT } from "./traits.mjs";
 
 const feat = (actor, re) => (actor?.itemTypes?.feat ?? []).find((f) => f.isActive !== false && re.test(f.name)) ?? null;
-const buff = (actor, re) => (actor?.itemTypes?.buff ?? []).find((b) => b.isActive && re.test(b.name)) ?? null;
+const buff = activeBuff;
 
 /** What kind of ranged weapon an action uses: { thrown, bow, crossbow, sling, names }. */
 function weaponKind(action) {

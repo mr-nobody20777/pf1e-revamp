@@ -9,7 +9,7 @@
 // bypasses any damage reduction the creature might possess." A higher bleed replaces a lower one.
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM, onGmRequest, requestedByOwner } from "./util.mjs";
+import { esc, isActiveGM, onGmRequest, requestedByOwner, gmWhisper, ownerWhisper } from "./util.mjs";
 
 const FLAG = "bleed";
 const HEALED = `${MODULE_ID}BleedHealed`;
@@ -49,7 +49,7 @@ Hooks.on("updateCombat", async (combat, changes, options) => {
   await actor.applyDamage(bleed.amount, { forceDialog: false });
   await ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
-    whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
+    whisper: ownerWhisper(actor),
     content: `<p><strong>${esc(actor.name)}</strong> takes ${bleed.amount} bleed damage${bleed.source ? ` (${esc(bleed.source)})` : ""}. Any healing or a DC 15 Heal check stops it.</p>
       <button type="button" data-action="${MODULE_ID}-stop-bleed">Heal check succeeded: stop the bleeding</button>`,
     flags: { [MODULE_ID]: { bleedTurn: { actor: actor.uuid } } },
@@ -64,7 +64,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   if (!bleedOf(actor)) return button.remove();
   button.addEventListener("click", async () => {
     if (actor.isOwner) await stopBleed(actor);
-    else await ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p>Stop ${esc(actor.name)}'s bleeding (Heal check)…</p>`, flags: { [MODULE_ID]: { stopBleed: data.actor } } });
+    else await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p>Stop ${esc(actor.name)}'s bleeding (Heal check)…</p>`, flags: { [MODULE_ID]: { stopBleed: data.actor } } });
     button.remove();
   });
 });

@@ -29,7 +29,7 @@
 // The GM still judges "must be able to see the target ... and reach such a spot": untick it when not.
 
 import { MODULE_ID, RANGED_ATTACKS } from "./const.mjs";
-import { evaluate, classLevel, equippedItem as equipped, tokenDistance } from "./util.mjs";
+import { evaluate, classLevel, equippedItem as equipped, tokenDistance, activeBuff } from "./util.mjs";
 import { registerRollEffect, registerDamageFilter, rollPlan } from "./roll-effects.mjs";
 import { missChances, seesInvisible } from "./miss-chance.mjs";
 import { isIncorporeal } from "./resistance.mjs";
@@ -87,7 +87,7 @@ function bonusDice(actor, action, target, classDice) {
   const out = [];
   const add = (dice, label) => dice > 0 && out.push({ dice, size: 6, label });
   // Sense Vitals: +1d6, +1d6 per 3 caster levels beyond 3rd (max 5d6), with manufactured weapons
-  const vitals = actor.itemTypes.buff.find((b) => b.isActive && /^sense vitals/i.test(b.name));
+  const vitals = activeBuff(actor, /^sense vitals/i);
   if (vitals && action.item?.subType !== "natural") add(Math.min(5, 1 + Math.floor(Math.max(0, (vitals.system.level ?? 3) - 3) / 3)), "Sense Vitals");
   if (classDice || out.length) {
     if (equipped(actor, /armor of the shadow lord/i)) add(1, "Armor of the Shadow Lord");

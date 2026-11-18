@@ -15,7 +15,7 @@
 //     of the Fortunate Soldier, once; Fortified): a button on the card for the target's owner or the GM.
 
 import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
-import { esc, classLevel, onGmRequest, equippedItem as worn, requestedByOwner } from "./util.mjs";
+import { esc, classLevel, onGmRequest, equippedItem as worn, requestedByOwner, activeBuff, gmWhisper } from "./util.mjs";
 import { rollPlan, registerDamageFilter } from "./roll-effects.mjs";
 import { qualitiesOf } from "./magic-arms.mjs";
 
@@ -24,7 +24,7 @@ const FLAG = "fortification";
 const LEVELS = { light: 25, moderate: 50, heavy: 75 };
 
 const feat = (actor, re) => (actor?.itemTypes?.feat ?? []).find((f) => f.isActive !== false && re.test(f.name)) ?? null;
-const buff = (actor, re) => (actor?.itemTypes?.buff ?? []).find((b) => b.isActive && re.test(b.name)) ?? null;
+const buff = activeBuff;
 
 /** The defender's chance to negate a critical hit or sneak attack: { chance, label } or null. */
 export const negatedSneak = (message, index) => {
@@ -176,7 +176,7 @@ Hooks.on("renderChatMessagePF", (message, html) => {
           event.preventDefault();
           button.disabled = true;
           if (game.user.isGM) await negate(message, i, option.key);
-          else await ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p>${esc(target.name)} negates a ${esc(what(a))} (${esc(option.label)})…</p>`, flags: { [MODULE_ID]: { negateHit: { message: message.id, index: i, key: option.key } } } });
+          else await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p>${esc(target.name)} negates a ${esc(what(a))} (${esc(option.label)})…</p>`, flags: { [MODULE_ID]: { negateHit: { message: message.id, index: i, key: option.key } } } });
         });
         div.append(button);
       }

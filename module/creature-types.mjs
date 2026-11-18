@@ -135,6 +135,9 @@ export function creatureTypes(actor) {
  * undead—positive energy harms it, negative energy heals it", dhampirs and others). Channel energy and
  * cure and inflict spells use this; effects that name undead as a type (Disrupt Undead) use the type.
  */
+/** Living: not undead and not a construct ("'living creatures' means all but constructs and undead"). */
+export const isLiving = (actor, types = creatureTypes(actor).types) => !types.has("undead") && !types.has("construct");
+
 export function energyAsUndead(actor) {
   if (!actor) return false;
   if (creatureTypes(actor).types.has("undead")) return true;

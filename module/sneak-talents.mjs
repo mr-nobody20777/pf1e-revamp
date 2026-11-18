@@ -12,7 +12,7 @@
 //   - Same-source bonuses (Offensive Defense, Emboldening Strike) don't stack: a new hit refreshes them.
 
 import { MODULE_ID, MELEE_ATTACKS } from "./const.mjs";
-import { esc, classLevel, onGmRequest, equippedItem, requestedByOwner, timed, saveResult, applyCondition } from "./util.mjs";
+import { esc, classLevel, onGmRequest, equippedItem, requestedByOwner, timed, saveResult, applyCondition, gmWhisper } from "./util.mjs";
 import { rollPlan } from "./roll-effects.mjs";
 import { precisionImmune } from "./resistance.mjs";
 import { setBleed } from "./bleed.mjs";
@@ -274,7 +274,7 @@ function riderLine(message, data, info, r, i, attacker) {
         event.preventDefault();
         button.disabled = true;
         if (game.user.isGM || (rider.self && attacker?.isOwner)) await applyRider(message, r, i);
-        else await ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p>Applying ${esc(info.name)}…</p>`, flags: { [MODULE_ID]: { applySneakRider: { message: message.id, rider: r, index: i } } } });
+        else await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p>Applying ${esc(info.name)}…</p>`, flags: { [MODULE_ID]: { applySneakRider: { message: message.id, rider: r, index: i } } } });
       });
       div.append(button);
     }

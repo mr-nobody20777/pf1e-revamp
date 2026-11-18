@@ -19,7 +19,7 @@
 // spells that give fast healing (Infernal Healing and Celestial Healing, lesser and greater).
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM } from "./util.mjs";
+import { esc, isActiveGM, ownerWhisper } from "./util.mjs";
 
 const STOPPED = "regenStopped"; // actor flag: the damage types that stop its next regeneration
 const TICK = "healedRound"; // actor flag: `${combat}.${round}` of the last healing, so it heals once a round
@@ -89,7 +89,7 @@ export async function healTurn(actor) {
   const line = `<strong>${esc(actor.name)}</strong> ${esc(text)}.`;
   await ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
-    whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
+    whisper: ownerWhisper(actor),
     content: `<p>${line}</p>`,
   });
   return line;

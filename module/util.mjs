@@ -250,9 +250,33 @@ export async function oncePerRound(actor, flag, combat, round = combat.round) {
 export const steppedBack = (prior, current) => !!prior && !!current && (current.round < prior.round || (current.round === prior.round && current.turn < prior.turn));
 
 /** Users to whisper an actor's prompts to: its player owners, or the GMs if it has none. */
+/** A button for a chat card (the same look everywhere); disabled once clicked. */
+export function cardButton(label, tooltip, onClick) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.textContent = label;
+  b.dataset.tooltip = tooltip;
+  b.style.cssText = "width: auto; line-height: 1.4; margin: 2px 0.25em; padding: 0 6px;";
+  b.addEventListener("click", (event) => {
+    event.preventDefault();
+    b.disabled = true;
+    onClick();
+  });
+  return b;
+}
+
+/** The creature's active buff whose name matches (Rage, Delay Poison, Blur...), or null. */
+export const activeBuff = (actor, re) => (actor?.itemTypes?.buff ?? []).find((b) => b.isActive && re.test(b.name)) ?? null;
+
+/** Recipients of a message for the GM only. */
+export const gmWhisper = () => game.users.filter((u) => u.isGM).map((u) => u.id);
+
+/**
+ * Recipients of a private message about a creature: its owners and every GM. (A GM doesn't see a private
+ * message that isn't addressed to them, unless they wrote it.)
+ */
 export function ownerWhisper(actor) {
-  const owners = game.users.filter((u) => !u.isGM && actor.testUserPermission(u, "OWNER")).map((u) => u.id);
-  return owners.length ? owners : game.users.filter((u) => u.isGM).map((u) => u.id);
+  return game.users.filter((u) => u.isGM || (actor && actor.testUserPermission(u, "OWNER"))).map((u) => u.id);
 }
 
 /** Key of the actor's spellbook for the given class tag ("cleric", "wizard"), if it's in use. */

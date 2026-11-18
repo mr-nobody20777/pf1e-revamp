@@ -27,7 +27,7 @@
 //     slings). A warning, not a block.
 
 import { MODULE_ID, RANGED_ATTACKS } from "./const.mjs";
-import { esc, onGmRequest, requestedByOwner, equippedItem, tokenDistance, saveResult } from "./util.mjs";
+import { esc, onGmRequest, requestedByOwner, equippedItem, tokenDistance, saveResult, activeBuff, gmWhisper, ownerWhisper } from "./util.mjs";
 import { rollPlan } from "./roll-effects.mjs";
 import { rangeChanges } from "./ranged.mjs";
 import { loading } from "./ranged-actions.mjs";
@@ -35,7 +35,7 @@ import { loading } from "./ranged-actions.mjs";
 const FLAG = "rangedDefense";
 const WEAPON_ATTACKS = ["rwak", "twak"]; // ranged weapon attacks (not spells, not maneuvers)
 const feat = (actor, re) => (actor?.itemTypes?.feat ?? []).find((f) => f.isActive !== false && re.test(f.name)) ?? null;
-const buff = (actor, re) => (actor?.itemTypes?.buff ?? []).find((b) => b.isActive && re.test(b.name)) ?? null;
+const buff = activeBuff;
 const enhancement = (action) => Number(action?.item?.system?.enh ?? 0) || 0;
 const isNatural = (action) => action?.item?.subType === "natural";
 
@@ -182,7 +182,7 @@ Hooks.on("renderChatMessagePF", (message, html) => {
           event.preventDefault();
           button.disabled = true;
           if (game.user.isGM) await deflect(message, k, i);
-          else await ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p>${esc(t.name)} deflects a ranged attack (${esc(d.label)})…</p>`, flags: { [MODULE_ID]: { deflectRanged: { message: message.id, target: k, index: i } } } });
+          else await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p>${esc(t.name)} deflects a ranged attack (${esc(d.label)})…</p>`, flags: { [MODULE_ID]: { deflectRanged: { message: message.id, target: k, index: i } } } });
         });
         div.append(button);
         lines.push(div);
@@ -256,7 +256,7 @@ Hooks.on("pf1ApplyDamage", (actor, options) => {
   options.reduction = (options.reduction ?? 0) + absorbed;
   ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
-    whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
+    whisper: ownerWhisper(actor),
     content: `<p>${esc(actor.name)}: ${esc(dr.label)} absorbs ${absorbed} of the ranged weapon damage.</p>`,
   });
   if (dr.pool) {

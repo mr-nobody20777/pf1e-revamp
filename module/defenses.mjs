@@ -18,7 +18,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { evaluate, classLevel, esc, titleFor, wrapMethod } from "./util.mjs"; // classLevel: flag grants
+import { evaluate, classLevel, esc, titleFor, wrapMethod, activeBuff } from "./util.mjs"; // classLevel: flag grants
 import { materialDR, armorGrants } from "./magic-arms.mjs";
 
 const PF1 = "Compendium.pf1.class-abilities.Item.";
@@ -161,9 +161,9 @@ function levelOf(item, def) {
 
 const RAGE = /^(rage|bloodrage|inspired rage|rage \(|raging song: inspired rage)/i;
 /** Is the creature raging (rage, bloodrage, inspired rage, the rage spell)? */
-export const isRaging = (actor) => !!actor?.itemTypes?.buff?.some((b) => b.isActive && RAGE.test(b.name));
+export const isRaging = (actor) => !!activeBuff(actor, RAGE);
 function conditionMet(actor, when) {
-  if (when === "rage") return actor.itemTypes.buff.some((b) => b.isActive && RAGE.test(b.name));
+  if (when === "rage") return isRaging(actor);
   if (when === "armor") return actor.itemTypes.equipment.some((e) => e.system.equipped && ["armor", "shield"].includes(e.system.subType));
   return true;
 }

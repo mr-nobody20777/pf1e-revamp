@@ -24,7 +24,7 @@
 
 import { MODULE_ID, MELEE_ATTACKS as MELEE, RANGED_ATTACKS as RANGED } from "./const.mjs";
 import { registerFootnote } from "./footnote.mjs";
-import { esc, tokenDistance } from "./util.mjs";
+import { esc, tokenDistance, activeBuff } from "./util.mjs";
 import { qualitiesOf } from "./magic-arms.mjs";
 
 
@@ -52,7 +52,7 @@ export function registerMissSource(fn) {
 
 const missBuff = (item) => (item.type === "buff" ? BUFFS[item.name.toLowerCase()] ?? null : null);
 const activeMissBuffs = (actor) => (actor?.itemTypes?.buff ?? []).filter((b) => b.isActive && missBuff(b));
-const hasBuff = (actor, re) => (actor?.itemTypes?.buff ?? []).some((b) => b.isActive && re.test(b.name));
+const hasBuff = (actor, re) => !!activeBuff(actor, re);
 
 const hasTruesight = (actor) => (actor?.system.traits?.senses?.tr?.total ?? 0) > 0 || hasBuff(actor, /^true seeing$/i);
 export const seesInvisible = (actor) => hasTruesight(actor) || hasBuff(actor, /^see invisibility$/i);

@@ -10,7 +10,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { classLevel, isActiveGM, allActors, linkedBuffs, createQueue, stillExists, deleteIfExists, esc, onSceneCatchUp, titleFor } from "./util.mjs";
+import { classLevel, isActiveGM, allActors, linkedBuffs, createQueue, stillExists, deleteIfExists, esc, onSceneCatchUp, titleFor, activeBuff } from "./util.mjs";
 
 const FLAG = "ragingSong";
 const LINK = "songLink";
@@ -110,7 +110,7 @@ function roundsLeft(pool) {
 /** Deafened by the PF1 condition, a buff that applies it, or an active buff named like it. */
 function isDeaf(actor) {
   if (actor.statuses?.has("deaf")) return true;
-  return actor.itemTypes.buff.some((b) => b.isActive && /^deaf(ened)?\b/i.test(b.name));
+  return !!activeBuff(actor, /^deaf(ened)?\b/i);
 }
 
 /* -------------------------------------------- */

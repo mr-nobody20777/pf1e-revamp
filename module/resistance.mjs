@@ -12,7 +12,7 @@
 // Doubling (ratio above 1) keeps resistance first, which is also the more favorable order.
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, wrapMethod } from "./util.mjs";
+import { esc, wrapMethod, activeBuff, ownerWhisper } from "./util.mjs";
 import { creatureTypes } from "./creature-types.mjs";
 import { hasConditionalDR } from "./defenses.mjs";
 import { qualitiesOf, strikesMagically } from "./magic-arms.mjs";
@@ -47,7 +47,7 @@ export function precisionImmune(actor) {
   const { types, subtypes } = creatureTypes(actor);
   if (types.has("ooze") || subtypes.has("elemental") || isIncorporeal(actor)) return true;
   if ((actor.itemTypes?.feat ?? []).some((f) => f.isActive !== false && /^amorphous$/i.test(f.name))) return true;
-  return (actor.itemTypes?.buff ?? []).some((b) => b.isActive && PRECISION_IMMUNE_FORMS.test(b.name));
+  return !!activeBuff(actor, PRECISION_IMMUNE_FORMS);
 }
 
 Hooks.once("setup", () => {
@@ -194,7 +194,7 @@ function incorporealRule(actor, options) {
   else options.ratio = (options.ratio ?? 1) * rule.ratio;
   ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
-    whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
+    whisper: ownerWhisper(actor),
     content: `<p><strong>${esc(actor.name)}</strong> is incorporeal: ${esc(rule.why)}.</p>`,
   });
 }
@@ -267,7 +267,7 @@ function quickApplyResistance(actor, options) {
 
   ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
-    whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
+    whisper: ownerWhisper(actor),
     content: `<p><strong>${esc(actor.name)}</strong> resists ${reduced} damage${halving ? " (after halving)" : ""}: ${esc(notes.join(", "))}. Took ${took}.</p>`,
   });
 }

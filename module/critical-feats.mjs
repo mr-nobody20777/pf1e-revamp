@@ -19,8 +19,8 @@
 // Crippling Critical lowers each speed by half its value when the hit lands.
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, timed, saveResult, onGmRequest, requestedByOwner, isActiveGM, applyCondition } from "./util.mjs";
-import { creatureTypes } from "./creature-types.mjs";
+import { esc, timed, saveResult, onGmRequest, requestedByOwner, isActiveGM, applyCondition, gmWhisper } from "./util.mjs";
+import { creatureTypes, isLiving } from "./creature-types.mjs";
 import { setBleed } from "./bleed.mjs";
 import { negatedSneak } from "./fortification.mjs";
 
@@ -226,7 +226,7 @@ Hooks.on("renderChatMessagePF", (message, html) => {
           event.preventDefault();
           div.querySelectorAll("button").forEach((b) => (b.disabled = true));
           if (game.user.isGM) await applyFeat(message, f, i);
-          else await ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p>Applying ${esc(feat.name)}…</p>`, flags: { [MODULE_ID]: { applyCriticalFeat: { message: message.id, feat: f, index: i } } } });
+          else await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p>Applying ${esc(feat.name)}…</p>`, flags: { [MODULE_ID]: { applyCriticalFeat: { message: message.id, feat: f, index: i } } } });
         });
         div.append(button);
       }
@@ -253,7 +253,7 @@ export async function applyFeat(message, f, index) {
     const { types } = creatureTypes(target);
     const skip = def.skip?.(target);
     if (skip) result = skip;
-    else if (def.save === "fort" && (types.has("undead") || types.has("construct"))) result = "no effect: undead and constructs ignore Fortitude effects";
+    else if (def.save === "fort" && !isLiving(null, types)) result = "no effect: undead and constructs ignore Fortitude effects";
     else {
       let saved = false;
       if (def.save) {

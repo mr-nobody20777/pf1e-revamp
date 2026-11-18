@@ -48,12 +48,12 @@
 // the row says whether the creature takes full or half.
 
 import { MODULE_ID } from "./const.mjs";
-import { remainingSeconds, dealDamage } from "./util.mjs";
+import { remainingSeconds, dealDamage, ownerWhisper } from "./util.mjs";
 import { cureAfflictions } from "./afflictions.mjs";
 import { LASTING_SPELLS } from "./lasting-areas.mjs";
 import { SPELLS } from "./spell-data.mjs";
 import { abilityDef } from "./ability-effects.mjs";
-import { creatureTypes, energyAsUndead } from "./creature-types.mjs";
+import { creatureTypes, energyAsUndead, isLiving } from "./creature-types.mjs";
 import { compendiumBuff, nevelaAppliesBuff } from "./buff-grants.mjs";
 import { isChannel } from "./channel-energy.mjs";
 import { immunitiesOf } from "./defenses.mjs";
@@ -196,7 +196,7 @@ function unaffectedBy(def, actor, spell) {
   const hd = actor.system.attributes?.hd?.total ?? 0;
   if (def?.types && !def.types.some((t) => types.has(t) || subtypes.has(t))) return `only ${def.types.join(" or ")} creatures`;
   if (def?.hdMax != null && hd > def.hdMax) return `${def.hdMax} HD or less only`;
-  const undeadOrConstruct = types.has("undead") || types.has("construct");
+  const undeadOrConstruct = !isLiving(null, types);
   if (def?.living && undeadOrConstruct) return "living creatures only";
   if (def?.dying && !((actor.system.attributes?.hp?.value ?? 0) < 0)) return "only a creature below 0 hit points";
   if (def?.wounded && !((actor.system.attributes?.hp?.value ?? 0) < (actor.system.attributes?.hp?.max ?? 0))) return "only a wounded creature";
@@ -432,7 +432,7 @@ async function offerResave(actor, token, buff, combat) {
   if (!resave.every) await buff.unsetFlag(MODULE_ID, "resave");
   await ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor, token }),
-    whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
+    whisper: ownerWhisper(actor),
     content: `<p><strong>${esc(buff.name)}</strong>: ${esc(actor.name)} may make a new save to end it${resave.action ? ` (${esc(resave.action)})` : ""}.${resave.every ? "" : " On a failure it lasts the full duration."}</p>`,
     flags: { [MODULE_ID]: { [FLAG]: { name: buff.name, save: resave.save, cl: resave.cl, ends: buff.uuid, resave, resolved: true, rows: [{ uuid: token?.uuid ?? actor.uuid, name: token?.name ?? actor.name, state: "save" }] } } },
   });
@@ -496,7 +496,7 @@ async function applyEffect(actor, effect, data, caster) {
   const rollData = { ...(data.ability ? caster?.getRollData?.() ?? {} : {}), cl: data.cl };
   for (const [key, formula] of Object.entries(effect.roll ?? {})) rollData[key] = (await new Roll(formula).evaluate()).total;
   const { types } = creatureTypes(actor);
-  const living = !types.has("undead") && !types.has("construct");
+  const living = isLiving(actor, types);
   const immune = actor.getConditionImmunities?.() ?? new Set();
 
   // Conditions, each with its own duration

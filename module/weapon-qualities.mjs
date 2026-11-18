@@ -54,10 +54,10 @@
 // unidentified weapon sees its rows as "Unidentified quality".
 
 import { MODULE_ID, ATTACK_ACTIONS } from "./const.mjs";
-import { esc, dealDamage, restoreDamage, rollTotal, isActiveGM, wrapMethod, ownerWhisper } from "./util.mjs";
+import { esc, dealDamage, restoreDamage, rollTotal, isActiveGM, wrapMethod, ownerWhisper, cardButton } from "./util.mjs";
 import { registerRollEffect, rollPlan } from "./roll-effects.mjs";
 import { registerFootnote } from "./footnote.mjs";
-import { matchesCreatures, creatureTypes } from "./creature-types.mjs";
+import { matchesCreatures, creatureTypes, isLiving } from "./creature-types.mjs";
 import { hitOf } from "./natural-riders.mjs";
 import { QUALITIES, qualitiesOf, foeText, keenWorks, fits, limitText } from "./magic-arms.mjs";
 import { isRaging } from "./defenses.mjs";
@@ -150,11 +150,11 @@ export function armorAndShield(actor) {
 Hooks.on("pf1ApplyDamage", (actor, options) => {
   if (!(options.value > 0) || !qualitiesOf(options.action?.item)?.ids.has("brilliantEnergy")) return;
   const { types } = creatureTypes(actor);
-  if (!types.has("undead") && !types.has("construct")) return;
+  if (isLiving(null, types)) return;
   options.value = 0;
   ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
-    whisper: game.users.filter((u) => u.isGM || actor.testUserPermission(u, "OWNER")).map((u) => u.id),
+    whisper: ownerWhisper(actor),
     content: `<p><strong>${esc(actor.name)}</strong> takes no damage: a brilliant energy weapon can't harm undead or constructs.</p>`,
   });
 });
@@ -341,19 +341,6 @@ Hooks.on("createChatMessage", async (message) => {
   }
 });
 
-function cardButton(label, tooltip, onClick) {
-  const b = document.createElement("button");
-  b.type = "button";
-  b.textContent = label;
-  b.dataset.tooltip = tooltip;
-  b.style.cssText = "width: auto; line-height: 1.4; margin: 2px 0.25em; padding: 0 6px;";
-  b.addEventListener("click", (event) => {
-    event.preventDefault();
-    b.disabled = true;
-    onClick();
-  });
-  return b;
-}
 
 Hooks.on("renderChatMessagePF", (message, html) => {
   const data = message.getFlag(MODULE_ID, FLAG)?.vicious;

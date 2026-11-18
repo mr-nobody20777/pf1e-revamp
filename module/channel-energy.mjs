@@ -11,7 +11,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { esc, onGmRequest, classLevel, titleFor, saveResult } from "./util.mjs";
+import { esc, onGmRequest, classLevel, titleFor, saveResult, gmWhisper } from "./util.mjs";
 import { creatureTypes, energyAsUndead } from "./creature-types.mjs";
 import { variantEffect, variantOf, variantsAllowed, chooseVariant, clearVariant, applyVariant, channelBonus, isVariantFeature, VARIANTS } from "./variant-channeling.mjs";
 
@@ -140,7 +140,7 @@ export async function channel(actionUse, { targets = null } = {}) {
   // PF1's own card already shows the amount, and saves get their own cards
   return ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
-    whisper: game.users.filter((u) => u.isGM).map((u) => u.id),
+    whisper: gmWhisper(),
     content: `<p><strong>${esc(action.name)}</strong>: applying to ${chosen.length} creature(s)…</p>`,
     flags: {
       [MODULE_ID]: {

@@ -44,7 +44,7 @@
 //     affliction persists": PF1's rest leaves that damage (ruling: put back, with a note).
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM, onGmRequest, requestedByOwner, saveResult, rollTotal, ownerWhisper, timed, plainText, applyCondition, rollSaveAgainst } from "./util.mjs";
+import { esc, isActiveGM, onGmRequest, requestedByOwner, saveResult, rollTotal, ownerWhisper, timed, plainText, applyCondition, rollSaveAgainst, activeBuff, gmWhisper } from "./util.mjs";
 import { registerFootnote, footnoteButton } from "./footnote.mjs";
 import { creatureTypes } from "./creature-types.mjs";
 
@@ -58,7 +58,7 @@ const CONDITIONS = { daze: "dazed", dazed: "dazed", sickened: "sickened", nausea
 const SAVES = { fort: "fort", fortitude: "fort", ref: "ref", reflex: "ref", will: "will" };
 const DICE = "\\d+d\\d+(?:\\s*[+-]\\s*\\d+)?|\\d+";
 const unitOf = (w) => w.toLowerCase().replace(/s$/, "");
-const hasBuff = (actor, re) => (actor?.itemTypes?.buff ?? []).some((b) => b.isActive && re.test(b.name));
+const hasBuff = (actor, re) => !!activeBuff(actor, re);
 /** Delay poison: poisons wait. */
 export const delayed = (actor, kind) => kind === "poison" && hasBuff(actor, /^delay poison\b/i);
 /** Pernicious poison: −4 on saves against poison and on attempts to cure it. */
@@ -511,7 +511,7 @@ async function treat(buff, stop = false) {
     }
   }
   if (buff.isOwner) await setTreatment(buff, healer);
-  else await ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p>${healer ? `${esc(healer.name)} treats` : "Stop treating"} ${esc(buff.actor?.name ?? "")}'s ${esc(buff.name)}…</p>`, flags: { [MODULE_ID]: { afflictTreat: { buff: buff.uuid, healer: healer?.uuid ?? null } } } });
+  else await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p>${healer ? `${esc(healer.name)} treats` : "Stop treating"} ${esc(buff.actor?.name ?? "")}'s ${esc(buff.name)}…</p>`, flags: { [MODULE_ID]: { afflictTreat: { buff: buff.uuid, healer: healer?.uuid ?? null } } } });
 }
 
 // On the affliction's buff: its schedule, and the Treat button
@@ -615,7 +615,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
       const actor = target?.actor ?? target;
       if (!actor) continue;
       if (actor.isOwner) await exposeAndReport(actor, spec, message);
-      else await ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p>Expose ${esc(actor.name)} to ${esc(spec.name)}…</p>`, flags: { [MODULE_ID]: { afflictExpose: { target: actor.uuid, spec, reference: message.uuid } } } });
+      else await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p>Expose ${esc(actor.name)} to ${esc(spec.name)}…</p>`, flags: { [MODULE_ID]: { afflictExpose: { target: actor.uuid, spec, reference: message.uuid } } } });
     }
   });
   (html.querySelector(".card-content, .message-content") ?? html).append(div);

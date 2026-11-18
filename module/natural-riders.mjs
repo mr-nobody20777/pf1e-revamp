@@ -37,8 +37,8 @@
 // wins (the universal Paralysis item's Charisma-based DC is computed from Constitution).
 
 import { MODULE_ID } from "./const.mjs";
-import { applyCondition, dealDamage, esc, isActiveGM, onGmRequest, requestedByOwner, restoreDamage, rollTotal, saveResult, timed } from "./util.mjs";
-import { creatureTypes } from "./creature-types.mjs";
+import { applyCondition, dealDamage, esc, isActiveGM, onGmRequest, requestedByOwner, restoreDamage, rollTotal, saveResult, timed, gmWhisper, cardButton } from "./util.mjs";
+import { creatureTypes, isLiving } from "./creature-types.mjs";
 import { setBleed, stopBleed } from "./bleed.mjs";
 import { extinguish, setBurning } from "./burning.mjs";
 import { constrictFormula, endGrapple, maneuverCheck, recordGrapple, sizeOf, specialAttack } from "./monster-grapple.mjs";
@@ -172,7 +172,7 @@ export function hitOf(message, index, targetUuid) {
 function immuneTo(target, rider) {
   const key = rider.key;
   const { types } = creatureTypes(target);
-  const undeadOrConstruct = types.has("undead") || types.has("construct");
+  const undeadOrConstruct = !isLiving(target, types);
   const ci = target.getConditionImmunities?.() ?? new Set();
   const traitCi = target.system.traits?.ci?.total ?? new Set();
   const has = (id) => ci.has(id) || traitCi.has(id);
@@ -484,31 +484,19 @@ Hooks.on("createChatMessage", async (message) => {
     // Vorpal: tell the GM about a natural 20 that's confirmed
     const vorpal = data.riders.findIndex((r) => r.key === "vorpal");
     if (vorpal >= 0 && hit.critical && attacks[i]?.attack?.dice?.[0]?.total === 20) {
-      await ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p><strong>Vorpal:</strong> ${esc(fromUuidSync(data.attacker)?.name ?? "")} rolled a natural 20 and confirmed the critical hit on ${esc(fromUuidSync(data.target)?.name ?? "the target")}. Its head is severed if it has one: use <strong>Sever</strong> on the attack card.</p>` });
+      await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p><strong>Vorpal:</strong> ${esc(fromUuidSync(data.attacker)?.name ?? "")} rolled a natural 20 and confirmed the critical hit on ${esc(fromUuidSync(data.target)?.name ?? "the target")}. Its head is severed if it has one: use <strong>Sever</strong> on the attack card.</p>` });
     }
   }
   if (data.rend) await countRend(message, data);
 });
 
-function button(label, tooltip, onClick) {
-  const b = document.createElement("button");
-  b.type = "button";
-  b.textContent = label;
-  b.dataset.tooltip = tooltip;
-  b.style.cssText = "width: auto; line-height: 1.4; margin: 2px 0.25em; padding: 0 6px;";
-  b.addEventListener("click", (event) => {
-    event.preventDefault();
-    b.disabled = true;
-    onClick();
-  });
-  return b;
-}
+const button = cardButton; // util.mjs
 
 /** Run it here (GM) or ask the GM's client (the creature's owner). */
 const request = (message, index, r, how) =>
   game.user.isGM
     ? runRider(message, index, r, how)
-    : ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p>Applying a rider…</p>`, flags: { [MODULE_ID]: { naturalRider: { message: message.id, index, rider: r, how } } } });
+    : ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p>Applying a rider…</p>`, flags: { [MODULE_ID]: { naturalRider: { message: message.id, index, rider: r, how } } } });
 
 Hooks.on("renderChatMessagePF", (message, html) => {
   const data = message.getFlag(MODULE_ID, FLAG);

@@ -52,15 +52,15 @@
 // line from where the move started to where it ended).
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM, saveResult, rollTotal, timed, dealDamage, restoreDamage } from "./util.mjs";
-import { creatureTypes } from "./creature-types.mjs";
+import { esc, isActiveGM, saveResult, rollTotal, timed, dealDamage, restoreDamage, activeBuff, gmWhisper } from "./util.mjs";
+import { creatureTypes, isLiving } from "./creature-types.mjs";
 import { registerMissSource } from "./miss-chance.mjs";
 
 const FLAG = "lastingArea"; // template flag: the area's state (below)
 const LINK = "lastingAreaLink"; // buff flag: the template's uuid
 const CARD = "lastingAreaCard"; // chat message flag: { undo: [{ actor, conditions, damage, con }] }
 const UNIT_SECONDS = { round: 6, minute: 60, hour: 3600 };
-const living = (actor) => { const { types } = creatureTypes(actor); return !types.has("undead") && !types.has("construct"); };
+const living = (actor) => isLiving(actor);
 const poisonImmune = (actor) => !living(actor) || (actor.system.traits?.ci?.total ?? new Set()).has?.("poison");
 const hdOf = (actor) => actor.system.attributes?.hd?.total ?? 0;
 const SAVE = { fort: "Fortitude", ref: "Reflex", will: "Will" };
@@ -328,7 +328,7 @@ function context(template, zone, token, { atCasting = false, lines, undo, ...opt
       const taken = await hurt(dmg, ["piercing"]);
       line(`${feet} feet through the spikes: ${dmg} piercing damage${taken < dmg ? ` (${taken} after DR)` : ""}`);
       if (!taken) return; // "Any creature that takes damage from this spell must also succeed on a Reflex save"
-      if (actor.itemTypes.buff.some((b) => b.isActive && /^spike growth injury/i.test(b.name))) return;
+      if (activeBuff(actor, /^spike growth injury/i)) return;
       if (await c.save("ref")) return;
       await actor.createEmbeddedDocuments("Item", [{ name: "Spike Growth injury", type: "buff", img: "icons/svg/trap.svg", system: { active: true, subType: "temp", duration: { value: "24", units: "hour" }, contextNotes: [{ text: "Land speed halved (feet and legs injured by spike growth) until the 24 hours pass or a cure spell heals it", target: "attack" }] } }]);
       line("land speed halved for 24 hours");
@@ -366,7 +366,7 @@ async function act(template, tokens, handler, title, opts = {}) {
   if (template.parent?.templates?.has(template.id)) await template.update({ [`flags.${MODULE_ID}.${FLAG}`]: zone });
   if (!lines.length) return;
   await ChatMessage.implementation.create({
-    whisper: game.users.filter((u) => u.isGM).map((u) => u.id),
+    whisper: gmWhisper(),
     content: `<p><strong>${esc(zone.name)}</strong>${title ? ` (${esc(title)})` : ""}${zone.roll && spell.roll ? `, tentacles' roll ${zone.roll}` : ""}:</p><ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>${undo.some((u) => u.conditions.length || u.lost?.hp || u.lost?.temp || u.con) ? `<button type="button" data-action="${MODULE_ID}-area-undo">Undo</button>` : ""}`,
     flags: { [MODULE_ID]: { [CARD]: { undo } } },
   });
@@ -500,7 +500,7 @@ async function endZone(template) {
   if (inside.length) await act(template, inside, SPELLS[zone.key].leave ?? "leave", "the spell ended");
   for (const t of inside) await removeBuff(t, template);
   await template.delete();
-  await ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p><strong>${esc(zone.name)}</strong> has ended; its area is removed.</p>` });
+  await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p><strong>${esc(zone.name)}</strong> has ended; its area is removed.</p>` });
 }
 
 // Every change of game time: the check is synchronous, and only an ended spell starts anything async
