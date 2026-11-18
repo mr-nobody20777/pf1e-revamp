@@ -22,7 +22,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton } from "./footnote.mjs";
-import { classLevel, isActiveGM, createQueue, settled, stillExists, esc, onSceneCatchUp, titleFor, tokenDistance, allActors } from "./util.mjs";
+import { classLevel, isActiveGM, createQueue, settled, stillExists, esc, onSceneCatchUp, titleFor, tokenDistance, allActors, registerHandledFeatures } from "./util.mjs";
 import { mindAffectingImmune } from "./spells.mjs";
 
 const LINK = "auraLink";
@@ -196,6 +196,8 @@ const AURAS = {
     effect: () => effect("−2 penalty to AC and on attack rolls and saving throws", { changes: [["ac", "untyped", -2], ["attack", "untyped", -2], [SAVES, "untyped", -2]] }),
   },
 };
+// Auras apply their own effects: general note readers skip the features
+registerHandledFeatures(...Object.values(AURAS).map((a) => a.name).filter(Boolean));
 
 /* -------------------------------------------- */
 /*  Lookup                                      */

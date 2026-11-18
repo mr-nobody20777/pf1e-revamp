@@ -35,9 +35,12 @@
 // Left for later (they depend on something the module can't see yet): see TODO.md.
 
 import { MODULE_ID, RANGED_ATTACKS } from "./const.mjs";
-import { classLevel, equippedItem, tokenDistance, activeBuff } from "./util.mjs";
+import { classLevel, equippedItem, tokenDistance, activeBuff, registerHandledFeatures } from "./util.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 import { CRIT } from "./traits.mjs";
+
+// Their bonuses are applied here: general note readers skip them
+registerHandledFeatures(/^(ammo drop|juggle load|slipslinger style|deft shootist|art of the gun|warslinger|accuracy \(sniper\)|alkenstar defender|arc slinger|arrow-splitter|bullseye shot|canopy shooter|coordinated shot|crossbow mastery|crossbow training|distance thrower|eagle-eyed|far shot|flying blade training|focused shot|halfling slinger|hawkeye|hunter's eye|improved charging hurler|large target|mystery of unfolding wind|observant archer|opening volley|pinpoint targeting|point-blank shot|precise throw|prone slinger|protective line|raging hurler|roving range|safe shot|skilled thrower|sword and pistol|toxophilite|wasteland hunter)\b/i);
 
 const feat = (actor, re) => (actor?.itemTypes?.feat ?? []).find((f) => f.isActive !== false && re.test(f.name)) ?? null;
 const buff = activeBuff;

@@ -15,8 +15,11 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { isBashShield, bashCountsAsLight } from "./shield-trained.mjs";
-import { esc, norm, wrapMethod, addSearch } from "./util.mjs";
+import { esc, norm, wrapMethod, addSearch, registerHandledFeatures } from "./util.mjs";
 import { attackAbilityMod } from "./roll-effects.mjs";
+
+// Their bonuses are applied here: general note readers skip them
+registerHandledFeatures(/^(improved |greater )?two-weapon (fighting|defense)\b/i, /^double slice\b/i, /^two-weapon rend\b/i);
 
 const FIELD_ON = `${MODULE_ID}-twf`;
 const FIELD_OFF = `${MODULE_ID}-twf-offhand`;

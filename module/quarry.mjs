@@ -11,7 +11,10 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
-import { isActiveGM, allActors, linkedBuffs, createQueue, stillExists, deleteIfExists, esc, onSceneCatchUp, titleFor } from "./util.mjs";
+import { isActiveGM, allActors, linkedBuffs, createQueue, stillExists, deleteIfExists, esc, onSceneCatchUp, titleFor, registerHandledFeatures } from "./util.mjs";
+
+// Their bonuses are applied here: general note readers skip them
+registerHandledFeatures(/^(improved )?quarry\b/i);
 
 const FLAG = "quarry";
 const LINK = "quarryLink";

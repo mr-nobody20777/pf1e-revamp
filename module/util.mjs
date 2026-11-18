@@ -265,6 +265,15 @@ export function cardButton(label, tooltip, onClick) {
   return b;
 }
 
+// Features the module automates on their own (their bonuses applied by their own code): readers of general
+// notes (situational-bonuses.mjs) skip them so nothing counts twice. Each feature file registers its names.
+const handled = [];
+export function registerHandledFeatures(...patterns) {
+  handled.push(...patterns.filter((p) => p instanceof RegExp));
+}
+/** Does another feature of the module already apply this item's bonuses? */
+export const handledFeature = (item) => handled.some((re) => re.test(item?.name ?? ""));
+
 /** The creature's active buff whose name matches (Rage, Delay Poison, Blur...), or null. */
 export const activeBuff = (actor, re) => (actor?.itemTypes?.buff ?? []).find((b) => b.isActive && re.test(b.name)) ?? null;
 

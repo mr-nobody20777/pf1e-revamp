@@ -28,6 +28,7 @@ import { parseCreatures, matchesCreatures, mentionsCreatures, creatureTypes, typ
 import { TYPE_WORDS, noteLines } from "./save-bonuses.mjs";
 import { isWard } from "./ward.mjs";
 import { registerDamageAddition } from "./resistance.mjs";
+import "./situational-bonuses.mjs"; // the same notes' situational bonuses (flanking, charging...)
 
 const CHOICE = "creatureChoice"; // item flag: { types: [], subtypes: [] }
 const CARD = "creatureBonuses"; // attack card flag: per-target bonuses when only some targets qualify

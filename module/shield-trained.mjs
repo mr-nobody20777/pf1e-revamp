@@ -11,8 +11,12 @@
 // All of this happens at roll/check time; nothing is written to the shield.
 
 import { MODULE_ID } from "./const.mjs";
+import { registerHandledFeatures } from "./util.mjs";
 import { registerFootnote } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
+
+// Their bonuses are applied here: general note readers skip them
+registerHandledFeatures(/^shield-trained\b/i);
 
 const SETTING = "shieldBashMartial";
 const BASH_SHIELDS = ["lightShield", "heavyShield"];

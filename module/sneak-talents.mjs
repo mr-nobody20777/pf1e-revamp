@@ -12,7 +12,7 @@
 //   - Same-source bonuses (Offensive Defense, Emboldening Strike) don't stack: a new hit refreshes them.
 
 import { MODULE_ID, MELEE_ATTACKS } from "./const.mjs";
-import { esc, classLevel, onGmRequest, equippedItem, requestedByOwner, timed, saveResult, applyCondition, gmWhisper } from "./util.mjs";
+import { esc, classLevel, onGmRequest, equippedItem, requestedByOwner, timed, saveResult, applyCondition, gmWhisper, registerHandledFeatures } from "./util.mjs";
 import { rollPlan } from "./roll-effects.mjs";
 import { precisionImmune } from "./resistance.mjs";
 import { setBleed } from "./bleed.mjs";
@@ -115,6 +115,8 @@ const RIDERS = [
     } },
   { id: "mountainside", card: false, re: /^mountainside ambush/i, text: () => "unaware target, higher ground: maximum sneak attack damage", fields: (terms) => ({ dice: { dmg: String(terms.reduce((t, x) => t + x.n * x.size, 0)) } }) },
 ];
+// These talents' notes describe the target's penalties, applied here: general note readers skip them
+registerHandledFeatures(...RIDERS.map((r) => r.re));
 
 const termsText = (terms) => terms.filter((t) => t.n > 0).map((t) => `${t.n}d${t.size}`).join(" + ");
 

@@ -202,7 +202,15 @@ const STACKING = () => new Set(pf1.config.stackingBonusTypes ?? ["untyped", "dod
 
 /** Situational bonuses for this roll; of several with the same type, only the highest counts. */
 function collectProvided(actor, roll) {
-  const list = providers.flatMap((p) => p.collect(actor, roll) ?? []).filter(Boolean);
+  // Each feature's entries on its own: one feature's error mustn't take the others (or the roll) down
+  const list = providers.flatMap((p) => {
+    try {
+      return p.collect(actor, roll) ?? [];
+    } catch (err) {
+      console.error(`${MODULE_ID} | a roll-window feature failed`, err);
+      return [];
+    }
+  }).filter(Boolean);
   const stacking = STACKING();
   // Same-type bonuses only compete on the same roll (a trait bonus on attacks and one on damage both count)
   const parts = (p) => ["atk", "dmg", "roll"].filter((k) => (p[k] ?? 0) > 0);

@@ -252,6 +252,9 @@ Many racial traits, traits and feats give a bonus only against certain creatures
 
 Creatures are recognized by their type, subtypes and alignment, as described under [Creature types and templates](#creature-types-and-templates). A creature whose type is unknown gets no bonus until it's known.
 
+## Situational bonuses
+Bonuses that depend on a situation ("+1 on attack rolls when flanking", "+2 on attacks and damage when at negative hit points") are applied in the roll window when the situation holds: the attack window's Flanking and Charge boxes, raging, the character's hit points, allies around the token, the target's condition. Ones the module can't check (attacks of opportunity, a specific combat maneuver, "to jump after a running start") are listed under Not Applied, with the condition, to tick. Features the module already applies on their own aren't listed twice.
+
 ## Creature types and templates
 Spells that affect only certain creatures, channel energy, immunity to precision damage and similar rules depend on a creature's type and subtypes. PF1e Revamp reads them from the race and the creature's other items, and applies its monster templates as their rules text says:
 - **A template's type replaces the race's.** A half-fiend goblin is an outsider (native), not a humanoid, so *Hold Person* doesn't affect it. A template that gives the augmented subtype keeps the original type only as "augmented humanoid" for effects that name it.

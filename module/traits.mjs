@@ -16,7 +16,10 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
-import { esc, wrapMethod, searchSelects, titleFor } from "./util.mjs";
+import { esc, wrapMethod, searchSelects, titleFor, registerHandledFeatures } from "./util.mjs";
+
+// Traits applied here: general note readers skip them
+registerHandledFeatures(/^(swordlord's page|student of philosophy|gifted adept|magical knack|criminal|dilettante artist)\b/i);
 
 const FLAG = "traitChoice";
 const baseName = (name) => name.replace(/\s*\([^()]*\)\s*$/, "").trim();

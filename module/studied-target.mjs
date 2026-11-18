@@ -16,7 +16,10 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote, footnoteButton, refreshFootnotes } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
-import { esc, evaluate, classLevel, isActiveGM, allActors, linkedBuffs as linkedBuffsBy, createQueue, stillExists, deleteIfExists, onSceneCatchUp } from "./util.mjs";
+import { esc, evaluate, classLevel, isActiveGM, allActors, linkedBuffs as linkedBuffsBy, createQueue, stillExists, deleteIfExists, onSceneCatchUp, registerHandledFeatures } from "./util.mjs";
+
+// Their bonuses are applied here: general note readers skip them
+registerHandledFeatures(/^studied target\b/i);
 
 const FLAG = "studiedTarget";
 const PF1_STUDIED_TARGET = "Compendium.pf1.class-abilities.Item.JnXrphJlr1ULx1MK";

@@ -46,6 +46,7 @@ import { registerTypedPenaltyTests } from "./typed-penalties.test.mjs";
 import { registerAfflictionTests } from "./afflictions.test.mjs";
 import { registerLastingAreaTests } from "./lasting-areas.test.mjs";
 import { registerSharedHelperTests } from "./shared-helpers.test.mjs";
+import { registerSituationalBonusTests } from "./situational-bonuses.test.mjs";
 
 export function registerTests(quench) {
   registerTwoWeaponTests(quench);
@@ -72,6 +73,7 @@ export function registerTests(quench) {
   registerAfflictionTests(quench);
   registerLastingAreaTests(quench);
   registerSharedHelperTests(quench);
+  registerSituationalBonusTests(quench);
   registerQuarryTests(quench);
   registerTrueStrikeTests(quench);
   registerMissChanceTests(quench);
