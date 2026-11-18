@@ -75,25 +75,22 @@ Hooks.once("init", () => {
   // Sheet totals: a typed penalty bypasses PF1's highest-bonus tracking; the worst one of each type applies
   const worst = new WeakMap(); // the actor's changeOverrides (new each preparation) → Map("target|type" → worst so far)
   wrapMethod("pf1.components.ItemChange.prototype.applyChange", function (wrapped, actor, targets = null, ...rest) {
-    if (this.operator !== "add" || stackingTypes().has(this.type ?? "untyped") || (!isNaN(this.formula) && Number(this.formula) >= 0) || !actor?.changeOverrides) return wrapped(actor, targets, ...rest);
-    const list = targets ?? this.getTargets(actor);
-    const before = list.map((t) => ({ t, base: foundry.utils.getProperty(actor, t), prior: actor.changeOverrides[t]?.add?.[this.type], has: !!actor.changeOverrides[t] }));
-    const result = wrapped(actor, list, ...rest);
-    if (!Number.isFinite(this.value) || this.value >= 0) return result;
+    const result = wrapped(actor, targets, ...rest);
+    // Only a typed penalty needs anything (checked after PF1 has worked out the value: most changes stop here)
+    if (!(this.value < 0) || this.operator !== "add" || !actor?.changeOverrides || stackingTypes().has(this.type ?? "untyped")) return result;
     let map = worst.get(actor.changeOverrides);
     if (!map) worst.set(actor.changeOverrides, (map = new Map()));
-    for (const { t, base, prior, has } of before) {
-      if (!has || !t || typeof base !== "number") continue;
+    for (const t of targets ?? this.getTargets(actor)) {
+      const add = actor.changeOverrides[t]?.add;
+      const current = foundry.utils.getProperty(actor, t);
+      if (!add || typeof current !== "number") continue;
+      // What PF1 just applied: nothing when a bonus of this type was already counted (its record is above 0),
+      // else the whole penalty ("use higher value only" against none)
+      const applied = add[this.type] > 0 ? 0 : this.value;
       const key = `${t}|${this.type}`;
       const sofar = map.get(key) ?? 0;
-      foundry.utils.setProperty(actor, t, base + Math.min(0, this.value - sofar));
+      foundry.utils.setProperty(actor, t, current - applied + Math.min(0, this.value - sofar));
       map.set(key, Math.min(sofar, this.value));
-      // Leave PF1's bonus tracking as it was, so later bonuses of this type count in full
-      const add = actor.changeOverrides[t]?.add;
-      if (add) {
-        if (prior === undefined) delete add[this.type];
-        else add[this.type] = prior;
-      }
       const ability = t.match(/^system\.abilities\.([a-zA-Z0-9]+)\.(?:total|penalty|base)$/)?.[1];
       if (ability) {
         const a = actor.system.abilities[ability];

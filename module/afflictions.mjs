@@ -438,16 +438,21 @@ Hooks.on("updateCombat", async (combat, changes, options) => {
 });
 
 // Longer frequencies (and "/round" ones outside combat): when game time passes their due time
-Hooks.on("updateWorldTime", async (worldTime, delta) => {
+// Runs on every change of game time: the check for work is synchronous, and only work starts anything async
+Hooks.on("updateWorldTime", (worldTime, delta) => {
   if (!isActiveGM()) return;
-  for (const actor of new Set([...game.actors, ...canvas?.scene?.tokens?.map((t) => t.actor).filter(Boolean) ?? []])) {
+  const work = [];
+  const now = game.time.worldTime;
+  for (const actor of new Set([...game.actors, ...(canvas?.scene?.tokens?.map((t) => t.actor).filter(Boolean) ?? [])])) {
     for (const buff of afflictionsOf(actor)) {
       const data = buff.flags[MODULE_ID][FLAG];
       // Delay poison: the poison's clock stands still while the spell lasts
-      if (delayed(actor, data.kind) && delta > 0) await buff.update({ [`flags.${MODULE_ID}.${FLAG}.dueAt`]: data.dueAt + delta });
-      else await checkDue(actor, buff);
+      if (delayed(actor, data.kind)) {
+        if (delta > 0) work.push(() => buff.update({ [`flags.${MODULE_ID}.${FLAG}.dueAt`]: data.dueAt + delta }));
+      } else if (!data.pending && (now >= data.dueAt || data.firstWaiting)) work.push(() => checkDue(actor, buff));
     }
   }
+  if (work.length) (async () => { for (const fn of work) await fn(); })();
 });
 
 /* -------------------------------------------- */

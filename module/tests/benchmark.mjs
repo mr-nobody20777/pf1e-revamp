@@ -5,6 +5,8 @@
 import { createTestActor, addItems, fromPack, cleanup, useTestScene, placeToken, setTargets, deleteTokens, waitFor, waitForItem } from "./helpers.mjs";
 import { promptApply } from "../subclass.mjs";
 import { wrapperChains } from "../util.mjs";
+import * as LA from "../lasting-areas.mjs";
+import * as AF from "../afflictions.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -145,6 +147,13 @@ export async function runBenchmark({ rounds = 3 } = {}) {
   ]);
   const fighterToken = await placeToken(fighter, 2, 3);
 
+  // Afflictions and lasting areas: a poisoned fighter, a fog and an entangle on the scene
+  await AF.contract(fighter, { ...AF.parseAffliction("save Fort DC 5; frequency 1/hour for 6 hours; effect 1 Con; cure 2 saves", { name: "Bench Venom", kind: "poison" }) }, { failed: true });
+  const size = canvas.scene.grid.size;
+  const zone = (key, name, col) => ({ t: "circle", x: canvas.dimensions.sceneX + col * size, y: canvas.dimensions.sceneY + 6 * size, distance: 10, flags: { [MODULE_ID]: { [LA._test.FLAG]: { key, name, caster: sorc.uuid, message: null, dc: 5, cl: 5, endsAt: null, inside: [], creatures: {} } } } });
+  const areas = await canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [zone("fogCloud", "Fog Cloud", 4), zone("entangle", "Entangle", 9)]);
+  const goblinStart = { x: goblinToken.x, y: goblinToken.y };
+
   const workload = {
     "actor prepare ×450": async () => { for (let i = 0; i < 150; i++) { sorc.reset(); slayer.reset(); fighter.reset(); } },
     "magic attacks ×10": async () => { for (let i = 0; i < 10; i++) await flaming.use({ skipDialog: true }); },
@@ -154,7 +163,18 @@ export async function runBenchmark({ rounds = 3 } = {}) {
     "attacks ×15": async () => { for (let i = 0; i < 15; i++) await longsword.use({ skipDialog: true }); },
     "saves + skills ×40": async () => { for (let i = 0; i < 20; i++) { await slayer.rollSavingThrow("will", { skipDialog: true }); await slayer.rollSkill("per", { skipDialog: true }); } },
     "cleric sheet renders ×10": async () => { for (let i = 0; i < 10; i++) await cleric.sheet._render(true); await cleric.sheet.close(); },
+    // Afflictions and lasting areas check on every game-time change (without changing the world's time here)
+    "world time ticks ×30": async () => { for (let i = 0; i < 30; i++) Hooks.callAll("updateWorldTime", game.time.worldTime, 0); },
+    "token moves ×10": async () => { for (let i = 0; i < 10; i++) { await goblinToken.update({ x: goblinStart.x + (i % 2 ? size : 0) }, { animate: false }); await new Promise((r) => setTimeout(r, 350)); } },
+    // The area recheck runs from a timer, outside any hook: timed directly
+    "area rechecks ×200": async () => {
+      const start = performance.now();
+      for (let i = 0; i < 100; i++) for (const t of areas) await LA._test.recheck(t);
+      direct.ms += performance.now() - start;
+      direct.calls += 200;
+    },
   };
+  const direct = { ms: 0, calls: 0 };
 
   const hooks = await ourHooks();
   const results = { ourHookCount: hooks.length, wrapperCount: [...wrapperChains.values()].reduce((n, c) => n + c.length, 0), heapStartMB: heap(), workloadMs: {}, ourMsTotal: 0, handlers: [] };
@@ -168,7 +188,7 @@ export async function runBenchmark({ rounds = 3 } = {}) {
     restore();
     wrapped.restore();
   }
-  Object.assign(totals, wrapped.totals);
+  Object.assign(totals, wrapped.totals, { "lasting-areas recheck (timed directly)": direct });
   await new Promise((r) => setTimeout(r, 1000)); // let queued syncs settle
   results.handlers = Object.entries(totals)
     .filter(([, t]) => t.calls)
@@ -178,6 +198,7 @@ export async function runBenchmark({ rounds = 3 } = {}) {
   results.totalWorkloadMs = Object.values(results.workloadMs).reduce((s, v) => s + v, 0);
   results.heapEndMB = heap();
 
+  for (const t of areas) if (canvas.scene.templates.has(t.id)) await t.delete();
   await deleteTokens([slayerToken, goblinToken, fighterToken]);
   await cleanup([sorc, slayer, goblin, cleric, fighter], messagesBefore);
   await sceneCtl.restore();

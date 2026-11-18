@@ -122,4 +122,4 @@ The design reference gives every feat, trait, class and archetype feature, racia
 - **Per-feature settings and localization.** On/off settings for each feature and translatable text, for a wider audience.
 - **Foundry package listing.** Foundry's AI policy requires human-written item and description text for a listing on foundryvtt.com.
 - **Documentation.** Keep the wiki (`wiki/`, published to the repository wiki) current with every feature.
-- **Next performance review** after ten more features (0 of 10 so far). Review #4 was completed on 2026-11-16.
+- **Next performance review** after ten more features (0 of 10 so far). Review #5 was completed on 2026-11-17.

@@ -498,12 +498,15 @@ async function endZone(template) {
   await ChatMessage.implementation.create({ whisper: game.users.filter((u) => u.isGM).map((u) => u.id), content: `<p><strong>${esc(zone.name)}</strong> has ended; its area is removed.</p>` });
 }
 
-Hooks.on("updateWorldTime", async () => {
+// Every change of game time: the check is synchronous, and only an ended spell starts anything async
+Hooks.on("updateWorldTime", () => {
   if (!isActiveGM()) return;
+  const ended = [];
   for (const scene of game.scenes) for (const template of zonesIn(scene)) {
     const zone = zoneOf(template);
-    if (zone.endsAt !== null && game.time.worldTime >= zone.endsAt) await endZone(template);
+    if (zone.endsAt !== null && game.time.worldTime >= zone.endsAt) ended.push(template);
   }
+  if (ended.length) (async () => { for (const t of ended) await endZone(t); })();
 });
 
 // A template deleted by hand: what it held ends
