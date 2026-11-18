@@ -46,11 +46,11 @@ Everything the module automates carries a short **PF1e Revamp** note on its shee
 
 - **Foundry VTT** v13
 - **Pathfinder 1e** system 11.x
+- **[Pathfinder 1e Content](https://foundryvtt.com/packages/pf-content)**, for spell buffs, racial traits and character traits.
 
 ## 🧩 Recommended modules
 
 - **[libWrapper](https://foundryvtt.com/packages/lib-wrapper)**, so PF1e Revamp can work safely alongside other modules.
-- **[Pathfinder 1e Content](https://foundryvtt.com/packages/pf-content)**, for racial traits, character traits and spell buffs.
 - **[Pathfinder 1e Archetypes and Abilities](https://foundryvtt.com/packages/pf1e-archetypes)**, for archetypes.
 - **[Roll Bonuses PF1](https://foundryvtt.com/packages/ckl-roll-bonuses)**, for range-increment penalties.
 - **Nevela's Automation Suite** works well alongside it; see [Compatibility](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Compatibility).

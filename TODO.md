@@ -115,6 +115,11 @@ The design reference gives every feat, trait, class and archetype feature, racia
 - **Test tooling.** Nevela's Automation Suite cancels targeted buff spells (such as *Haste*) cast without a target, so tests that cast spells must set a target or use a non-buff spell.
 
 ### Known issues
+- **Lasting areas do nothing for spells whose compendium action has no template.** The area tracking starts from the template placed on casting, but PF1's *Web* (and possibly other spells in the lasting-areas list) states its area only in the action's Effect text, so no template is offered and the spell is cast without any of its effects. The module should supply the template from its own area data when the action has none. Found in the 2026-11-18 field test.
+- **Level-up dialog: the first Finish click after typing in the domain or arcane school search box is ignored.** The search field's change re-renders the section, swallowing the click; a second click works. Found in the 2026-11-18 field test.
+- **Save roll window: the racial bonus chip has no visible label.** The elf's +2 against enchantment shows as a ticked chip with blank text (the tooltip reads "Racial · vs Enchantment Effects"). The total is correct. Found in the 2026-11-18 field test.
+- **Attack bonuses listed for spells with no attack roll.** *Bless* (+1 on attack rolls) is listed and ticked in the roll window for *Magic Missile*, which never rolls to hit. Harmless, but misleading. Found in the 2026-11-18 field test.
+- **Intense Spells is granted but not automated.** The evoker's +½ level damage on evocation spells is not added to the damage roll. Found in the 2026-11-18 field test.
 - **Test flake: Staggering Critical's added duration.** "Another hit adds to it" failed once in a full run (5 rounds where at least 6 were expected) and passes on its own; possibly game time moving between the two hits during a full run.
 - **Snap Shot archers don't threaten.** With Snap Shot, an archer threatens squares within 5 feet (more with Improved Snap Shot), which affects flanking and the warning for shooting while threatened. The Snap Shot feat is also missing from the installed compendiums (only the rogue talent of the same name exists).
 

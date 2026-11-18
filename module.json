@@ -36,16 +36,18 @@
         }
       }
     ],
+    "requires": [
+      {
+        "id": "pf-content",
+        "type": "module",
+        "reason": "The spell buffs the module applies (Resistance, Virtue, Guidance and many more), racial traits for the racial-trait review, and the buffs that miss chances, wards and next-roll effects recognize."
+      }
+    ],
     "recommends": [
       {
         "id": "lib-wrapper",
         "type": "module",
         "reason": "Safe hooking into PF1's attack and proficiency code (two-weapon fighting, shield bashes, Gifted Adept, Swordlord's Page). Works without it, but with a higher chance of conflicts."
-      },
-      {
-        "id": "pf-content",
-        "type": "module",
-        "reason": "Racial traits for the racial-trait review, and the spell buffs that miss chances, wards and next-roll effects recognize."
       },
       {
         "id": "pf1e-archetypes",
