@@ -9,7 +9,7 @@
 // creature prone. The fire, the save and its DC are kept in a flag; PF1's Burning condition shows it.
 
 import { MODULE_ID } from "./const.mjs";
-import { dealDamage, esc, isActiveGM, oncePerRound, ownerWhisper, rollTotal, saveResult, steppedBack } from "./util.mjs";
+import { dealDamage, esc, isActiveGM, oncePerRound, ownerWhisper, rollTotal, saveResult, steppedBack, rollSaveAgainst } from "./util.mjs";
 
 const FLAG = "burning";
 const TICK = "burningTick";
@@ -36,7 +36,8 @@ export async function burningSave(actor, { dropAndRoll = false } = {}) {
   const fire = burningOf(actor);
   if (!fire) return true;
   if (dropAndRoll && !actor.statuses.has("prone")) await actor.setCondition("prone", true);
-  const save = await actor.rollSavingThrow("ref", { skipDialog: true, dc: fire.dc, ...(dropAndRoll ? { bonus: "4[Drop and roll]" } : {}) });
+  // Against fire: save bonuses against fire count (there's no card to say so)
+  const save = await rollSaveAgainst(actor, "ref", ["fire"], { dc: fire.dc, ...(dropAndRoll ? { bonus: "4[Drop and roll]" } : {}) });
   const passed = saveResult(save, fire.dc).passed;
   if (passed) await extinguish(actor);
   return passed;

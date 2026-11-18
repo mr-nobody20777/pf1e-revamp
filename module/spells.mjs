@@ -48,6 +48,7 @@
 // the row says whether the creature takes full or half.
 
 import { MODULE_ID } from "./const.mjs";
+import { remainingSeconds, dealDamage } from "./util.mjs";
 import { cureAfflictions } from "./afflictions.mjs";
 import { LASTING_SPELLS } from "./lasting-areas.mjs";
 import { SPELLS } from "./spell-data.mjs";
@@ -300,8 +301,10 @@ async function resolveCard(message) {
     const onHit = rowDef(def, row)?.onHit;
     if (onHit?.damage) {
       const roll = await new Roll(onHit.damage.formula, { cl: data.cl }).evaluate();
-      await actor.applyDamage(roll.total, { forceDialog: false });
-      row.hitDamage = `${roll.total} ${onHit.damage.type} damage`;
+      // Typed, so energy resistance, immunities and DR apply (PF1's ids: "negative energy" is "negative")
+      const type = { "negative energy": "negative", "positive energy": "positive" }[onHit.damage.type] ?? onHit.damage.type;
+      const lost = await dealDamage(actor, roll.total, [type]);
+      row.hitDamage = `${roll.total} ${onHit.damage.type} damage${lost.hp + lost.temp < roll.total ? ` (${lost.hp + lost.temp} after resistance)` : ""}`;
     }
     row.state = data.save && !willing && rowDef(def, row)?.initialSave !== false ? "save" : "apply";
   }
@@ -615,15 +618,7 @@ function stackedFear(actor, id) {
 }
 
 /** Seconds left on a condition the creature already has: null if it hasn't, Infinity if it doesn't end. */
-export function remainingSeconds(actor, id) {
-  if (!actor.statuses.has(id)) return null;
-  const effect = actor.effects.find((e) => e.statuses.has(id));
-  const { seconds, startTime, rounds, turns } = effect?.duration ?? {};
-  if (Number.isFinite(seconds)) return seconds - (game.time.worldTime - (startTime ?? 0));
-  // Timed in rounds or turns (PF1 or another module made it): Foundry's rounds left (all of them out of combat)
-  if (rounds || turns) return (effect.duration.remaining ?? rounds ?? 0) * (CONFIG.time.roundTime || 6);
-  return Infinity;
-}
+export { remainingSeconds }; // moved to util.mjs
 
 /** The spell's duration as a buff duration ({ value, units }), when it's a plain one. */
 function spellDuration(item, cl) {

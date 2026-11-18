@@ -44,7 +44,7 @@
 //     affliction persists": PF1's rest leaves that damage (ruling: put back, with a note).
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM, onGmRequest, requestedByOwner, saveResult, rollTotal, ownerWhisper, timed, plainText } from "./util.mjs";
+import { esc, isActiveGM, onGmRequest, requestedByOwner, saveResult, rollTotal, ownerWhisper, timed, plainText, applyCondition, rollSaveAgainst } from "./util.mjs";
 import { registerFootnote, footnoteButton } from "./footnote.mjs";
 import { creatureTypes } from "./creature-types.mjs";
 
@@ -64,18 +64,9 @@ export const delayed = (actor, kind) => kind === "poison" && hasBuff(actor, /^de
 /** Pernicious poison: −4 on saves against poison and on attempts to cure it. */
 const pernicious = (actor, kind) => kind === "poison" && hasBuff(actor, /^pernicious poison\b/i);
 
-// The kind of affliction a save is being rolled against, while it's rolled (save-bonuses.mjs reads it:
-// a dwarf's "+2 vs poison", a paladin's immunity aside)
-let against = null;
-export const savingAgainst = () => against;
 async function rollSave(actor, data, dc, reference, extra = []) {
-  against = data.kind;
   const bonus = [...extra, ...(pernicious(actor, data.kind) ? ["-4[Pernicious Poison]"] : [])].join(" + ") || undefined;
-  try {
-    return await actor.rollSavingThrow(data.save, { skipDialog: true, dc, reference, bonus });
-  } finally {
-    against = null;
-  }
+  return rollSaveAgainst(actor, data.save, [data.kind], { dc, reference, bonus });
 }
 
 /** Treat poison / disease: the healer's Heal check against the DC; +4 competence on the save when it beats it. */
@@ -178,9 +169,7 @@ async function applyEffect(actor, text) {
   for (const c of e.conditions) {
     if (!pf1.registry.conditions.get(c.id)) continue;
     if (c.duration) {
-      const rounds = await roundsOf(c.duration);
-      await actor.setConditions({ [c.id]: { duration: timed(rounds) } });
-      parts.push(`${c.id} ${rounds} round${rounds === 1 ? "" : "s"}`);
+      parts.push(await applyCondition(actor, c.id, await roundsOf(c.duration)));
     } else {
       await actor.setConditions({ [c.id]: true });
       held.push(c.id);

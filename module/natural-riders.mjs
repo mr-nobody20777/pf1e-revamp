@@ -37,7 +37,7 @@
 // wins (the universal Paralysis item's Charisma-based DC is computed from Constitution).
 
 import { MODULE_ID } from "./const.mjs";
-import { dealDamage, esc, isActiveGM, onGmRequest, requestedByOwner, restoreDamage, rollTotal, saveResult, timed } from "./util.mjs";
+import { applyCondition, dealDamage, esc, isActiveGM, onGmRequest, requestedByOwner, restoreDamage, rollTotal, saveResult, timed } from "./util.mjs";
 import { creatureTypes } from "./creature-types.mjs";
 import { setBleed, stopBleed } from "./bleed.mjs";
 import { extinguish, setBurning } from "./burning.mjs";
@@ -211,8 +211,9 @@ async function applyAuto(rider, { attacker, target, targetUuid, critical, messag
       if (!rider.duration) return { text: `failed (Fortitude DC ${rider.dc}): paralyzed; its entry gives no duration, so apply it by hand` };
       const [amount, unit] = rider.duration;
       const rounds = (await roll(amount)) * (unit.toLowerCase() === "minute" ? 10 : unit.toLowerCase() === "hour" ? 600 : 1);
-      await target.setConditions({ paralyzed: { duration: timed(rounds) } });
-      return { text: `failed (Fortitude DC ${rider.dc}): paralyzed ${rounds} round${rounds === 1 ? "" : "s"}`, undo: { conditions: ["paralyzed"] } };
+      const had = target.statuses.has("paralyzed");
+      const text = await applyCondition(target, "paralyzed", rounds);
+      return { text: `failed (Fortitude DC ${rider.dc}): ${text}`, undo: had ? undefined : { conditions: ["paralyzed"] } };
     }
     case "attach": {
       if (!attacker.statuses.has("grappled")) await attacker.setConditions({ grappled: true });

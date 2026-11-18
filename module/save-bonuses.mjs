@@ -24,7 +24,7 @@ import { evaluate } from "./util.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 import { parseCreatures, matchesCreatures } from "./creature-types.mjs";
 import { isWard } from "./ward.mjs";
-import { savingAgainst } from "./afflictions.mjs";
+import { savingAgainst } from "./util.mjs";
 
 // Words in a note → test against the effect
 const KEYWORDS = [
@@ -81,10 +81,10 @@ export const TYPE_WORDS = {
   competence: "competence", insight: "insight", circumstance: "circumstance", enhancement: "enh", dodge: "dodge", alchemical: "alchemical",
 };
 
-/** A poison, disease or curse being saved against (afflictions.mjs), as an effect. */
+/** What a save without a card is against (an affliction's kind, a fire: util.rollSaveAgainst), as an effect. */
 function afflictionEffect() {
-  const kind = savingAgainst();
-  return kind ? { name: kind, text: kind, school: null, subschools: new Set(), descriptors: new Set([kind]), isSpell: false, isSLA: false, isPoison: kind === "poison" } : null;
+  const kinds = savingAgainst();
+  return kinds?.length ? { name: kinds.join(", "), text: kinds.join(" "), school: null, subschools: new Set(), descriptors: new Set(kinds), isSpell: false, isSLA: false, isPoison: kinds.includes("poison") } : null;
 }
 
 /** What the save is against, from the chat card it was rolled from. */

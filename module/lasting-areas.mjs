@@ -52,7 +52,7 @@
 // line from where the move started to where it ended).
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM, saveResult, rollTotal, timed } from "./util.mjs";
+import { esc, isActiveGM, saveResult, rollTotal, timed, dealDamage, restoreDamage } from "./util.mjs";
 import { creatureTypes } from "./creature-types.mjs";
 import { registerMissSource } from "./miss-chance.mjs";
 
@@ -219,7 +219,14 @@ const tokenActor = (token) => token?.actor ?? null;
 function context(template, zone, token, { atCasting = false, lines, undo, ...opts }) {
   const actor = tokenActor(token);
   const state = (zone.creatures ??= {})[token.id] ??= { held: [], marks: [] };
-  const record = { actor: actor.uuid, conditions: [], damage: 0, con: 0 };
+  const record = { actor: actor.uuid, conditions: [], lost: { hp: 0, temp: 0 }, con: 0 };
+  /** Typed damage (resistances and DR apply), recorded for the Undo. */
+  const hurt = async (amount, types) => {
+    const lost = await dealDamage(actor, amount, types);
+    record.lost.hp += lost.hp;
+    record.lost.temp += lost.temp;
+    return lost.hp + lost.temp;
+  };
   undo.push(record);
   const line = (text) => lines.push(`${token.name}: ${text}`);
   const c = {
@@ -278,9 +285,8 @@ function context(template, zone, token, { atCasting = false, lines, undo, ...opt
       if (total < cmd) return line(`tentacles ${total} vs CMD ${cmd}: no grapple`);
       if (!c.holds("grappled")) await c.hold(["grappled"]);
       const dmg = await rollTotal("1d6+4");
-      await actor.applyDamage(dmg, { forceDialog: false });
-      record.damage += dmg;
-      line(`tentacles ${total} vs CMD ${cmd}: grappled, ${dmg} bludgeoning damage`);
+      const taken = await hurt(dmg, ["bludgeoning"]);
+      line(`tentacles ${total} vs CMD ${cmd}: grappled, ${dmg} bludgeoning damage${taken < dmg ? ` (${taken} after DR)` : ""}`);
     },
     async webMove() {
       // Combat maneuver check or Escape Artist, whichever is better, against the spell's DC
@@ -319,9 +325,9 @@ function context(template, zone, token, { atCasting = false, lines, undo, ...opt
       const feet = Math.max(5, Math.round(feetInside(template, from.x, from.y, to.x, to.y)));
       const n = Math.max(1, Math.floor(feet / 5));
       const dmg = await rollTotal(`${n}d4`);
-      await actor.applyDamage(dmg, { forceDialog: false });
-      record.damage += dmg;
-      line(`${feet} feet through the spikes: ${dmg} piercing damage`);
+      const taken = await hurt(dmg, ["piercing"]);
+      line(`${feet} feet through the spikes: ${dmg} piercing damage${taken < dmg ? ` (${taken} after DR)` : ""}`);
+      if (!taken) return; // "Any creature that takes damage from this spell must also succeed on a Reflex save"
       if (actor.itemTypes.buff.some((b) => b.isActive && /^spike growth injury/i.test(b.name))) return;
       if (await c.save("ref")) return;
       await actor.createEmbeddedDocuments("Item", [{ name: "Spike Growth injury", type: "buff", img: "icons/svg/trap.svg", system: { active: true, subType: "temp", duration: { value: "24", units: "hour" }, contextNotes: [{ text: "Land speed halved (feet and legs injured by spike growth) until the 24 hours pass or a cure spell heals it", target: "attack" }] } }]);
@@ -331,8 +337,7 @@ function context(template, zone, token, { atCasting = false, lines, undo, ...opt
     async pit(text) {
       const depth = Math.min(30, 10 * Math.max(1, Math.floor(zone.cl / 2)));
       const dmg = await rollTotal(`${depth / 10}d6`);
-      await actor.applyDamage(dmg, { forceDialog: false });
-      record.damage += dmg;
+      await hurt(dmg, ["bludgeoning"]); // falling damage
       await c.fall(`${text}: falls ${depth} feet, ${dmg} damage, prone`);
     },
     async saveOrPit(bonus) {
@@ -362,7 +367,7 @@ async function act(template, tokens, handler, title, opts = {}) {
   if (!lines.length) return;
   await ChatMessage.implementation.create({
     whisper: game.users.filter((u) => u.isGM).map((u) => u.id),
-    content: `<p><strong>${esc(zone.name)}</strong>${title ? ` (${esc(title)})` : ""}${zone.roll && spell.roll ? `, tentacles' roll ${zone.roll}` : ""}:</p><ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>${undo.some((u) => u.conditions.length || u.damage || u.con) ? `<button type="button" data-action="${MODULE_ID}-area-undo">Undo</button>` : ""}`,
+    content: `<p><strong>${esc(zone.name)}</strong>${title ? ` (${esc(title)})` : ""}${zone.roll && spell.roll ? `, tentacles' roll ${zone.roll}` : ""}:</p><ul>${lines.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>${undo.some((u) => u.conditions.length || u.lost?.hp || u.lost?.temp || u.con) ? `<button type="button" data-action="${MODULE_ID}-area-undo">Undo</button>` : ""}`,
     flags: { [MODULE_ID]: { [CARD]: { undo } } },
   });
 }
@@ -536,7 +541,7 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
       const actor = fromUuidSync(u.actor);
       if (!actor) continue;
       if (u.conditions.length) await actor.setConditions(Object.fromEntries(u.conditions.map((c) => [c, false])));
-      if (u.damage) await actor.applyDamage(-u.damage, { forceDialog: false });
+      if (u.lost) await restoreDamage(actor, u.lost);
       if (u.con) await actor.update({ "system.abilities.con.damage": Math.max(0, (actor.system.abilities.con.damage ?? 0) - u.con) });
     }
     await message.setFlag(MODULE_ID, "undone", true);

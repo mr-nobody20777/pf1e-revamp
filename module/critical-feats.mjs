@@ -19,9 +19,8 @@
 // Crippling Critical lowers each speed by half its value when the hit lands.
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, timed, saveResult, onGmRequest, requestedByOwner, isActiveGM } from "./util.mjs";
+import { esc, timed, saveResult, onGmRequest, requestedByOwner, isActiveGM, applyCondition } from "./util.mjs";
 import { creatureTypes } from "./creature-types.mjs";
-import { remainingSeconds } from "./spells.mjs";
 import { setBleed } from "./bleed.mjs";
 import { negatedSneak } from "./fortification.mjs";
 
@@ -34,28 +33,7 @@ const SPEEDS = ["land", "climb", "swim", "burrow", "fly"];
 /*  Conditions and buffs                        */
 /* -------------------------------------------- */
 
-/**
- * Give the creature a condition for `rounds` rounds (null: until removed). `extend`: an existing one gets
- * the rounds added ("additional hits add to the duration"); otherwise a longer one replaces a shorter one.
- */
-async function condition(actor, id, rounds, { extend = false } = {}) {
-  const name = pf1.registry.conditions.get(id)?.name?.toLowerCase() ?? id;
-  if (actor.getConditionImmunities?.().has(id)) return `immune to ${name}`;
-  const left = remainingSeconds(actor, id);
-  if (rounds == null) {
-    if (left === Infinity) return `already ${name}`;
-    if (left != null) await actor.setConditions({ [id]: false });
-    await actor.setConditions({ [id]: true });
-    return name;
-  }
-  if (left === Infinity) return `already ${name}`;
-  let total = rounds;
-  if (left != null && extend) total = Math.ceil(left / ROUND()) + rounds;
-  else if (left != null && left >= rounds * ROUND()) return `already ${name}`;
-  if (left != null) await actor.setConditions({ [id]: false });
-  await actor.setConditions({ [id]: { duration: timed(total) } });
-  return `${name} ${total} round${total === 1 ? "" : "s"}${left != null && extend ? " (duration added)" : ""}`;
-}
+const condition = applyCondition; // util.mjs
 
 /** A buff on the target named for the feat; an older one of the same name is replaced. */
 async function featBuff(actor, { name, img, rounds = null, text, changes = [], flags = {} }) {

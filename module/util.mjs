@@ -105,6 +105,57 @@ Hooks.on("canvasReady", () => {
  */
 export const timed = (rounds) => ({ seconds: rounds * (CONFIG.time.roundTime || 6), startTime: game.time.worldTime });
 
+// What a save is being rolled against when it has no card to tell (an affliction's kind, a fire): save
+// bonuses against those (save-bonuses.mjs) read it while the save is rolled
+let saveContext = null;
+export const savingAgainst = () => saveContext;
+/** Roll a save against kinds of effects (["poison"], ["fire"]) when no card says what the effect is. */
+export async function rollSaveAgainst(actor, type, descriptors, options = {}) {
+  saveContext = descriptors;
+  try {
+    return await actor.rollSavingThrow(type, { skipDialog: true, ...options });
+  } finally {
+    saveContext = null;
+  }
+}
+
+/** Seconds left on a condition: null when the creature doesn't have it, Infinity when it has no duration. */
+export function remainingSeconds(actor, id) {
+  if (!actor.statuses.has(id)) return null;
+  const effect = actor.effects.find((e) => e.statuses.has(id));
+  const { seconds, startTime, rounds, turns } = effect?.duration ?? {};
+  if (Number.isFinite(seconds)) return seconds - (game.time.worldTime - (startTime ?? 0));
+  // Timed in rounds or turns (PF1 or another module made it): Foundry's rounds left (all of them out of combat)
+  if (rounds || turns) return (effect.duration.remaining ?? rounds ?? 0) * (CONFIG.time.roundTime || 6);
+  return Infinity;
+}
+
+/**
+ * Give a creature a condition for `rounds` rounds (null: until removed), the one way every feature does it.
+ * PF1 ignores a new duration when the creature already has the condition (it keeps the old one, or keeps it
+ * permanent), so an existing one is lifted first. A longer existing one stays ("already"); `extend` adds the
+ * rounds to it instead ("additional hits add to the duration"). Returns a short description.
+ */
+export async function applyCondition(actor, id, rounds = null, { extend = false } = {}) {
+  const name = pf1.registry.conditions.get(id)?.name?.toLowerCase() ?? id;
+  if (actor.getConditionImmunities?.().has(id)) return `immune to ${name}`;
+  const left = remainingSeconds(actor, id);
+  const round = CONFIG.time.roundTime || 6;
+  if (rounds == null) {
+    if (left === Infinity) return `already ${name}`;
+    if (left != null) await actor.setConditions({ [id]: false });
+    await actor.setConditions({ [id]: true });
+    return name;
+  }
+  if (left === Infinity) return `already ${name}`;
+  let total = rounds;
+  if (left != null && extend) total = Math.ceil(left / round) + rounds;
+  else if (left != null && left >= rounds * round) return `already ${name}`;
+  if (left != null) await actor.setConditions({ [id]: false });
+  await actor.setConditions({ [id]: { duration: timed(total) } });
+  return `${name} ${total} round${total === 1 ? "" : "s"}${left != null && extend ? " (duration added)" : ""}`;
+}
+
 /**
  * A saving throw's result against a DC (from rollSavingThrow's message or roll): "a natural 1 is always a
  * failure, and a natural 20 is always a success."
