@@ -3,7 +3,7 @@
 import { createTestActor, cleanup, addItems } from "./helpers.mjs";
 import * as SB from "../situational-bonuses.mjs";
 import { creatureBonuses } from "../creature-bonuses.mjs";
-import { notesOf } from "../util.mjs";
+import { notesOf, rollSaveAgainst } from "../util.mjs";
 
 export function registerSituationalBonusTests(quench) {
   quench.registerBatch(
@@ -93,6 +93,13 @@ export function registerSituationalBonusTests(quench) {
           assert.isTrue(p.unchecked);
           assert.isFalse(SB._test.parseLine("+[[2]] on combat maneuver checks to grapple").unchecked);
           assert.isFalse(SB._test.parseLine("+[[1]] on attack rolls when flanking.").unchecked);
+        });
+
+        it("description save bonuses go to the save reader: Pure Faith's +4 sacred on a save against poison", async () => {
+          await actor.createEmbeddedDocuments("Item", [{ name: "Pure Faith", type: "feat", system: { subType: "trait" } }]);
+          const message = await rollSaveAgainst(actor, "fort", ["poison"], { dc: 10 });
+          assert.match(message?.rolls?.[0]?.formula ?? "", /4\[Pure Faith\]/);
+          await actor.items.getName("Pure Faith").delete();
         });
 
         it("features the module automates on their own are skipped (no double count)", async () => {

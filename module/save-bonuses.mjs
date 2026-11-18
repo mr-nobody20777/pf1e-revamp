@@ -20,7 +20,7 @@
 // the highest, and only the part above the character's existing bonus of that type on that save.
 
 import { MODULE_ID } from "./const.mjs";
-import { evaluate } from "./util.mjs";
+import { evaluate, notesOf } from "./util.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 import { parseCreatures, matchesCreatures } from "./creature-types.mjs";
 import { isWard } from "./ward.mjs";
@@ -163,9 +163,10 @@ export function saveBonuses(actor, saveId, effect, { stack = true, source = null
   // (halfling "+2 vs fear" on the race and on Fearless): count it once.
   const racialSeen = new Set();
   for (const item of actor.items) {
-    if (item.isActive === false || !item.system.contextNotes?.length || isWard(item)) continue; // wards: ward.mjs
+    const notes = notesOf(item);
+    if (item.isActive === false || !notes.length || isWard(item)) continue; // wards: ward.mjs
     const racialSource = item.type === "race" || item.system.subType === "racial";
-    for (const note of item.system.contextNotes) {
+    for (const note of notes) {
       if (note.target !== "allSavingThrows" && note.target !== saveId) continue;
       for (const line of noteLines(note.text ?? "")) {
         const parsed = parseNote(line);
