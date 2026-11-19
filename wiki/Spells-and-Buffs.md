@@ -95,6 +95,9 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 | Cleanse | Ends blinded, confused, dazzled, deafened, exhausted, fatigued, nauseated and sickened on the caster |
 | Mass Hold Person, Eyebite, Circle of Death, Undeath to Death, Waves of Exhaustion, Insanity, Flesh to Stone, Greater Shout, Waves of Ecstasy, Prediction of Failure | Paralyzed (new save each turn); effects by Hit Dice; slain or destroyed from a pool of Hit Dice; exhausted; confused; petrified; stunned and deafened; stunned then staggered; shaken and sickened |
 | Irresistible Dance, Transformation, Dance of a Thousand Cuts | −4 AC and −10 Reflex; +4 Strength, Dexterity and Constitution; haste |
+| Holy Aura, Unholy Aura, Cloak of Chaos, Shield of Law, Communal Mind Blank, Greater Spell Immunity, Mass Fly, Mind Blank | The spell's buff on each creature affected |
+| Power Word Stun, Power Word Blind | By the target's current hit points; unaffected above 150 (Stun) or 200 (Blind) |
+| Scintillating Pattern, Sunburst | A pool of caster level Hit Dice, unconscious, stunned or confused by Hit Dice; blinded |
 | Lesser Restoration | Ends fatigue and improves exhausted to fatigued; heals 1d4 damage to one ability score or ends a spell's penalty to one. With more than one option, the caster picks on a card |
 | Endure Elements, Feather Fall, Hide from Animals, Hide from Undead, Undetectable Alignment, Comprehend Languages, Speak with Animals, Pass Without Trace | A buff on each subject for the duration, with a reminder of what it does |
 

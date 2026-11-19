@@ -240,6 +240,8 @@ function unaffectedBy(def, actor, spell) {
   const hd = actor.system.attributes?.hd?.total ?? 0;
   if (def?.types && !def.types.some((t) => types.has(t) || subtypes.has(t))) return `only ${def.types.join(" or ")} creatures`;
   if (def?.hdMax != null && hd > def.hdMax) return `${def.hdMax} HD or less only`;
+  // Power words: "Any creature that currently has 151 or more hit points is unaffected"
+  if (def?.hpTiers && (actor.system.attributes?.hp?.value ?? 0) > def.hpTiers.at(-1)[0]) return `only a creature with ${def.hpTiers.at(-1)[0]} hit points or less`;
   const undeadOrConstruct = !isLiving(null, types);
   if (def?.living && undeadOrConstruct) return "living creatures only";
   if (def?.dying && !((actor.system.attributes?.hp?.value ?? 0) < 0)) return "only a creature below 0 hit points";
@@ -562,7 +564,7 @@ async function applyRow(row, def, data, caster, { saved }) {
   const actor = actorOf(row.uuid);
   // A creature not on the caster's side gets the spell's foe effect when it has one (Prayer)
   const foe = !!def?.foe && !accepts(data, row, caster);
-  const effect = !def ? null : saved ? def.onSave : def.tiers ? tierFor(def, actor) : def.choice ? def.choice.effects[data.choice] ?? null : foe ? def.foe : def.effect;
+  const effect = !def ? null : saved ? def.onSave : def.tiers ? tierFor(def, actor) : def.hpTiers ? hpTierFor(def, actor) : def.choice ? def.choice.effects[data.choice] ?? null : foe ? def.foe : def.effect;
   if (def?.choice && !saved && !data.choice) row.pendingChoice = true;
   const applied = [];
   // A healing spell heals the living; undead take it as damage (half on a save), and inflict spells heal them
@@ -578,6 +580,12 @@ async function applyRow(row, def, data, caster, { saved }) {
   if (!saved && def?.unread && !data.damage) applied.push("apply its effect by hand (see the ability)");
   if (def?.cooldown && actor && !saved) await actor.setFlag(MODULE_ID, "spellCooldown", { [data.name.toLowerCase()]: game.time.worldTime + def.cooldown * 6 });
   row.applied = applied;
+}
+
+/** The effect by the creature's current hit points (the power words). */
+function hpTierFor(def, actor) {
+  const hp = actor?.system.attributes?.hp?.value ?? 0;
+  return def.hpTiers.find(([max]) => hp <= max)?.[1] ?? null;
 }
 
 function tierFor(def, actor) {

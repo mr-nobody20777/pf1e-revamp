@@ -42,6 +42,8 @@
 //   saveModifiers  [{ when, value, label, reason }] ticked in the save window: when "inCombat",
 //              "aloneOutOfCombat" (the only creature affected, not in combat) or "differentType" (not
 //              of the caster's type)
+//   hpTiers    effect by the creature's current hit points: [[up to hp, effect], ...]; more than the last is
+//              unaffected (the power words)
 //   tiers      effect by Hit Dice: [[up to HD, effect], ...] (Color Spray)
 //   utility    nothing to apply to creatures (Mending, Prestidigitation): no rows on its card
 //   selfIfNone the caster is the subject when nothing is targeted (Light: usually the caster's own gear)
@@ -1153,6 +1155,61 @@ export const SPELLS = {
   "restoration, greater": { effect: { remove: ["fatigued", "exhausted"], note: "also dispels negative levels and magical penalties to ability scores, cures all ability damage" } },
   forcecage: { effect: { marker: true, note: "trapped in a cage of force" } },
   "telekinetic sphere": { effect: { marker: true, note: "enclosed in a weightless sphere of force" } },
+
+  // 8th level, the four core books: nothing to apply to the creatures in the rows
+  "clenched fist": { utility: true },
+  clone: { utility: true },
+  "create greater undead": { utility: true },
+  etherealness: { utility: true },
+  "planar ally, greater": { utility: true },
+  "prismatic wall": { utility: true },
+  "prying eyes, greater": { utility: true },
+  "repel metal or stone": { utility: true },
+  screen: { utility: true },
+  "shadow evocation, greater": { utility: true },
+  "summon nature's ally viii": { utility: true },
+  "wall of lava": { utility: true },
+  // 8th level, the four core books: on the caster, with a reminder
+  "divine vessel": { self: true, effect: { marker: true, note: "one size larger with an aspect's powers (see the spell)" } },
+  seamantle: { self: true, effect: { marker: true, note: "a column of water: swim speed, attacks against you are hampered (see the spell)" } },
+  "form of the dragon iii": { self: true, effect: { marker: true, note: "polymorph into a Huge dragon: apply the form's changes by hand" } },
+  "giant form ii": { self: true, effect: { marker: true, note: "polymorph into a Huge giant: apply the form's changes by hand" } },
+  "undead anatomy iv": { self: true, effect: { marker: true, note: "polymorph into a Diminutive to Huge undead: apply the form's changes by hand" } },
+  "iron body": { self: true, effect: { marker: true, note: "living iron: DR 15/adamantine and many immunities (see the spell)" } },
+  "moment of prescience": { self: true, effect: { marker: true, note: "once: an insight bonus equal to your caster level (max +25) on one roll or to AC" } },
+  "frightful aspect": { self: true, effect: { marker: true, note: "Large and terrifying: +6 Str, +4 Con, +6 natural armor and more (see the spell)" } },
+  // 8th level, the four core books
+  "cloak of chaos": { effect: { buff: "Cloak of Chaos" } },
+  "holy aura": { effect: { buff: "Holy Aura" } },
+  "shield of law": { effect: { buff: "Shield of Law" } },
+  "unholy aura": { effect: { buff: "Unholy Aura" } },
+  "mind blank, communal": { effect: { buff: "Mind Blank" } },
+  "spell immunity, greater": { effect: { buff: "Spell Immunity", note: "spells of 8th level or lower" } },
+  "atavism, mass": { effect: { marker: true, note: "the advanced template: +2 on rolls, +4 AC and CMD, +2 hp per HD; attacks the nearest creature" } },
+  "control plants": { types: ["plant"], pool: "2 * @cl", effect: { marker: true, note: "under your control" } },
+  "temporal stasis": { effect: { marker: true, note: "in suspended animation until freed (freedom, dispel magic)" } },
+  "polymorph any object": { effect: { marker: true, note: "transformed (see the spell for the duration by how far the new form is from the old)" } },
+  // "All creatures in the globe are blinded and take 6d6 points of damage ... A successful Reflex save negates the
+  // blindness"
+  sunburst: { effect: { conditions: [["blind", null]] } },
+  // "affects a total number of HD of creatures equal to your caster level (maximum 20) ... 6 HD or fewer:
+  // unconscious for 1d4 rounds, then stunned for 1d4 rounds, and then confused for 1d4 rounds; 7 to 12 HD: stunned for
+  // 1d4 rounds, then confused for 1d4 rounds; 13 HD or more: confused for 1d4 rounds"
+  "scintillating pattern": {
+    pool: "min(@cl, 20)",
+    sighted: true,
+    tiers: [
+      [6, { conditions: [["unconscious", "1d4"]], note: "then stunned 1d4 rounds and confused 1d4 rounds" }],
+      [12, { conditions: [["stunned", "1d4"]], note: "then confused 1d4 rounds" }],
+      [999, { conditions: [["confused", "1d4"]] }],
+    ],
+  },
+  // "50 or less: 4d4 rounds; 51-100: 2d4 rounds; 101-150: 1d4 rounds. Any creature that currently has 151 or more hit
+  // points is unaffected"
+  "power word stun": { hpTiers: [[50, { conditions: [["stunned", "4d4"]] }], [100, { conditions: [["stunned", "2d4"]] }], [150, { conditions: [["stunned", "1d4"]] }]] },
+  // "50 or less: Permanent; 51-100: 1d4+1 minutes; 101-200: 1d4+1 rounds. Any creature that currently has 201 or more
+  // hit points is unaffected"
+  "power word blind": { hpTiers: [[50, { conditions: [["blind", null]] }], [100, { conditions: [["blind", "10 * (1d4 + 1)"]] }], [200, { conditions: [["blind", "1d4 + 1"]] }]] },
 
   "pass without trace": { effect: { buff: "Pass Without Trace" } },
   "undetectable alignment": { effect: { marker: true, note: "alignment can't be detected by divinations" } },

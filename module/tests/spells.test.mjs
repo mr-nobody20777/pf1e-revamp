@@ -21,7 +21,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation", "Hold Monster", "Litany of Madness", "Calcific Touch", "Waves of Fatigue", "Stunning Finale", "Eyebite", "Hold Person, Mass", "Fly, Mass"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation", "Hold Monster", "Litany of Madness", "Calcific Touch", "Waves of Fatigue", "Stunning Finale", "Eyebite", "Hold Person, Mass", "Fly, Mass", "Power Word Stun"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -63,7 +63,7 @@ export function registerSpellTests(quench) {
           uniform = CONFIG.Dice.randomUniform;
           sceneCtl = await useTestScene();
           wizard = await createTestActor("Quench Spell Wizard", { abilities: { int: 18 }, items: [["pf1.races", "Human"], ["pf1.classes", "Wizard", { system: { level: 5 } }]] });
-          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : ["Prayer", "Fear", "Fungal Infestation"].includes(n) ? 3 : ["Hold Monster", "Litany of Madness", "Calcific Touch"].includes(n) ? 4 : ["Waves of Fatigue", "Stunning Finale"].includes(n) ? 5 : ["Eyebite", "Hold Person, Mass"].includes(n) ? 6 : ["Fly, Mass"].includes(n) ? 7 : 1)]));
+          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : ["Prayer", "Fear", "Fungal Infestation"].includes(n) ? 3 : ["Hold Monster", "Litany of Madness", "Calcific Touch"].includes(n) ? 4 : ["Waves of Fatigue", "Stunning Finale"].includes(n) ? 5 : ["Eyebite", "Hold Person, Mass"].includes(n) ? 6 : ["Fly, Mass"].includes(n) ? 7 : ["Power Word Stun"].includes(n) ? 8 : 1)]));
           human = await createTestActor("Quench Spell Human", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
           ogre = await createTestActor("Quench Spell Ogre", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 6 } }]] });
           friend = await createTestActor("Quench Spell Friend", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
@@ -682,6 +682,14 @@ export function registerSpellTests(quench) {
           await cast("Fly, Mass", [friendToken, wizardToken]);
           await waitFor(() => friend.itemTypes.buff.some((b) => b.name === "Fly") && wizard.itemTypes.buff.some((b) => b.name === "Fly"), { what: "the buffs" });
           for (const a of [friend, wizard]) await a.itemTypes.buff.find((b) => b.name === "Fly").delete();
+        });
+
+        it("Power Word Stun: the duration by current hit points (50 or less: 4d4 rounds)", async () => {
+          dice(0.01); // 4d4: 16
+          const card = await cast("Power Word Stun", [humanToken]);
+          await waitFor(() => human.statuses.has("stunned"), { what: "stunned" });
+          assert.match(row(card, human).applied.join(), /stunned 16 rounds/);
+          await human.setConditions({ stunned: false });
         });
 
         it("a personal spell goes on the caster", async () => {
