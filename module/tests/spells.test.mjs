@@ -21,7 +21,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -63,7 +63,7 @@ export function registerSpellTests(quench) {
           uniform = CONFIG.Dice.randomUniform;
           sceneCtl = await useTestScene();
           wizard = await createTestActor("Quench Spell Wizard", { abilities: { int: 18 }, items: [["pf1.races", "Human"], ["pf1.classes", "Wizard", { system: { level: 5 } }]] });
-          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : 1)]));
+          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : 1)]));
           human = await createTestActor("Quench Spell Human", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
           ogre = await createTestActor("Quench Spell Ogre", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 6 } }]] });
           friend = await createTestActor("Quench Spell Friend", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
@@ -470,6 +470,93 @@ export function registerSpellTests(quench) {
           await save(card, human);
           assert.equal(human.system.skills.crf.mod, before - 5);
           await human.itemTypes.buff.find((b) => b.name === "Crafter's Curse").delete();
+        });
+
+        it("Hold Person: paralyzed for its duration, with a new save each turn", async () => {
+          const card = await cast("Hold Person", [humanToken]);
+          dice(0.99);
+          await save(card, human);
+          assert.isTrue(human.statuses.has("paralyzed"));
+          const buff = human.itemTypes.buff.find((b) => b.name === "Hold Person");
+          assert.isTrue(buff.getFlag(MODULE_ID, "resave").every);
+          await buff.delete();
+          await human.setConditions({ paralyzed: false });
+        });
+
+        it("Bull's Strength: PF1's buff on the ally", async () => {
+          const str = friend.system.abilities.str.total;
+          await cast("Bull's Strength", [friendToken]);
+          await waitFor(() => friend.system.abilities.str.total === str + 4, { what: "+4 Strength" });
+          await friend.itemTypes.buff.find((b) => b.name === "Bull's Strength").delete();
+        });
+
+        it("Touch of Idiocy: one 1d6 roll as the penalty to Intelligence, Wisdom and Charisma", async () => {
+          dice(0.01); // the touch attack hits; 1d6: 6
+          const int = human.system.abilities.int.total;
+          // PF1 rolls it as a melee attack: the target must be in reach
+          const { x, y } = humanToken;
+          await humanToken.update({ x: wizardToken.x, y: wizardToken.y + canvas.grid.size }, { animate: false });
+          await cast("Touch of Idiocy", [humanToken]);
+          await humanToken.update({ x, y }, { animate: false });
+          const buff = await waitFor(() => human.itemTypes.buff.find((b) => b.name === "Touch of Idiocy"), { what: "the buff" });
+          assert.deepEqual(buff.system.changes.map((c) => c.formula), ["-6", "-6", "-6"]);
+          assert.equal(human.system.abilities.int.total, int - 6);
+          await buff.delete();
+        });
+
+        it("Blindness/Deafness: the caster's choice decides the condition", async () => {
+          const card = await cast("Blindness/Deafness", [humanToken]);
+          await waitFor(() => [...foundry.applications.instances.values()].some((a) => /Blinded or deafened/.test(a.title ?? "")), { what: "the dialog" });
+          for (const a of [...foundry.applications.instances.values()]) if (/Blinded or deafened/.test(a.title ?? "")) await a.close();
+          await card.setFlag(MODULE_ID, "spellChoice", "deaf");
+          dice(0.99);
+          await save(card, human);
+          assert.isTrue(human.statuses.has("deaf"));
+          assert.isFalse(human.statuses.has("blind"));
+          await human.setConditions({ deaf: false });
+        });
+
+        it("Aid: PF1's buff and 1d8 + caster level temporary hit points, gone with the buff", async () => {
+          const temp = friend.system.attributes.hp.temp ?? 0;
+          dice(0.01); // 1d8: 8
+          await cast("Aid", [friendToken]);
+          await waitFor(() => (friend.system.attributes.hp.temp ?? 0) === temp + 13, { what: "8 + 5 temporary hit points" });
+          await friend.itemTypes.buff.find((b) => b.name === "Aid").delete();
+          await waitFor(() => (friend.system.attributes.hp.temp ?? 0) === temp, { what: "gone" });
+        });
+
+        it("Flame Blade: a melee touch attack only, 1d8 + 2 fire at caster level 5", async () => {
+          await cast("Flame Blade", []);
+          const attack = await waitFor(() => wizard.itemTypes.attack.find((i) => i.name === "Flame Blade"), { what: "the attack" });
+          assert.deepEqual(attack.actions.map((a) => a.actionType), ["msak"]);
+          assert.equal(attack.actions.contents[0].damage.parts[0].formula, "1d8 + min(floor(5 / 2), 10)");
+          await wizard.itemTypes.buff.find((b) => b.name === "Flame Blade").delete();
+          await waitFor(() => !wizard.itemTypes.attack.some((i) => i.name === "Flame Blade"), { what: "the attack gone" });
+        });
+
+        it("Castigate: cowering with a new save each turn; shaken 1 round on a save", async () => {
+          const card = await cast("Castigate", [humanToken, ogreToken]);
+          dice(0.99);
+          await save(card, human);
+          dice(0.01);
+          await save(card, ogre);
+          assert.isTrue(human.statuses.has("cowering"));
+          assert.isOk(human.itemTypes.buff.find((b) => b.name === "Castigate")?.getFlag(MODULE_ID, "resave"));
+          assert.isTrue(ogre.statuses.has("shaken"));
+          await human.itemTypes.buff.find((b) => b.name === "Castigate").delete();
+          await human.setConditions({ cowering: false });
+          await ogre.setConditions({ shaken: false });
+        });
+
+        it("Pox Pustules: sickened and -4 Dexterity", async () => {
+          const dex = human.system.abilities.dex.total;
+          const card = await cast("Pox Pustules", [humanToken]);
+          dice(0.99);
+          await save(card, human);
+          assert.isTrue(human.statuses.has("sickened"));
+          assert.equal(human.system.abilities.dex.total, dex - 4);
+          await human.itemTypes.buff.find((b) => b.name === "Pox Pustules").delete();
+          await human.setConditions({ sickened: false });
         });
 
         it("a personal spell goes on the caster", async () => {

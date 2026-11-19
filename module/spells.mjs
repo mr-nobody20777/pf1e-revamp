@@ -245,6 +245,7 @@ function unaffectedBy(def, actor, spell) {
   if (def?.dying && !((actor.system.attributes?.hp?.value ?? 0) < 0)) return "only a creature below 0 hit points";
   if (def?.wounded && !((actor.system.attributes?.hp?.value ?? 0) < (actor.system.attributes?.hp?.max ?? 0))) return "only a wounded creature";
   if (def?.intMin != null && !((actor.system.abilities?.int?.value ?? 0) >= def.intMin)) return `Intelligence ${def.intMin} or higher only`;
+  if (def?.intMax != null && (actor.system.abilities?.int?.value ?? 0) > def.intMax) return `Intelligence ${def.intMax} or lower only`;
   if (def?.sighted && actor.statuses?.has("blind")) return "sightless creatures are unaffected";
   if (def?.unless && actor.statuses?.has(def.unless)) return `already ${def.unless}`;
   if (def?.cooldown) {
@@ -287,6 +288,7 @@ async function resolveCard(message) {
   const data = foundry.utils.deepClone(message.getFlag(MODULE_ID, FLAG));
   if (!data || data.resolved) return;
   data.energy = message.getFlag(MODULE_ID, ENERGY_FLAG) ?? null;
+  data.choice = message.getFlag(MODULE_ID, CHOICE_FLAG) ?? null;
   const caster = ChatMessage.implementation.getSpeakerActor(message.speaker);
   const item = caster?.items.get(message.system.item?.id) ?? message.itemSource;
   const def = data.ability ? abilityDef(item, data.save?.type) : spellDef(item);
@@ -356,7 +358,7 @@ async function resolveCard(message) {
 
   // A pool of Hit Dice (Sleep): fewest HD first, then nearest to the spell's origin
   if (def?.pool) {
-    let left = (await new Roll(def.pool).evaluate()).total;
+    let left = (await new Roll(def.pool, { cl: data.cl ?? 0 }).evaluate()).total;
     data.pool = left;
     const origin = fromUuidSync(message.system.template ?? "") ?? caster?.getActiveTokens()[0]?.document;
     const dist = (row) => {
@@ -384,6 +386,20 @@ async function resolveCard(message) {
 // kept in its own flag (the GM's game writes the rows' flag at the same time)
 const ENERGY_FLAG = "spellEnergy";
 const ENERGIES = { acid: "acid", cold: "cold", electric: "electricity", fire: "fire", sonic: "sonic" };
+// The same for a choice between effects (Blindness/Deafness, Bestow Curse)
+const CHOICE_FLAG = "spellChoice";
+Hooks.on("createChatMessage", async (message, options, userId) => {
+  if (userId !== game.user.id || message.type !== "action" || !message.getFlag(MODULE_ID, FLAG)) return;
+  const choice = spellDef(message.itemSource)?.choice;
+  if (!choice) return;
+  const picked = await foundry.applications.api.DialogV2.wait({
+    window: { title: `${message.getFlag(MODULE_ID, FLAG).name}: ${choice.title}` },
+    content: `<p>${esc(choice.title)}?</p><select name="choice">${Object.entries(choice.options).map(([id, label]) => `<option value="${id}">${esc(label)}</option>`).join("")}</select>`,
+    buttons: [{ action: "ok", label: "Choose", default: true, callback: (event, button) => button.form.elements.choice.value }],
+    rejectClose: false,
+  });
+  if (choice.options[picked]) await message.setFlag(MODULE_ID, CHOICE_FLAG, picked);
+});
 Hooks.on("createChatMessage", async (message, options, userId) => {
   if (userId !== game.user.id || message.type !== "action" || !message.getFlag(MODULE_ID, FLAG)) return;
   if (!spellDef(message.itemSource)?.energy) return;
@@ -420,6 +436,7 @@ Hooks.on("createChatMessage", (save) => {
     const data = foundry.utils.deepClone(card?.getFlag?.(MODULE_ID, FLAG));
     if (!data?.resolved || !data.save) return;
     data.energy = card.getFlag(MODULE_ID, ENERGY_FLAG) ?? null;
+    data.choice = card.getFlag(MODULE_ID, CHOICE_FLAG) ?? null;
     const { token: tokenId, actor: actorId } = save.speaker;
     // By token when the save has one; else by actor, except for unlinked tokens (they share their actor's id)
     const mine = (r) => (tokenId && r.uuid.endsWith(`Token.${tokenId}`)) || (actorOf(r.uuid)?.id === actorId && tokenOf(r.uuid)?.actorLink !== false);
@@ -543,7 +560,8 @@ async function endEffect(row, data, passed) {
 async function applyRow(row, def, data, caster, { saved }) {
   row.state = "done";
   const actor = actorOf(row.uuid);
-  const effect = !def ? null : saved ? def.onSave : def.tiers ? tierFor(def, actor) : def.effect;
+  const effect = !def ? null : saved ? def.onSave : def.tiers ? tierFor(def, actor) : def.choice ? def.choice.effects[data.choice] ?? null : def.effect;
+  if (def?.choice && !saved && !data.choice) row.pendingChoice = true;
   const applied = [];
   // A healing spell heals the living; undead take it as damage (half on a save), and inflict spells heal them
   const reversed = !!actor && energyAsUndead(actor) && REVERSED.test(data.name);
@@ -551,6 +569,7 @@ async function applyRow(row, def, data, caster, { saved }) {
   else if (saved && data.damage) applied.push("half damage");
   else if (data.damage) applied.push("full damage");
   if (saved && def && !def.onSave && !data.damage) applied.push(row.hitDamage ? "no further effect" : "no effect");
+  if (row.pendingChoice) applied.push("the caster hasn't chosen the effect yet: apply it by hand");
   if (effect && actor) applied.push(...(await applyEffect(actor, effect, data, caster, tokenOf(row.uuid))));
   // An ability whose effect couldn't be read from its text: the GM applies it (DECISIONS.md)
   if (!saved && def?.reminder?.length) applied.push(`${def.reminder.join(", ")}: its duration isn't in the text, apply by hand`);
@@ -633,11 +652,12 @@ async function applyEffect(actor, effect, data, caster, token = null) {
   }
   if (effect.changes) {
     const duration = spellDuration(item, data.cl);
-    const changes = effect.changes.map((c) => ({ ...c }));
+    // Values rolled once for the casting (Touch of Idiocy's 1d6) go into the formulas
+    const changes = effect.changes.map((c) => ({ ...c, formula: String(c.formula).replace(/@(\w+)/g, (m, k) => (effect.roll && k in effect.roll ? String(rollData[k]) : m)) }));
     const existing = actor.itemTypes.buff.find((b) => b.name === data.name);
     if (existing) await existing.update({ "system.active": true, "system.changes": changes, ...byUpdate, ...(duration ? { "system.duration": duration } : {}) });
     else await actor.createEmbeddedDocuments("Item", [stamp({ name: data.name, type: "buff", img: item?.img, system: { subType: "spell", active: true, level: data.cl, changes, ...(duration ? { duration } : {}) } })]);
-    out.push(effect.changes.map((c) => `${c.formula} ${c.target.replace(/^skill\./, "")}`).join(", "));
+    out.push(changes.map((c) => `${c.formula} ${c.target.replace(/^skill\./, "")}`).join(", "));
   }
   // Neutralize poison, remove disease, remove curse: a caster level check against each affliction of the kind
   if (effect.cure) out.push(await cureAfflictions(actor, effect.cure, data.cl ?? 1));
@@ -675,6 +695,8 @@ async function applyEffect(actor, effect, data, caster, token = null) {
       out.push(`${total} damage`);
     }
   }
+  // Temporary hit points for the spell's duration (Aid, False Life): they go when its buff ends
+  if (effect.tempHp) out.push(await giveTempHp(actor, effect, data, rollData));
   // An attack the spell gives for its duration (Produce Flame)
   if (effect.attack) out.push(await giveAttack(actor, effect.attack, data));
   // Lesser Restoration: fatigue, exhaustion, and one ability score
@@ -736,7 +758,7 @@ async function giveAttack(actor, attack, data) {
       name: data.name,
       type: "attack",
       img: buff.img,
-      system: { subType: "misc", actions: [action("Touch", "msak", { units: "touch" }, "str"), action("Hurl", "rsak", { value: String(attack.range), units: "ft", maxIncrements: 1 }, "dex")] },
+      system: { subType: "misc", actions: [action("Touch", "msak", { units: "touch" }, "str"), ...(attack.range ? [action("Hurl", "rsak", { value: String(attack.range), units: "ft", maxIncrements: 1 }, "dex")] : [])] },
       flags: { [MODULE_ID]: { [SPELL_ATTACK]: { buff: buff.id, perUse: attack.perUse } } },
     },
   ]);
@@ -748,7 +770,7 @@ Hooks.on("createChatMessage", (message, options, userId) => {
   const item = message.itemSource;
   const flag = item?.flags?.[MODULE_ID]?.[SPELL_ATTACK];
   const buff = flag && item.actor?.items.get(flag.buff);
-  if (buff) spendDuration(buff, flag.perUse);
+  if (buff && flag.perUse) spendDuration(buff, flag.perUse);
 });
 async function spendDuration(buff, seconds) {
   const effect = buff.effect;
@@ -847,6 +869,18 @@ onGmRequest("restoreChosen", async (request, { message, index }) => {
   if (card && requestedByOwner(request, caster)) await chooseRestore(card, index);
   await request.delete();
 });
+
+/** Temporary hit points on the spell's buff (Aid, False Life); a new casting replaces those of the old one. */
+async function giveTempHp(actor, effect, data, rollData) {
+  const buff = actor.itemTypes.buff.find((b) => b.name === (effect.buff ?? data.name));
+  if (!buff) return "no buff to hold the temporary hit points";
+  let temp = actor.system.attributes.hp.temp ?? 0;
+  temp = Math.max(0, temp - (buff.getFlag(MODULE_ID, "tempHp") ?? 0));
+  const gained = (await new Roll(effect.tempHp, rollData).evaluate()).total;
+  await buff.setFlag(MODULE_ID, "tempHp", gained);
+  await actor.update({ "system.attributes.hp.temp": temp + gained });
+  return `${gained} temporary hit points`;
+}
 
 /**
  * Death Knell (Core Rulebook): "If the subject fails its saving throw, it dies, and you gain 1d8 temporary hit

@@ -68,6 +68,17 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 | Snapdragon Fireworks | Dazzled 1 round on a failed Reflex save |
 | Wrath, Invigorate, Remove Sickness, Hex Ward, Tactical Acumen, Moment of Greatness, Stone Fist, Litany of Sloth, Fumbletongue and about 35 more | A buff on each subject for the duration, with a reminder of what it does |
 | Animate Rope | Ranged touch attack, then a Reflex save (missing from PF1's data); entangled on a failure |
+| Bull's Strength, Bear's Endurance, Cat's Grace, Eagle's Splendor, Fox's Cunning, Owl's Wisdom, Haste, Heroism, Invisibility, Barkskin, Blur, Darkvision, See Invisibility, Protection From Arrows and more | PF1's or Pathfinder 1e Content's buff on each creature affected |
+| Aid, False Life | The buff, and temporary hit points (1d8 or 1d10 + caster level, max +10) that go when it ends |
+| Hold Person, Hold Animal | Paralyzed for the duration; a new save each turn (a full-round action) ends it |
+| Glitterdust | Blinded, with a new save at the end of each turn; −40 on Stealth even on a save |
+| Castigate | Cowering, with a new save each turn; shaken 1 round on a save |
+| Slow, Rage | PF1's Slow buff plus staggered; Rage's own +2 Strength and Constitution, +1 Will, −2 AC |
+| Scare, Sound Burst, Ghoul Touch, Cacophonous Call, Pain Strike, Pox Pustules, Piercing Shriek, Frigid Touch, Distressing Tone, Severed Fate, Dust of Twilight | Frightened, stunned, paralyzed, nauseated, sickened, staggered, shaken or fatigued, as the spell says |
+| Hypnotic Pattern, Animal Trance | Fascinated, from a pool of Hit Dice (2d4 + caster level, max 10; or 2d6 animals of Intelligence 1–2) |
+| Touch of Idiocy | One 1d6 roll as the penalty to Intelligence, Wisdom and Charisma |
+| Blindness/Deafness, Bestow Curse, Disfiguring Touch | The caster picks the effect when the card is posted |
+| Flame Blade | A melee touch attack while it lasts, 1d8 + 1 per two caster levels (max +10) fire |
 | Lesser Restoration | Ends fatigue and improves exhausted to fatigued; heals 1d4 damage to one ability score or ends a spell's penalty to one. With more than one option, the caster picks on a card |
 | Endure Elements, Feather Fall, Hide from Animals, Hide from Undead, Undetectable Alignment, Comprehend Languages, Speak with Animals, Pass Without Trace | A buff on each subject for the duration, with a reminder of what it does |
 

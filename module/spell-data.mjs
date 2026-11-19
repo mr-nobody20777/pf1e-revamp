@@ -10,6 +10,11 @@
 //   wounded    only a creature below its maximum hit points (Touch of Bloodletting)
 //   sighted    sightless creatures are unaffected
 //   intMin     creatures with a lower Intelligence (or none) are unaffected
+//   intMax     creatures with a higher Intelligence are unaffected (Animal Trance: 1 or 2)
+//   choice     { title, options: { id: label }, effects: { id: effect } }: the caster picks the effect when
+//              casting (Blindness/Deafness, Bestow Curse); it replaces `effect`
+//   effect.tempHp  formula: temporary hit points on the spell's buff, gone when it ends (Aid, False Life)
+//   effect.roll    { key: formula }: rolled once; @key in conditions, penalties and changes (Touch of Idiocy)
 //   unless     a condition that makes the creature unaffected (Flare: already dazzled)
 //   cooldown   rounds during which a creature affected once can't be affected again (Daze: 1 minute)
 //   effect     what happens on a failed save (or, with no save, to every affected creature):
@@ -232,6 +237,286 @@ export const SPELLS = {
   // "Creatures in the target square take 1d4 points of fire damage and are dazzled for 1 round (Reflex half, a
   // successful save negates the dazzled condition)"
   "snapdragon fireworks": { effect: { conditions: [["dazzled", 1]] } },
+  // 2nd level, Core Rulebook
+  aid: { effect: { buff: "Aid", tempHp: "1d8 + min(@cl, 10)" } },
+  barkskin: { effect: { buff: "Barkskin" } },
+  "bear's endurance": { effect: { buff: "Bear's Endurance" } },
+  "bull's strength": { effect: { buff: "Bull's Strength" } },
+  "cat's grace": { effect: { buff: "Cat's Grace" } },
+  "eagle's splendor": { effect: { buff: "Eagle's Splendor" } },
+  "fox's cunning": { effect: { buff: "Fox's Cunning" } },
+  "owl's wisdom": { effect: { buff: "Owl's Wisdom" } },
+  darkvision: { effect: { buff: "Darkvision" } },
+  haste: { effect: { buff: "Haste" } },
+  heroism: { effect: { buff: "Heroism" } },
+  invisibility: { effect: { buff: "Invisibility" } },
+  "protection from arrows": { effect: { buff: "Protection From Arrows" } },
+  "see invisibility": { self: true, effect: { buff: "See Invisibility" } },
+  blur: { effect: { buff: "Blur" } },
+  // "can take only a single move action or standard action each turn ... -1 penalty on attack rolls, AC, and Reflex
+  // saves ... moves at half its normal speed": PF1's buff, and staggered for the duration
+  slow: { effect: { buff: "Slow", conditions: [["staggered", "@cl"]] } },
+  // "+2 morale bonus to Strength and Constitution, a +1 morale bonus on Will saves, and a -2 penalty to AC" (PF1's
+  // Rage buff is the barbarian's)
+  rage: { living: true, effect: { changes: [{ target: "str", formula: "2", type: "morale" }, { target: "con", formula: "2", type: "morale" }, { target: "will", formula: "1", type: "morale" }, { target: "ac", formula: "-2", type: "untyped" }], note: "as a barbarian's rage, but not fatigued afterward" } },
+  // "Roll 2d6 to determine the total number of HD ... Only a creature with an Intelligence score of 1 or 2"
+  "animal trance": { types: ["animal", "magicalbeast"], intMin: 1, intMax: 2, pool: "2d6", effect: { conditions: [["fascinated", null]], marker: true, note: "while you concentrate" } },
+  "blindness/deafness": { living: true, choice: { title: "Blinded or deafened", options: { blind: "Blinded", deaf: "Deafened" }, effects: { blind: { conditions: [["blind", null]] }, deaf: { conditions: [["deaf", null]] } } } },
+  "bestow curse": {
+    choice: {
+      title: "Which curse",
+      options: { ability: "-6 to an ability score", rolls: "-4 on attacks, saves, ability and skill checks", action: "50% chance each turn to take no action" },
+      effects: {
+        ability: { marker: true, note: "-6 to one ability score (minimum 1): add it to the buff for the score chosen" },
+        rolls: { changes: [{ target: "attack", formula: "-4", type: "untyped" }, { target: "allSavingThrows", formula: "-4", type: "untyped" }, { target: "allChecks", formula: "-4", type: "untyped" }, { target: "skills", formula: "-4", type: "untyped" }] },
+        action: { marker: true, note: "each turn, 50% chance to act normally; otherwise it takes no action" },
+      },
+    },
+  },
+  "calm emotions": { effect: { marker: true, note: "can't take violent actions; morale bonuses, rage and fear suppressed; confusion removed; ends for all if one is attacked or damaged" } },
+  "command undead": { types: ["undead"], effect: { marker: true, note: "friendly toward you; follows orders (opposed Charisma check for what it wouldn't do)" } },
+  enthrall: { effect: { marker: true, note: "friendly (4 HD or more, or Wisdom 16+: indifferent); takes no action while you speak and for 1d3 rounds after" } },
+  // "paralyze a single living humanoid ... A paralyzed subject exudes a carrion stench"
+  "ghoul touch": { living: true, types: ["humanoid"], effect: { conditions: [["paralyzed", "1d6 + 2"]], note: "living creatures within 10 feet: Fortitude or sickened (a poison effect)" } },
+  // "Each round at the end of their turn blinded creatures may attempt new saving throws ... -40 penalty on Stealth"
+  glitterdust: { effect: { conditions: [["blind", "@cl"]], changes: [{ target: "skill.ste", formula: "-40", type: "untyped" }], resave: { every: true, save: "will", removes: ["blind"], action: "at the end of its turn" } }, onSave: { changes: [{ target: "skill.ste", formula: "-40", type: "untyped" }] } },
+  // "Each round on its turn, the subject may attempt a new saving throw to end the effect. This is a full-round action"
+  "hold person": { types: ["humanoid"], effect: { conditions: [["paralyzed", "@cl"]], marker: true, resave: { every: true, save: "will", removes: ["paralyzed"], action: "a full-round action" } } },
+  "hold animal": { types: ["animal"], effect: { conditions: [["paralyzed", "@cl"]], marker: true, resave: { every: true, save: "will", removes: ["paralyzed"], action: "a full-round action" } } },
+  // "Roll 2d4 and add your caster level (maximum 10) ... Sightless creatures are not affected"
+  "hypnotic pattern": { pool: "2d4 + min(@cl, 10)", sighted: true, effect: { conditions: [["fascinated", null]], marker: true, note: "while you concentrate, and 2 rounds after" } },
+  // "functions like cause fear, except that it causes all targeted creatures of less than 6 HD to become frightened"
+  scare: { living: true, hdMax: 5, effect: { conditions: [["frightened", "@cl"]] }, onSave: { conditions: [["shaken", "1"]] } },
+  "sound burst": { effect: { conditions: [["stunned", "1"]], note: "a creature that can't hear isn't stunned" } },
+  suggestion: { effect: { marker: true, note: "follows the suggested course of action" } },
+  // "a 1d6 penalty to the target's Intelligence, Wisdom, and Charisma scores"
+  "touch of idiocy": { effect: { roll: { p: "1d6" }, changes: [{ target: "int", formula: "-@p", type: "untyped" }, { target: "wis", formula: "-@p", type: "untyped" }, { target: "cha", formula: "-@p", type: "untyped" }] } },
+  "remove paralysis": { effect: { remove: ["paralyzed", "staggered"], note: "on two or more creatures, each instead gets a new save (+4 for two, +2 for three or four)" } },
+  // "+1 deflection bonus to AC and a +1 resistance bonus on saves ... takes only half damage"
+  "shield other": { effect: { changes: [{ target: "ac", formula: "1", type: "deflection" }, { target: "allSavingThrows", formula: "1", type: "resist" }], note: "half of its hit point damage goes to the caster" } },
+  // "a climb speed of 20 feet and a +8 racial bonus on Climb skill checks"
+  "spider climb": { effect: { changes: [{ target: "skill.clm", formula: "8", type: "racial" }], note: "climb speed 20 feet, no Climb checks to move on walls and ceilings" } },
+  "water walk": { effect: { marker: true, note: "walks on liquids as on firm ground" } },
+  levitate: { effect: { marker: true, note: "moves up or down 20 feet a round (move action); attacks: -1, -2... up to -5" } },
+  tongues: { effect: { marker: true, note: "speaks and understands any intelligent creature's language" } },
+  status: { effect: { marker: true, note: "the caster knows its direction, distance and condition" } },
+  "undeath sense": { effect: { marker: true, note: "aware of undead auras within 60 feet" } },
+  "zone of truth": { effect: { marker: true, note: "can't speak deliberate lies in the area" } },
+  "find traps": { self: true, effect: { marker: true, note: "Perception to find traps as a rogue's trapfinding, +1/2 caster level (max +10) insight" } },
+  "speak with plants": { self: true, effect: { marker: true } },
+  "tree shape": { self: true, effect: { marker: true, note: "takes the form of a tree: AC (natural armor +10, Dex 0) and senses per the spell" } },
+  "alter self": { self: true, effect: { marker: true, note: "polymorph (beast shape of a humanoid): apply the form's changes by hand" } },
+  "mirror image": { self: true, effect: { marker: true, note: "1d4 + 1 per three caster levels images (max 8): an attack that hits may strike an image" } },
+  "reduce animal": { effect: { marker: true, note: "one size smaller, as reduce person" } },
+  nondetection: { effect: { marker: true, note: "divinations against it need a caster level check (DC 11 + caster level)" } },
+  // "temporary hit points equal to 1d10 + 1 per caster level (maximum +10)"
+  "false life": { self: true, effect: { marker: true, tempHp: "1d10 + min(@cl, 10)" } },
+  "protection from energy": { energy: true, effect: { marker: true, energy: true, note: "immune to the chosen energy until it absorbs 12 points per caster level (max 120)" } },
+  // "deals 1d8 points of fire damage + 1 point per two caster levels (maximum +10) ... your Strength modifier does not apply"
+  "flame blade": { self: true, effect: { marker: true, attack: { damage: "1d8 + min(floor(@cl / 2), 10)", type: "fire" } } },
+  // Nothing to apply to creatures
+  "arcane lock": { utility: true },
+  augury: { utility: true },
+  "clairaudience/clairvoyance": { utility: true },
+  "continual flame": { utility: true },
+  "fire trap": { utility: true },
+  "gentle repose": { utility: true },
+  "helping hand": { utility: true },
+  knock: { utility: true },
+  "locate object": { utility: true },
+  "minor image": { utility: true },
+  misdirection: { utility: true },
+  "phantom steed": { utility: true },
+  "phantom trap": { utility: true },
+  "rope trick": { utility: true },
+  snare: { utility: true },
+  "soften earth and stone": { utility: true },
+  "speak with dead": { utility: true },
+  "spectral hand": { utility: true },
+  "summon monster ii": { utility: true },
+  "summon nature's ally ii": { utility: true },
+  "summon swarm": { utility: true },
+  "warp wood": { utility: true },
+  "whispering wind": { utility: true },
+  "wind wall": { utility: true },
+  "wood shape": { utility: true },
+  // 2nd level, Advanced Player's Guide, Ultimate Magic, Ultimate Combat: nothing to apply to the creatures in the
+  // rows (objects, weapons, senses, summons, areas the GM places, or an effect used later)
+  "accelerate poison": { utility: true },
+  "alchemical allocation": { utility: true },
+  allfood: { utility: true },
+  "animate dead, lesser": { utility: true },
+  "arrow eruption": { utility: true },
+  "blood biography": { utility: true },
+  "blood transcription": { utility: true },
+  "campfire wall": { utility: true },
+  "create treasure map": { utility: true },
+  "destabilize powder": { utility: true },
+  "discovery torch": { utility: true },
+  "distracting cacophony": { utility: true },
+  "divine arrow": { utility: true },
+  "eagle eye": { utility: true },
+  "enter image": { utility: true },
+  "evolution surge, lesser": { utility: true },
+  "gallant inspiration": { utility: true },
+  "guiding star": { utility: true },
+  "hide campsite": { utility: true },
+  "magic siege engine": { utility: true },
+  "mask dweomer, communal": { utility: true },
+  "masterwork transformation": { utility: true },
+  "mount, communal": { utility: true },
+  "oracle's burden": { utility: true },
+  "paladin's sacrifice": { utility: true },
+  "pilfering hand": { utility: true },
+  "recoil fire": { utility: true },
+  "reinforce armaments, communal": { utility: true },
+  "reloading hands": { utility: true },
+  "restore eidolon, lesser": { utility: true },
+  "returning weapon, communal": { utility: true },
+  "ricochet shot": { utility: true },
+  "scent trail": { utility: true },
+  "sculpt simulacrum": { utility: true },
+  "seek thoughts": { utility: true },
+  "share memory": { utility: true },
+  "stabilize powder": { utility: true },
+  "summon eidolon": { utility: true },
+  "symbol of mirroring": { utility: true },
+  "telekinetic assembly": { utility: true },
+  "thunder fire": { utility: true },
+  "toxic gift": { utility: true },
+  "transmute potion to poison": { utility: true },
+  "vomit swarm": { utility: true },
+  "wake of light": { utility: true },
+  "web shelter": { utility: true },
+  "wilderness soldiers": { utility: true },
+  "brow gasher": { utility: true },
+  "instrument of agony": { utility: true },
+  "flames of the faithful": { utility: true },
+  "badger's ferocity": { utility: true },
+  "vestment of the champion": { utility: true },
+  "versatile weapon": { utility: true },
+  "stone call": { utility: true },
+  // 2nd level, Advanced Player's Guide, Ultimate Magic, Ultimate Combat
+  "aspect of the bear": { self: true, effect: { buff: "Aspect of the Bear" } },
+  "blessing of courage and life": { effect: { buff: "Blessing of Courage and Life" } },
+  "chameleon stride": { self: true, effect: { buff: "Chameleon Stride" } },
+  "perceive cues": { self: true, effect: { buff: "Perceive Cues" } },
+  "acute senses": { effect: { buff: "Acute Senses" } },
+  "certain grip": { effect: { buff: "Certain Grip" } },
+  "bullet shield": { effect: { buff: "Bullet Shield" } },
+  "hunter's eye": { self: true, effect: { buff: "Hunter's Eye" } },
+  "weapon of awe": { effect: { buff: "Weapon of Awe" } },
+  // "You gain the benefits of the spell haste for as long as you maintain that bardic performance"
+  allegro: { self: true, effect: { buff: "Haste", note: "while you maintain your bardic performance" } },
+  "protection from chaos, communal": { effect: { buff: "Protection From Chaos" } },
+  "protection from evil, communal": { effect: { buff: "Protection From Evil" } },
+  "protection from good, communal": { effect: { buff: "Protection From Good" } },
+  "protection from law, communal": { effect: { buff: "Protection From Law" } },
+  "endure elements, communal": { effect: { marker: true, note: "comfortable between -50 and 140 degrees Fahrenheit: no Fortitude saves against heat or cold environments" } },
+  "water walk, communal": { effect: { marker: true, note: "walks on liquids as on firm ground" } },
+  "share language, communal": { effect: { marker: true, note: "can use one language the caster knows (one more per 5 caster levels)" } },
+  "ant haul, communal": { effect: { marker: true, note: "carrying capacity tripled" } },
+  // "gains the nauseated condition for the duration of the spell"
+  "cacophonous call": { effect: { conditions: [["nauseated", "@cl"]] } },
+  // "On a failed save, the target cowers with fear. On a successful save, it is shaken for 1 round. Each round on its
+  // turn, a cowering subject may attempt a new save to end the effect."
+  castigate: { living: true, effect: { conditions: [["cowering", "@cl"]], marker: true, resave: { every: true, save: "will", removes: ["cowering"], action: "on its turn" } }, onSave: { conditions: [["shaken", "1"]] } },
+  // "Creatures in the area must make a Fortitude save or become fatigued"
+  "dust of twilight": { effect: { conditions: [["fatigued", null]] } },
+  fester: { living: true, effect: { marker: true, note: "spell resistance 12 + caster level against healing and temporary hit points; other healing halved" }, onSave: { marker: true, note: "for 1 round only: spell resistance against healing; other healing halved" } },
+  // "1d6 points of nonlethal damage per round ... sickened for the spell's duration ... +4 circumstance bonus on
+  // Intimidate checks against the target"
+  "pain strike": { living: true, effect: { conditions: [["sickened", "min(@cl, 10)"]], marker: true, note: "1d6 nonlethal damage each round; the caster has +4 on Intimidate against it" } },
+  // "The target is sickened and takes a -4 penalty to Dexterity"
+  "pox pustules": { effect: { conditions: [["sickened", "10 * @cl"]], changes: [{ target: "dex", formula: "-4", type: "untyped" }], note: "a move action scratching removes sickened until the start of its next turn" } },
+  "severed fate": { living: true, effect: { conditions: [["shaken", "10 * @cl"]], marker: true, note: "can't use hero points" } },
+  // "Targets must save or gain the sickened condition. Creatures that are immune to critical hits are immune"
+  "distressing tone": { living: true, effect: { conditions: [["sickened", "@cl"]] } },
+  // "Your melee touch attack deals 4d6 points of cold damage and causes the target to be staggered for 1 round"
+  "frigid touch": { effect: { conditions: [["staggered", "1"]], note: "staggered 1 minute on a critical hit" } },
+  "piercing shriek": { effect: { conditions: [["staggered", "@cl"]], note: "no effect on a deaf creature" } },
+  // "-2 penalty to AC, attacks, melee damage rolls, and Reflex saving throws"
+  "howling agony": { living: true, effect: { changes: [{ target: "ac", formula: "-2", type: "untyped" }, { target: "attack", formula: "-2", type: "untyped" }, { target: "ref", formula: "-2", type: "untyped" }], note: "-2 on melee damage; concentration to cast; a move action screaming removes the penalties for that turn" } },
+  // "-2 penalty on Will saving throws, caster level checks, Intelligence-based skill checks, and Wisdom-based skill checks"
+  "mad hallucination": { types: ["humanoid"], effect: { changes: [{ target: "will", formula: "-2", type: "untyped" }], note: "-2 on caster level checks and Intelligence- and Wisdom-based skill checks" } },
+  // "a -10 penalty on its ability checks, skill checks, and concentration checks"
+  qualm: { effect: { changes: [{ target: "allChecks", formula: "-10", type: "untyped" }, { target: "skills", formula: "-10", type: "untyped" }], note: "-10 on concentration; ends if it spends a whole turn doing nothing" } },
+  "litany of eloquence": { effect: { conditions: [["fascinated", "1"]] } },
+  "litany of entanglement": { effect: { conditions: [["entangled", "1"]], note: "no effect on a flying creature" } },
+  "frost fall": { effect: { conditions: [["staggered", "1"]] } },
+  // "The target takes one of the following penalties. -2 decrease to an ability score ... -2 penalty on attack rolls
+  // or saving throws. Land speed reduced by 5 feet."
+  "disfiguring touch": {
+    choice: {
+      title: "Which disfigurement",
+      options: { ability: "-2 to an ability score", attack: "-2 on attack rolls", saves: "-2 on saving throws", speed: "-5 feet land speed" },
+      effects: {
+        ability: { marker: true, note: "-2 to one ability score (minimum 1): add it to the buff for the score chosen" },
+        attack: { changes: [{ target: "attack", formula: "-2", type: "untyped" }] },
+        saves: { changes: [{ target: "allSavingThrows", formula: "-2", type: "untyped" }] },
+        speed: { changes: [{ target: "landSpeed", formula: "-5", type: "untyped" }] },
+      },
+    },
+  },
+  // "a sacred bonus to its saving throws equal to its Charisma bonus"
+  "bestow grace": { effect: { changes: [{ target: "allSavingThrows", formula: "max(0, @abilities.cha.mod)", type: "sacred" }] } },
+  "disguise other": { effect: { changes: [{ target: "skill.dis", formula: "10", type: "untyped" }], note: "+10 on the Disguise check; the disguise can be disbelieved (Will) when interacted with" } },
+  "litany of righteousness": { effect: { marker: true, note: "if evil: double damage from attacks by creatures with a good aura; with the evil subtype, also dazzled 1d4 rounds when hit by them" } },
+  "hostile levitation": { effect: { marker: true, note: "half speed; -4 CMD against bull rush, drag and reposition; attacks -1, -2... up to -5" } },
+  "twisted space": { effect: { marker: true, note: "its melee attacks go to a random creature it threatens" } },
+  "oppressive boredom": { effect: { marker: true, note: "a Will save to take each action; ends on a successful one" } },
+  "compassionate ally": { effect: { marker: true, note: "rushes to heal an injured ally and stays by it" } },
+  "reckless infatuation": { effect: { marker: true, note: "stays within 30 feet of the chosen creature; staggered while farther" } },
+  "unadulterated loathing": { effect: { marker: true, note: "stays at least 60 feet from the chosen creature; nauseated while closer" } },
+  "feast of ashes": { effect: { marker: true, note: "starves (nonlethal damage); eating nauseates for 1 round (DC 12 Fortitude)" } },
+  "boiling blood": { effect: { marker: true, note: "1 fire damage each round (an orc instead gets +2 morale to Strength)" } },
+  "unshakable chill": { effect: { marker: true, note: "severe cold: 1d6 nonlethal cold now and a save every 10 minutes" } },
+  confess: { effect: { marker: true, note: "must answer truthfully on its next action or take 1d6 per two caster levels and be sickened 2d4 rounds" } },
+  "steal voice": { effect: { marker: true, note: "the caster croak spellblight" } },
+  "spontaneous immolation": { effect: { marker: true, note: "catches fire: 1d6 fire each round on the caster's turn until a save (the spell's DC) puts it out" } },
+  "corruption resistance": { effect: { marker: true, note: "5 less damage (10 at 7th level, 15 at 11th) from effects that harm the chosen alignment" } },
+  "protective penumbra": { effect: { marker: true, note: "ignores light blindness, light sensitivity and sunlight vulnerability penalties; +2 on saves against bright light hazards" } },
+  "delay pain": { effect: { marker: true, note: "pain effects don't affect it until the spell ends" } },
+  "cushioning bands": { effect: { marker: true, note: "DR 2/piercing or slashing; half damage from constriction, falling and crushing (until 12 points per caster level are blocked)" } },
+  "imbue with aura": { effect: { marker: true, note: "radiates the caster's aura for alignment effects" } },
+  "miserable pity": { effect: { marker: true, note: "as sanctuary; attackers who failed get +2 morale to attack it for 1 minute if it attacks" } },
+  "ablative barrier": { effect: { marker: true, note: "+2 armor bonus to AC; the first 5 lethal damage of each attack becomes nonlethal (up to 5 per caster level)" } },
+  "kinetic reverberation": { effect: { marker: true, note: "a weapon that hits it in melee: Fortitude or takes the damage dealt" } },
+  "righteous vigor": { effect: { marker: true, note: "each melee hit on the same foe: +1 morale on attacks (max +4) and 1d8 temporary hit points (max 20); a miss resets the bonus" } },
+  "natural rhythm": { effect: { marker: true, note: "each natural attack hit on the same foe: +1 damage against it (max +5); a miss resets it" } },
+  lockjaw: { effect: { marker: true, note: "one natural attack gains grab (+4 on grapple checks)" } },
+  "heroic fortune": { effect: { marker: true, note: "1 hero point to spend before the spell ends" } },
+  "sacred bond": { effect: { marker: true, note: "touch healing spells between the two at close range" } },
+  "hidden speech": { effect: { marker: true, note: "+10 competence on Bluff to pass secret messages; -5 for others to decipher them" } },
+  slipstream: { effect: { marker: true, note: "speed +10 feet on level ground (+20 downhill); swim speed +20 feet (or 20 feet)" } },
+  "forest friend": { effect: { marker: true, note: "ignores undergrowth in forests; +5 circumstance on Acrobatics and Climb among trees" } },
+  "bestow weapon proficiency": { effect: { marker: true, note: "proficient with the weapon it holds" } },
+  "aura of greater courage": { self: true, effect: { marker: true, note: "allies in your aura of courage are immune to fear" } },
+  bloodhound: { self: true, effect: { marker: true, note: "scent; +8 Perception by smell, +4 Survival to track by scent; -4 on saves against odors" } },
+  "burning gaze": { self: true, effect: { marker: true, note: "standard action: a creature within 30 feet, Fortitude or 1d6 fire (then Reflex or catch fire)" } },
+  "elemental speech": { self: true, effect: { marker: true } },
+  "elemental touch": { self: true, effect: { marker: true, note: "melee touch: 1d6 of the chosen energy plus its effect; also on unarmed strikes" } },
+  "fire breath": { self: true, effect: { marker: true, note: "up to three cones: 4d6, then 2d6, then 1d6 fire (Reflex half)" } },
+  "follow aura": { self: true, effect: { marker: true } },
+  "instant armor": { self: true, effect: { marker: true, note: "armor of force replaces worn armor" } },
+  "light lance": { self: true, effect: { marker: true, note: "a +1 holy lance of light" } },
+  "protective spirit": { self: true, effect: { marker: true, note: "attacks of opportunity against you: the spirit rolls to make them miss (Dexterity bonus times)" } },
+  "saddle surge": { self: true, effect: { marker: true, note: "+1 Ride and +1 morale damage per 5 feet the mount moved this round" } },
+  "effortless armor": { self: true, effect: { marker: true, note: "armor doesn't reduce speed; armor check penalty -1 (+1 per five caster levels, max 5)" } },
+  "litany of defense": { self: true, effect: { marker: true, note: "armor's enhancement bonus doubled; immune to fear" } },
+  "litany of warding": { self: true, effect: { marker: true, note: "two extra attacks of opportunity this round; +2 sacred AC against them" } },
+  "locate weakness": { self: true, effect: { marker: true, note: "critical hits: roll the weapon's damage dice twice, take the higher" } },
+  "touch injection": { self: true, effect: { marker: true, note: "deliver the held substance with a melee touch" } },
+  "shadow bomb admixture": { self: true, effect: { marker: true } },
+  "ghostly disguise": { self: true, effect: { marker: true } },
+  "holy shield": { self: true, effect: { marker: true, note: "swift action: an ally within 30 feet gets your shield's bonus to AC until your next turn" } },
+  "defensive shock": { self: true, effect: { marker: true, note: "a creature touching or striking you takes 1d6 electricity per two caster levels (max 6d6), halved each time" } },
+  "surmount affliction": { self: true, effect: { marker: true, note: "one condition's effects suspended" } },
+  skinsend: { self: true, effect: { marker: true } },
+  "animal aspect": { self: true, effect: { marker: true, note: "the chosen animal's benefits (frog, gorilla, kangaroo, monkey, mole, octopus...): apply them by hand" } },
+  // "the target is entangled ... A target that saves against this spell is affected for only 1 round"
+  "fire of entanglement": { effect: { conditions: [["entangled", "@cl"]], note: "starting its turn adjacent to you, it can't move" }, onSave: { conditions: [["entangled", "1"]] } },
+  "silk to steel": { self: true, effect: { marker: true, note: "each round: +2 shield bonus, or attack with it as a whip" } },
   "pass without trace": { effect: { buff: "Pass Without Trace" } },
   "undetectable alignment": { effect: { marker: true, note: "alignment can't be detected by divinations" } },
 
