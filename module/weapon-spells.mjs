@@ -21,6 +21,7 @@
 //   - Lead Blades (Advanced Player's Guide): "All melee weapons you are carrying when the spell is cast deal damage
 //     as if one size category larger than they actually are." Not bound to one weapon: every melee attack.
 //     Increases to damage size don't stack with each other: the largest applies.
+//   - Strong Jaw (Advanced Player's Guide): natural attacks deal damage as if two sizes larger.
 //   - Bless weapon: "treated as having a +1 enhancement bonus for the purpose of bypassing the DR of evil
 //     creatures or striking evil incorporeal creatures (though the spell doesn't grant an actual enhancement
 //     bonus). The weapon also becomes good-aligned ... (This effect overrides and suppresses any other
@@ -125,6 +126,8 @@ function damageSizeSteps(action) {
   for (const buff of actor.itemTypes.buff) {
     if (!buff.isActive) continue;
     if (/^lead blades$/i.test(buff.name) && action.actionType === "mwak") steps = Math.max(steps, 1);
+    // Strong Jaw: "Each natural attack that creature makes deals damage as if the creature were two sizes larger"
+    if (/^strong jaw$/i.test(buff.name) && item.type === "attack" && item.system.subType === "natural") steps = Math.max(steps, 2);
     const id = buff.flags?.[MODULE_ID]?.[FLAG];
     if (id === item.id) steps = Math.max(steps, spellOf(buff)?.sizeSteps ?? 0);
   }

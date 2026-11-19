@@ -560,7 +560,9 @@ async function endEffect(row, data, passed) {
 async function applyRow(row, def, data, caster, { saved }) {
   row.state = "done";
   const actor = actorOf(row.uuid);
-  const effect = !def ? null : saved ? def.onSave : def.tiers ? tierFor(def, actor) : def.choice ? def.choice.effects[data.choice] ?? null : def.effect;
+  // A creature not on the caster's side gets the spell's foe effect when it has one (Prayer)
+  const foe = !!def?.foe && !accepts(data, row, caster);
+  const effect = !def ? null : saved ? def.onSave : def.tiers ? tierFor(def, actor) : def.choice ? def.choice.effects[data.choice] ?? null : foe ? def.foe : def.effect;
   if (def?.choice && !saved && !data.choice) row.pendingChoice = true;
   const applied = [];
   // A healing spell heals the living; undead take it as damage (half on a save), and inflict spells heal them
@@ -650,7 +652,10 @@ async function applyEffect(actor, effect, data, caster, token = null) {
       out.push(buff.name);
     }
   }
-  if (effect.changes) {
+  // A buff named after the spell that Nevela applies itself (Prayer): left to Nevela, as for the compendium buffs
+  const byNevela = !!item && !effect.buff && (effect.changes || effect.marker) && nevelaAppliesBuff(item, data.actionId ?? item.defaultAction?.id, data.name);
+  if (byNevela) out.push(`${data.name} (applied by Nevela's Automation Suite)`);
+  if (effect.changes && !byNevela) {
     const duration = spellDuration(item, data.cl);
     // Values rolled once for the casting (Touch of Idiocy's 1d6) go into the formulas
     const changes = effect.changes.map((c) => ({ ...c, formula: String(c.formula).replace(/@(\w+)/g, (m, k) => (effect.roll && k in effect.roll ? String(rollData[k]) : m)) }));
@@ -661,7 +666,7 @@ async function applyEffect(actor, effect, data, caster, token = null) {
   }
   // Neutralize poison, remove disease, remove curse: a caster level check against each affliction of the kind
   if (effect.cure) out.push(await cureAfflictions(actor, effect.cure, data.cl ?? 1));
-  if (effect.marker && !effect.buff) {
+  if (effect.marker && !effect.buff && !byNevela) {
     const duration = spellDuration(item, data.cl);
     const existing = actor.itemTypes.buff.find((b) => b.name === data.name);
     const marker = { name: data.name, type: "buff", img: item?.img, system: { subType: "spell", active: true, level: data.cl, ...(duration ? { duration } : {}) } };
@@ -714,7 +719,8 @@ async function applyEffect(actor, effect, data, caster, token = null) {
   // The subject's token sheds light for the duration (Light); one casting per caster
   if (effect.light) out.push(await giveLight(actor, token, effect.light, data, caster));
   // Ability damage (Chill Touch: 1 Strength)
-  for (const [ability, amount] of Object.entries(effect.abilityDamage ?? {})) {
+  for (let [ability, amount] of Object.entries(effect.abilityDamage ?? {})) {
+    if (typeof amount !== "number") amount = (await new Roll(String(amount), rollData).evaluate()).total;
     const current = actor.system.abilities?.[ability]?.damage ?? 0;
     await actor.update({ [`system.abilities.${ability}.damage`]: current + amount });
     out.push(`${amount} ${pf1.config.abilities?.[ability] ?? ability} damage`);

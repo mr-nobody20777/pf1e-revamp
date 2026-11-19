@@ -153,6 +153,17 @@ export function registerWeaponSpellTests(quench) {
           assert.equal(size(club), before + 2, "the larger increase only");
         });
 
+        it("strong jaw: natural attacks deal damage two sizes larger, weapons don't", async () => {
+          const sword = await weapon("Longsword", "Longsword");
+          const [bite] = await fighter.createEmbeddedDocuments("Item", [{ name: "Bite", type: "attack", system: { subType: "natural", actions: [{ _id: foundry.utils.randomID(16), name: "Bite", actionType: "mwak", damage: { parts: [{ formula: "sizeRoll(1, 6, @size)", types: ["piercing"] }] } }] } }]);
+          const size = (w) => w.defaultAction.getRollData().size;
+          const before = size(bite);
+          await fighter.createEmbeddedDocuments("Item", [{ name: "Strong Jaw", type: "buff", system: { subType: "spell", active: true, level: 5 } }]);
+          assert.equal(size(bite), before + 2);
+          assert.equal(size(sword), before, "not on manufactured weapons");
+          await bite.delete();
+        });
+
         it("a buff turned off takes its effects with it", async () => {
           const sword = await weapon("Longsword", "Longsword");
           const b = await buff("Keen Edge");

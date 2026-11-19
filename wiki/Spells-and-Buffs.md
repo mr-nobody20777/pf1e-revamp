@@ -79,6 +79,13 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 | Touch of Idiocy | One 1d6 roll as the penalty to Intelligence, Wisdom and Charisma |
 | Blindness/Deafness, Bestow Curse, Disfiguring Touch | The caster picks the effect when the card is posted |
 | Flame Blade | A melee touch attack while it lasts, 1d8 + 1 per two caster levels (max +10) fire |
+| Fly, Blink, Displacement, Stoneskin, Good Hope, Crushing Despair, Greater Invisibility, Greater Magic Fang, Magic Vestment, Mass Enlarge/Reduce Person, Magic Circle against Chaos/Evil/Good/Law and more | The spell's buff on each creature affected |
+| Prayer | +1 luck on attacks, weapon damage, saves and skills for the caster's side; −1 for foes |
+| Fear, Deep Slumber, Mass Daze, Confusion, Ray of Exhaustion, Halt Undead, Thundering Drums, Obsidian Flow, Spit Venom | Panicked (shaken 1 round on a save), asleep (10 HD), dazed, confused, exhausted (fatigued on a save), paralyzed, prone, entangled, blinded |
+| Overwhelming Grief | Cowering, with a new save each round |
+| Retribution, Ward the Faithful | −4 on attacks, skill and ability checks; +2 deflection and resistance (+3 at caster level 12, +4 at 18) |
+| Fungal Infestation, Greater False Life | 1d3 Charisma damage; 2d10 + caster level (max +20) temporary hit points |
+| Strong Jaw | Natural attacks deal damage as if two sizes larger |
 | Lesser Restoration | Ends fatigue and improves exhausted to fatigued; heals 1d4 damage to one ability score or ends a spell's penalty to one. With more than one option, the caster picks on a card |
 | Endure Elements, Feather Fall, Hide from Animals, Hide from Undead, Undetectable Alignment, Comprehend Languages, Speak with Animals, Pass Without Trace | A buff on each subject for the duration, with a reminder of what it does |
 

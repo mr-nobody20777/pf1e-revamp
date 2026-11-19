@@ -21,7 +21,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -63,7 +63,7 @@ export function registerSpellTests(quench) {
           uniform = CONFIG.Dice.randomUniform;
           sceneCtl = await useTestScene();
           wizard = await createTestActor("Quench Spell Wizard", { abilities: { int: 18 }, items: [["pf1.races", "Human"], ["pf1.classes", "Wizard", { system: { level: 5 } }]] });
-          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : 1)]));
+          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : ["Prayer", "Fear", "Fungal Infestation"].includes(n) ? 3 : 1)]));
           human = await createTestActor("Quench Spell Human", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
           ogre = await createTestActor("Quench Spell Ogre", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 6 } }]] });
           friend = await createTestActor("Quench Spell Friend", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
@@ -557,6 +557,45 @@ export function registerSpellTests(quench) {
           assert.equal(human.system.abilities.dex.total, dex - 4);
           await human.itemTypes.buff.find((b) => b.name === "Pox Pustules").delete();
           await human.setConditions({ sickened: false });
+        });
+
+        it("Prayer: +1 luck for allies, -1 for foes, from one casting", async () => {
+          // Nevela's Automation Suite applies Prayer itself (asking for each target's variant): off for this casting
+          const prayer = wizard.items.getName("Prayer");
+          await prayer.update({ "system.flags.boolean.nobuff": true });
+          const card = await cast("Prayer", [friendToken, humanToken]);
+          const ally = await waitFor(() => friend.itemTypes.buff.find((b) => b.name === "Prayer"), { what: "the ally's buff" });
+          const foe = await waitFor(() => human.itemTypes.buff.find((b) => b.name === "Prayer"), { what: "the foe's buff" });
+          assert.deepEqual(ally.system.changes.map((c) => c.formula), ["1", "1", "1", "1"]);
+          assert.deepEqual(foe.system.changes.map((c) => c.formula), ["-1", "-1", "-1", "-1"]);
+          assert.isOk(card);
+          await ally.delete();
+          await foe.delete();
+        });
+
+        it("Fear: panicked on a failed Will save, shaken 1 round on a success", async () => {
+          const card = await cast("Fear", [humanToken, ogreToken]);
+          dice(0.99);
+          await save(card, human);
+          dice(0.01);
+          await save(card, ogre);
+          assert.isTrue(human.statuses.has("panicked"));
+          assert.isTrue(ogre.statuses.has("shaken"));
+          await human.setConditions({ panicked: false });
+          await ogre.setConditions({ shaken: false });
+        });
+
+        it("Fungal Infestation: 1d3 Charisma damage rolled, with its reminder buff", async () => {
+          const { x, y } = humanToken;
+          await humanToken.update({ x: wizardToken.x, y: wizardToken.y + canvas.grid.size }, { animate: false });
+          dice(0.01); // the touch attack hits
+          const card = await cast("Fungal Infestation", [humanToken]);
+          await humanToken.update({ x, y }, { animate: false });
+          dice(0.99); // a failed save; 1d3: 1
+          await save(card, human);
+          assert.equal(human.system.abilities.cha.damage, 1);
+          await human.update({ "system.abilities.cha.damage": 0 });
+          await human.itemTypes.buff.find((b) => b.name === "Fungal Infestation")?.delete();
         });
 
         it("a personal spell goes on the caster", async () => {
