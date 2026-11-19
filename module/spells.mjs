@@ -57,7 +57,7 @@ import { creatureTypes, energyAsUndead, isLiving } from "./creature-types.mjs";
 import { compendiumBuff, nevelaAppliesBuff } from "./buff-grants.mjs";
 import { isChannel } from "./channel-energy.mjs";
 import { immunitiesOf } from "./defenses.mjs";
-import { esc, evaluate, isActiveGM, onGmRequest, createQueue, tokenDistance, timed, saveResult } from "./util.mjs";
+import { esc, evaluate, isActiveGM, onGmRequest, createQueue, tokenDistance, timed, saveResult, wrapMethod } from "./util.mjs";
 import { registerFootnote } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 
@@ -83,11 +83,49 @@ function spellNameOf(item) {
   return null;
 }
 
+/**
+ * The template a spell's area calls for, when PF1's action has none (Obscuring Mist, Flare Burst, Fog Cloud,
+ * Web): PF1 states the area only in the action's Area or Effect text, so it offers no template, and the
+ * creatures in the area get no rows and lasting areas never start. Read from that text: a fixed radius
+ * ("20-ft.-radius spread", "cloud spreads in 20-ft. radius") is a circle, a fixed line a ray, and the detect
+ * spells' "cone-shaped emanation" a cone as long as the spell's range (Detect Evil 60 ft, Deathwatch 30 ft,
+ * Detect Animals or Plants long range). Areas that scale with level, are made of cubes, can be shaped
+ * (walls, rings) or only hold the effect ("up to four lights, all within a 10-ft.-radius area") get none:
+ * the GM places those by hand.
+ */
+// Close, medium and long range in feet, as formulas of caster level (PF1 rolls a template's size)
+const CONE_REACH = { close: "25 + 5 * floor(@cl / 2)", medium: "100 + 10 * @cl", long: "400 + 40 * @cl" };
+export function templateFromArea(area, effect, range = null) {
+  const text = `${area ?? ""} ${effect ?? ""}`.trim();
+  if (!text || /\/\s*(?:\d+\s*|caster\s+)?(?:level|lvl)|per (?:two )?levels?|\bmiles?\b|\bup to\b|\ball within\b|\bwall\b|\bring\b|\bcubes?\b|\bvertical\b|\bfour\b|\bsee text\b/i.test(text)) return null;
+  const radius = text.match(/(\d+)[- ](?:ft|foot|feet)\.?-?\s*radius|radius (?:of )?(\d+)[- ]?(?:ft|foot|feet)/i);
+  if (radius) return { type: "circle", size: radius[1] ?? radius[2] };
+  const line = text.match(/(\d+)[- ](?:ft|foot|feet)\.?\s*(?:-\s*)?line\b|line up to (\d+) ft/i);
+  if (line) return { type: "ray", size: line[1] ?? line[2] };
+  if (/^cone-shaped emanation$/i.test(text)) return { type: "cone", size: CONE_REACH[range?.units] ?? (range?.units === "ft" && Number(range.value) > 0 ? String(range.value) : "60") };
+  return null;
+}
+
 /** The spell's entry, or null. */
 export function spellDef(item) {
   const name = spellNameOf(item);
   return name ? (SPELLS[name.toLowerCase().replace(/\s*\((?:mythic|communal)\)$/, "")] ?? null) : null;
 }
+
+// Supply the template while the item is prepared (not saved: the item's own data is unchanged)
+Hooks.once("init", () => {
+  wrapMethod("pf1.documents.item.ItemPF.prototype._prepareActions", function (wrapped, ...args) {
+    const result = wrapped(...args);
+    if (!this.actions?.size || !spellNameOf(this)) return result;
+    for (const action of this.actions) {
+      const mt = action.measureTemplate;
+      if (!mt || (mt.type && mt.size)) continue;
+      const t = templateFromArea(action.area, action.effect, action.range);
+      if (t) Object.assign(mt, t);
+    }
+    return result;
+  });
+});
 
 /** The compendium spell a scroll, wand or potion was made from (its descriptors and spell resistance). */
 async function sourceSpell(name) {
@@ -800,4 +838,4 @@ registerFootnote((item) => {
   return [`${parts.join("")}.`];
 });
 
-export const _test = { FLAG, spellDef, unaffectedBy, penetration, resolveCard, abilityDef };
+export const _test = { FLAG, spellDef, templateFromArea, unaffectedBy, penetration, resolveCard, abilityDef };

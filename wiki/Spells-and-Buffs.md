@@ -83,6 +83,7 @@ With **Nevela's Automation Suite**, a spell buff that Nevela applies itself is l
 - **Ending:** when the spell's duration has passed, its template is removed and everyone it held is released; deleting the template by hand does the same.
 - **Moving through:** *Grease* and *Sleet Storm* ask for DC 10 Acrobatics each time a creature moves in them (failing stops it; failing by 5 or more, or a failed Reflex save on *Grease*, is a fall). *Spike Growth* deals 1d4 piercing per 5 feet moved through it (the straight line of the move), then a Reflex save or half land speed for 24 hours.
 - ***Create Pit*:** creatures in it at the casting save or fall in (1d6 per 10 feet of depth, prone); one walking in falls; one ending its turn next to it saves at +2.
+- **Templates:** many spells (*Web*, *Fog Cloud*, *Obscuring Mist*, *Stinking Cloud*, *Cloudkill*, *Solid Fog*) state their area only in text in PF1's data, so PF1 offered no template. PF1e Revamp supplies one when the area is a fixed radius, a fixed line or a detect spell's cone (as long as its range); areas that grow with caster level, cubes and walls are placed by hand.
 - **Fog:** *Fog Cloud*, *Obscuring Mist*, *Solid Fog*, *Stinking Cloud* and *Cloudkill* give concealment (20% within 5 feet, 50% beyond) when either creature is in the fog or it lies between them; *Sleet Storm* gives 50%. The miss chance is rolled with the others.
 
 ## Saves against abilities

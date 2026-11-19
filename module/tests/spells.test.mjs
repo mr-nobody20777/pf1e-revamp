@@ -322,6 +322,28 @@ export function registerSpellTests(quench) {
           await waitFor(() => wizardToken.light.bright === 0, { what: "the light gone" });
         });
 
+        it("a spell whose area PF1 states only in text gets its template (not saved on the item)", async () => {
+          const t = spells.templateFromArea;
+          assert.deepEqual(t("", "webs in a 20-ft.-radius spread"), { type: "circle", size: "20" });
+          assert.deepEqual(t("", "cloud spreads in 20-ft. radius from you, 20 ft. high"), { type: "circle", size: "20" });
+          assert.deepEqual(t("cone-shaped emanation", "", { units: "ft", value: "30" }), { type: "cone", size: "30" }, "Deathwatch: its range");
+          assert.deepEqual(t("cone-shaped emanation", "", { units: "long" }), { type: "cone", size: "400 + 40 * @cl" }, "Detect Animals or Plants");
+          assert.deepEqual(t("", "120-ft. line, 10 ft. wide"), { type: "ray", size: "120" });
+          assert.isNull(t("", "Up to four lights, all within a 10-ft.-radius area"), "the lights, not an area");
+          assert.isNull(t("radius spread of up to 10 ft./level, 90 ft. high", ""), "scales with level");
+          assert.isNull(t("one 5-ft. cube/level (S)", ""), "shapeable cubes");
+          const [mist] = await addItems(wizard, [["pf1.spells", "Obscuring Mist", spell(1)]]);
+          try {
+            const action = mist.defaultAction;
+            assert.isTrue(action.hasTemplate);
+            assert.equal(action.measureTemplate.type, "circle");
+            assert.equal(action.measureTemplate.size, "20");
+            assert.isUndefined(mist.toObject().system.actions[0].measureTemplate?.type, "the item's own data is unchanged");
+          } finally {
+            await mist.delete();
+          }
+        });
+
         it("a personal spell goes on the caster", async () => {
           const card = await cast("Linebreaker", [humanToken]);
           assert.deepEqual(rows(card).map((r) => r.name), [wizard.name]);
