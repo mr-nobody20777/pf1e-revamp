@@ -37,6 +37,11 @@
 //              "aloneOutOfCombat" (the only creature affected, not in combat) or "differentType" (not
 //              of the caster's type)
 //   tiers      effect by Hit Dice: [[up to HD, effect], ...] (Color Spray)
+//   utility    nothing to apply to creatures (Mending, Prestidigitation): no rows on its card
+//   selfIfNone the caster is the subject when nothing is targeted (Light: usually the caster's own gear)
+//   effect.damage       { formula, type }: hit point damage on a failed save (Brand)
+//   effect.endsOnDamage the spell's buff ends when its subject takes damage (Haunted Fey Aspect)
+//   effect.light        { bright, dim } in feet: the subject's token sheds light for the duration (Light)
 // Durations: "@cl" rounds per level; a minute is 10 rounds.
 
 export const SPELLS = {
@@ -50,6 +55,31 @@ export const SPELLS = {
   lullaby: { living: true, effect: { buff: "Lullaby" } }, // "Area living creatures within a 10-ft.-radius burst"
   stabilize: { living: true, dying: true, effect: { conditions: [["stable", null]] } },
   bleed: { living: true, dying: true, effect: { remove: ["stable"] } },
+  // "inflicting 1 point of damage"
+  brand: { effect: { damage: { formula: "1" }, marker: true } },
+  // "You gain DR 1/cold iron against a single opponent until the end of the spell, or until you take damage"
+  "haunted fey aspect": { self: true, effect: { marker: true, endsOnDamage: true, note: "DR 1/cold iron against one chosen opponent; ends when you take damage" } },
+  // "shedding normal light in a 20-foot radius ... and increasing the light level for an additional 20 feet"
+  light: { selfIfNone: true, effect: { marker: true, light: { bright: 20, dim: 40 } } },
+  // Nothing to apply to creatures: PF1's card is all they need
+  "arcane mark": { utility: true },
+  "create water": { utility: true },
+  "dancing lights": { utility: true },
+  "detect magic": { utility: true },
+  "detect poison": { utility: true },
+  "ghost sound": { utility: true },
+  "know direction": { utility: true },
+  "mage hand": { utility: true },
+  mending: { utility: true },
+  message: { utility: true },
+  "open/close": { utility: true },
+  prestidigitation: { utility: true },
+  "purify food and drink": { utility: true },
+  "putrefy food and drink": { utility: true },
+  "read magic": { utility: true },
+  sift: { utility: true },
+  spark: { utility: true },
+  "summon instrument": { utility: true },
 
   /* 1st level ------------------------------------------------------------------------------------- */
   bane: { affects: "enemies", effect: { buff: "Bane" } },

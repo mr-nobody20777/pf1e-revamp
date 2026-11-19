@@ -54,6 +54,11 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 | Resistance, Virtue, Shield of Faith, Mage Armor, Enlarge Person, Reduce Person, Magic Fang, Magic Weapon, Bless Weapon, Jump, Sanctuary, Remove Fear, Protection from Chaos/Evil/Good/Law, Faerie Fire and about 30 more | The spell's buff on each creature affected |
 | Charm Person, Charm Animal, Calm Animals, Command, Hideous Laughter, Lock Gaze, Paranoia and similar | A buff named after the spell marks the creature for the duration, with a reminder of what it does |
 | Stabilize, Bleed | Stabilized, or bleeding again (a living creature below 0 hit points) |
+| Brand | 1 point of damage on a failed Fortitude save, and a buff marking the rune |
+| Haunted Fey Aspect | A buff on the caster with a reminder of its DR 1/cold iron against one chosen opponent; it ends as soon as the caster takes damage |
+| Light | The target's token sheds light (normal light 20 feet, dim light to 40 feet); with nothing targeted, the caster's token. Casting it again ends the caster's earlier *Light*, and the token's own light comes back when the spell ends |
+
+**Utility cantrips** (*Detect Magic*, *Read Magic*, *Mending*, *Prestidigitation*, *Mage Hand*, *Message*, *Ghost Sound*, *Dancing Lights*, *Create Water* and others with nothing to apply to a creature) post PF1's card without rows.
 
 **Save modifiers.** Hypnotism's +2 in combat (−2 for a lone creature out of combat) and Hideous Laughter's +4 for a creature of a different type from the caster appear as ticked entries in the save window.
 

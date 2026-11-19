@@ -21,7 +21,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -63,7 +63,7 @@ export function registerSpellTests(quench) {
           uniform = CONFIG.Dice.randomUniform;
           sceneCtl = await useTestScene();
           wizard = await createTestActor("Quench Spell Wizard", { abilities: { int: 18 }, items: [["pf1.races", "Human"], ["pf1.classes", "Wizard", { system: { level: 5 } }]] });
-          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light"].includes(n) ? 0 : 1)]));
+          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : 1)]));
           human = await createTestActor("Quench Spell Human", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
           ogre = await createTestActor("Quench Spell Ogre", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 6 } }]] });
           friend = await createTestActor("Quench Spell Friend", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
@@ -278,6 +278,50 @@ export function registerSpellTests(quench) {
           }
         });
 
+        it("utility cantrips (Mending): no rows, even with a save and spell resistance in PF1's data", async () => {
+          const card = await cast("Mending", [humanToken]);
+          assert.isUndefined(card.getFlag(MODULE_ID, spells.FLAG));
+        });
+
+        it("Brand: 1 damage on a failed Fortitude save", async () => {
+          dice(0.01); // the touch attack hits
+          const card = await cast("Brand", [humanToken]);
+          const hp = human.system.attributes.hp.value;
+          dice(0.99);
+          await save(card, human);
+          assert.equal(human.system.attributes.hp.value, hp - 1);
+          assert.include(row(card, human).applied.join(), "1 damage");
+        });
+
+        it("Haunted Fey Aspect: on the caster, and it ends when the caster takes damage", async () => {
+          await cast("Haunted Fey Aspect", []);
+          const buff = await waitFor(() => wizard.itemTypes.buff.find((b) => b.name === "Haunted Fey Aspect" && b.getFlag(MODULE_ID, "endsOnDamage")), { what: "the marker" });
+          assert.isOk(buff);
+          await wizard.applyDamage(1, { forceDialog: false });
+          await waitFor(() => !wizard.itemTypes.buff.some((b) => b.name === "Haunted Fey Aspect"), { what: "the marker gone" });
+          await wizard.update({ "system.attributes.hp.offset": 0 });
+        });
+
+        it("Light: the target's token sheds light; a second casting ends the first; the light goes when the buff does", async () => {
+          await friendToken.update({ "light.bright": 0, "light.dim": 5 });
+          await cast("Light", [friendToken]);
+          await waitFor(() => friendToken.light.bright === 20, { what: "the friend's light" });
+          assert.equal(friendToken.light.dim, 40);
+          await cast("Light", [wizardToken]);
+          await waitFor(() => wizardToken.light.bright === 20 && friendToken.light.bright === 0, { what: "the light moved" });
+          assert.equal(friendToken.light.dim, 5, "the token's own light is back");
+          await wizard.itemTypes.buff.find((b) => b.name === "Light").delete();
+          await waitFor(() => wizardToken.light.bright === 0, { what: "the light gone" });
+          await friendToken.update({ "light.bright": 0, "light.dim": 0 });
+        });
+
+        it("Light with nothing targeted: the caster's token", async () => {
+          await cast("Light", []);
+          await waitFor(() => wizardToken.light.bright === 20, { what: "the caster's light" });
+          await wizard.itemTypes.buff.find((b) => b.name === "Light").delete();
+          await waitFor(() => wizardToken.light.bright === 0, { what: "the light gone" });
+        });
+
         it("a personal spell goes on the caster", async () => {
           const card = await cast("Linebreaker", [humanToken]);
           assert.deepEqual(rows(card).map((r) => r.name), [wizard.name]);
@@ -383,7 +427,7 @@ export function registerSpellTests(quench) {
         });
 
         it("a wand of a spell with no save, no spell resistance and no effect here: no rows", async () => {
-          const wand = await wandOf("Light");
+          const wand = await wandOf("Read Magic");
           try {
             const card = await useWand(wand, [humanToken]);
             assert.isUndefined(card.getFlag(MODULE_ID, spells.FLAG));

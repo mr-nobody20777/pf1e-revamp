@@ -133,6 +133,8 @@ Hooks.on("preCreateChatMessage", (message) => {
   if (!spellName && !ability) return;
   const def = ability ? abilityDef(item, save.type) : spellDef(item);
   if (ability && !def) return; // a correction says its save isn't against the targets
+  // A spell with nothing to apply to creatures (Mending, Prestidigitation): PF1's card is all it needs
+  if (def?.utility) return;
   // The spell allows a save but PF1 couldn't work out its DC (a broken item): no rows, so nothing lands unsaved
   if (action?.save?.type && !save) return;
   const harmless = !!action?.save?.harmless;
@@ -146,6 +148,8 @@ Hooks.on("preCreateChatMessage", (message) => {
   // A personal-range spell targets its caster; a personal-range ability with a save is an emanation (Cold
   // Aura, Thorn Burst): its targets are the creatures around
   if (def?.self || (!ability && def && range === "personal")) targets = [casterToken?.uuid ?? caster?.uuid].filter(Boolean);
+  // A spell usually cast on the caster's own gear (Light): the caster, when nothing is targeted
+  if (def?.selfIfNone && !targets.length) targets = [casterToken?.uuid ?? caster?.uuid].filter(Boolean);
   if (def?.affects && casterToken) {
     const ally = (uuid) => tokenOf(uuid)?.disposition === casterToken.disposition;
     targets = targets.filter((uuid) => (def.affects === "allies") === ally(uuid));
@@ -473,7 +477,7 @@ async function applyRow(row, def, data, caster, { saved }) {
   else if (saved && data.damage) applied.push("half damage");
   else if (data.damage) applied.push("full damage");
   if (saved && def && !def.onSave && !data.damage) applied.push(row.hitDamage ? "no further effect" : "no effect");
-  if (effect && actor) applied.push(...(await applyEffect(actor, effect, data, caster)));
+  if (effect && actor) applied.push(...(await applyEffect(actor, effect, data, caster, tokenOf(row.uuid))));
   // An ability whose effect couldn't be read from its text: the GM applies it (DECISIONS.md)
   if (!saved && def?.reminder?.length) applied.push(`${def.reminder.join(", ")}: its duration isn't in the text, apply by hand`);
   if (!saved && def?.unread && !data.damage) applied.push("apply its effect by hand (see the ability)");
@@ -486,7 +490,7 @@ function tierFor(def, actor) {
   return def.tiers.find(([max]) => hd <= max)?.[1] ?? null;
 }
 
-async function applyEffect(actor, effect, data, caster) {
+async function applyEffect(actor, effect, data, caster, token = null) {
   const out = [];
   // Who cast it, when it's another creature: its penalties are locked in roll windows, like conditions
   // (by actor id: an unlinked token's own spell, cast from its sheet, names its base actor)
@@ -589,6 +593,18 @@ async function applyEffect(actor, effect, data, caster) {
       out.push(label);
     }
   }
+  // Hit point damage on a failed save (Brand: 1 point)
+  if (effect.damage) {
+    const total = (await new Roll(String(effect.damage.formula), rollData).evaluate()).total;
+    if (total > 0) {
+      await dealDamage(actor, total, effect.damage.type ? [effect.damage.type] : []);
+      out.push(`${total} damage`);
+    }
+  }
+  // The spell's buff ends when its subject takes damage (Haunted Fey Aspect)
+  if (effect.endsOnDamage) await actor.itemTypes.buff.find((b) => b.name === data.name)?.setFlag(MODULE_ID, "endsOnDamage", true);
+  // The subject's token sheds light for the duration (Light); one casting per caster
+  if (effect.light) out.push(await giveLight(actor, token, effect.light, data, caster));
   // Ability damage (Chill Touch: 1 Strength)
   for (const [ability, amount] of Object.entries(effect.abilityDamage ?? {})) {
     const current = actor.system.abilities?.[ability]?.damage ?? 0;
@@ -604,6 +620,60 @@ async function applyEffect(actor, effect, data, caster) {
   if (effect.note) out.push(effect.note);
   return out;
 }
+
+/**
+ * Light (Core Rulebook): "This spell causes a touched object to glow like a torch, shedding normal light in
+ * a 20-foot radius from the point touched, and increasing the light level for an additional 20 feet by one
+ * step ... You can only have one light spell active at any one time. If you cast this spell while another
+ * casting is still in effect, the previous casting is dispelled." The object is carried, so its bearer's
+ * token sheds the light (bright 20 ft, dim to 40 ft); the token's own light comes back when the buff ends.
+ */
+async function giveLight(actor, token, light, data, caster) {
+  token ??= actor.getActiveTokens()[0]?.document ?? null;
+  const buff = actor.itemTypes.buff.find((b) => b.name === data.name);
+  if (!token || !buff) return "no token to light";
+  // The caster's earlier casting ends
+  const by = caster?.uuid ?? null;
+  if (by) {
+    for (const t of token.parent?.tokens ?? []) {
+      const old = t.actor?.itemTypes.buff.find((b) => b !== buff && b.getFlag(MODULE_ID, "light")?.by === by);
+      if (old) await old.delete();
+    }
+  }
+  const kept = buff.getFlag(MODULE_ID, "light");
+  const previous = kept?.token === token.uuid ? kept.previous : { bright: token.light.bright, dim: token.light.dim };
+  await buff.setFlag(MODULE_ID, "light", { token: token.uuid, by, previous });
+  await token.update({ "light.bright": light.bright, "light.dim": light.dim });
+  return `sheds light (${light.bright} ft, dim to ${light.dim} ft)`;
+}
+
+/** The light ends with its buff: the token's own light comes back. */
+async function endLight(buff) {
+  const flag = buff.getFlag(MODULE_ID, "light");
+  const token = flag ? fromUuidSync(flag.token) : null;
+  if (token) await token.update({ "light.bright": flag.previous?.bright ?? 0, "light.dim": flag.previous?.dim ?? 0 });
+}
+Hooks.on("deleteItem", (item, options, userId) => {
+  if (game.user.id === userId && item.type === "buff" && item.getFlag(MODULE_ID, "light")) endLight(item);
+});
+Hooks.on("updateItem", (item, changes, options, userId) => {
+  if (game.user.id === userId && item.type === "buff" && foundry.utils.getProperty(changes, "system.active") === false && item.getFlag(MODULE_ID, "light")) endLight(item);
+});
+
+// Damage ends a buff flagged to end on damage (Haunted Fey Aspect: "until you take damage")
+const DAMAGED = `${MODULE_ID}Damaged`;
+Hooks.on("preUpdateActor", (actor, changes, options) => {
+  if (!actor.itemTypes?.buff?.some((b) => b.isActive && b.getFlag(MODULE_ID, "endsOnDamage"))) return;
+  const hp = actor.system.attributes?.hp ?? {};
+  const get = (k) => foundry.utils.getProperty(changes, `system.attributes.hp.${k}`);
+  const lower = (k) => get(k) != null && get(k) < (hp[k] ?? 0);
+  if (lower("offset") || lower("value") || lower("temp")) options[DAMAGED] = true;
+});
+Hooks.on("updateActor", async (actor, changes, options, userId) => {
+  if (!options[DAMAGED] || game.user.id !== userId) return;
+  const ids = actor.itemTypes.buff.filter((b) => b.isActive && b.getFlag(MODULE_ID, "endsOnDamage")).map((b) => b.id);
+  if (ids.length) await actor.deleteEmbeddedDocuments("Item", ids);
+});
 
 /**
  * Fear effects stack (Core Rulebook, Conditions): "A shaken character who is made shaken again becomes
@@ -710,7 +780,7 @@ function rowElement(message, data, row, index) {
 }
 
 registerFootnote((item) => {
-  if (item?.type !== "spell" || !spellDef(item)) return null;
+  if (item?.type !== "spell" || !spellDef(item) || spellDef(item).utility) return null;
   return ["Automated: the card lists each creature it affects (your targets, or those in the template). Spell resistance is checked for you; each creature's save is rolled from its row, and the result is applied (conditions and buffs with their duration)."];
 });
 
