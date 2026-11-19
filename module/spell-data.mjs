@@ -42,6 +42,11 @@
 //   effect.damage       { formula, type }: hit point damage on a failed save (Brand)
 //   effect.endsOnDamage the spell's buff ends when its subject takes damage (Haunted Fey Aspect)
 //   effect.light        { bright, dim } in feet: the subject's token sheds light for the duration (Light)
+//   effect.casterGains  { buff, changes, tempHp, roundsPerHD }: the caster gets the buff (plus these changes and
+//              temporary hit points) for that many rounds per Hit Die of the creature (Death Knell)
+//   effect.restore      { damage }: Lesser Restoration's fatigue, exhaustion and one ability score (spells.mjs)
+//   energy     the caster chooses an energy type when casting (Resist Energy); effect.energy puts it on the
+//              spell's buff, whose resistance defenses.mjs applies
 // Durations: "@cl" rounds per level; a minute is 10 rounds.
 
 export const SPELLS = {
@@ -119,6 +124,17 @@ export const SPELLS = {
   "feather fall": { effect: { marker: true, note: "falls 60 feet per round and takes no falling damage while it lasts" } },
   "hide from animals": { effect: { marker: true, note: "animals can't sense it; ends for all recipients if one touches an animal or attacks" } },
   "hide from undead": { effect: { marker: true, note: "undead can't sense it (intelligent undead: Will save); ends for all recipients if one attacks, touches an undead or channels positive energy" } },
+  // "touch a living creature that has -1 or fewer hit points. If the subject fails its saving throw, it dies, and
+  // you gain 1d8 temporary hit points and a +2 enhancement bonus to Strength. Additionally, your effective caster
+  // level goes up by +1 ... These effects last for 10 minutes per HD of the subject creature."
+  "death knell": { living: true, dying: true, effect: { conditions: [["dead", null]], casterGains: { buff: "Death Knell", changes: [{ target: "cl", formula: "1", type: "untyped" }], tempHp: "1d8", roundsPerHD: 100 } } },
+  // "dispels any magical effects reducing one of the subject's ability scores or cures 1d4 points of temporary
+  // ability damage to one of the subject's ability scores. It also eliminates any fatigue ... and improves an
+  // exhausted condition to fatigued."
+  "restoration, lesser": { effect: { restore: { damage: "1d4" } } },
+  // "grants a creature limited protection from damage of whichever one of five energy types you select"
+  "resist energy": { energy: true, effect: { marker: true, energy: true } },
+  "resist energy, communal": { energy: true, effect: { marker: true, energy: true } },
   "pass without trace": { effect: { buff: "Pass Without Trace" } },
   "undetectable alignment": { effect: { marker: true, note: "alignment can't be detected by divinations" } },
 

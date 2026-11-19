@@ -21,7 +21,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -357,6 +357,83 @@ export function registerSpellTests(quench) {
           await waitFor(() => friend.itemTypes.buff.some((b) => b.name === "Endure Elements"), { what: "the buff" });
           assert.match(row(card, friend).applied.join(), /Endure Elements/);
           await friend.itemTypes.buff.find((b) => b.name === "Endure Elements").delete();
+        });
+
+        it("Resist Energy: the caster's energy choice, on the ally's buff; 10 at caster level 5", async () => {
+          const eres = (a, type) => Math.max(0, ...a.system.traits.eres.value.filter((e) => e.types.includes(type)).map((e) => e.amount));
+          const card = await cast("Resist Energy", [friendToken]);
+          // The caster's dialog: answered here through the card's flag, as its Choose button does
+          await waitFor(() => [...foundry.applications.instances.values()].some((a) => /energy type/.test(a.title ?? "")), { what: "the dialog" });
+          for (const a of [...foundry.applications.instances.values()]) if (/energy type/.test(a.title ?? "")) await a.close();
+          const buff = await waitFor(() => friend.itemTypes.buff.find((b) => b.name === "Resist Energy"), { what: "the buff" });
+          assert.equal(eres(friend, "fire"), 0, "no energy chosen yet");
+          await card.setFlag(MODULE_ID, "spellEnergy", "fire");
+          await waitFor(() => buff.getFlag(MODULE_ID, "energyType") === "fire", { what: "the energy copied" });
+          await waitFor(() => eres(friend, "fire") === 10, { what: "fire resistance 10" });
+          await buff.delete();
+          assert.equal(eres(friend, "fire"), 0);
+        });
+
+        it("Death Knell: the dying creature dies; the caster gains its buff, +1 caster level and temporary hit points for 10 minutes per HD", async () => {
+          await human.update({ "system.attributes.hp.value": -1 });
+          const temp = wizard.system.attributes.hp.temp ?? 0;
+          const cl = wizard.system.attributes.spells.spellbooks.primary.cl.total;
+          try {
+            dice(0.01); // the touch attack hits
+            const card = await cast("Death Knell", [humanToken]);
+            dice(0.99);
+            await save(card, human);
+            assert.isTrue(human.statuses.has("dead"));
+            const buff = await waitFor(() => wizard.itemTypes.buff.find((b) => b.name === "Death Knell"), { what: "the caster's buff" });
+            assert.equal(buff.system.duration.value, "100", "1 HD: 10 minutes");
+            assert.equal(wizard.system.attributes.spells.spellbooks.primary.cl.total, cl + 1);
+            const gained = buff.getFlag(MODULE_ID, "tempHp");
+            assert.isAtLeast(gained, 1);
+            assert.equal(wizard.system.attributes.hp.temp, temp + gained);
+            await buff.delete();
+            await waitFor(() => (wizard.system.attributes.hp.temp ?? 0) === temp, { what: "the temporary hit points gone" });
+          } finally {
+            await human.setConditions({ dead: false });
+            await human.update({ "system.attributes.hp.value": human.system.attributes.hp.max });
+          }
+        });
+
+        it("Death Knell: a creature with hit points left is unaffected", async () => {
+          dice(0.01);
+          const card = await cast("Death Knell", [humanToken]);
+          assert.deepInclude(row(card, human), { state: "unaffected" });
+        });
+
+        it("Lesser Restoration: exhausted becomes fatigued; the only ability option is healed at once", async () => {
+          await friend.setConditions({ exhausted: true });
+          await friend.update({ "system.abilities.str.damage": 2 });
+          try {
+            dice(0.01); // 1d4: 4
+            await cast("Restoration, Lesser", [friendToken]);
+            await waitFor(() => friend.system.abilities.str.damage === 0, { what: "the damage healed" });
+            assert.isTrue(friend.statuses.has("fatigued"));
+            assert.isFalse(friend.statuses.has("exhausted"));
+          } finally {
+            await friend.setConditions({ exhausted: false, fatigued: false });
+            await friend.update({ "system.abilities.str.damage": 0 });
+          }
+        });
+
+        it("Lesser Restoration: with damage on two scores, the caster chooses one on a card", async () => {
+          await friend.update({ "system.abilities.str.damage": 2, "system.abilities.con.damage": 3 });
+          const before = new Set(game.messages.keys());
+          try {
+            dice(0.01);
+            await cast("Restoration, Lesser", [friendToken]);
+            const choice = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.getFlag(MODULE_ID, "restoreChoice")), { what: "the choice card" });
+            assert.equal(friend.system.abilities.con.damage, 3, "nothing healed before the choice");
+            const index = choice.getFlag(MODULE_ID, "restoreChoice").options.findIndex((o) => o.id === "con");
+            await spells.chooseRestore(choice, index);
+            assert.equal(friend.system.abilities.con.damage, 0);
+            assert.equal(friend.system.abilities.str.damage, 2, "only one score");
+          } finally {
+            await friend.update({ "system.abilities.str.damage": 0, "system.abilities.con.damage": 0 });
+          }
         });
 
         it("a personal spell goes on the caster", async () => {

@@ -25,7 +25,7 @@ const PF1 = "Compendium.pf1.class-abilities.Item.";
 const TPL = "Compendium.pf1.monster-templates.Item.";
 const ENERGIES = { acid: "acid", cold: "cold", electric: "electricity", fire: "fire", sonic: "sonic" };
 const OURS = Symbol("pf1eRevampGrant"); // marks entries this module added to a prepared actor
-const CHOICE = "energyType"; // actor flag { draconic, elemental } or item flag (rage power): an energy id
+export const CHOICE = "energyType"; // actor flag { draconic, elemental } or item flag (rage power, Resist Energy): an energy id
 
 /* -------------------------------------------- */
 /*  Grants                                      */
@@ -51,7 +51,8 @@ const halfDR = (actor) => dr((actor.system.attributes?.hd?.total ?? 0) >= 12 ? 1
  * PF1 features and templates: grants(level, actor, item) → grants. `level` is the class level (classTags,
  * the item's own class first) or, for templates, unused (they read Hit Dice). `choice`: the grant needs an
  * energy type ("draconic"/"elemental" per bloodline on the actor, "item" per copy of the item).
- * `when`: "rage" (an active rage buff) or "armor" (armor worn or a shield used).
+ * `when`: "rage" (an active rage buff) or "armor" (armor worn or a shield used). `buff`: the entry is a
+ * spell's buff, and its level is the buff's (the caster level).
  */
 const DEFENSES = {
   // Classes
@@ -120,6 +121,12 @@ const DEFENSES = {
   dualSpirit: { sources: [`${PF1}qJ7ubLyKJCalOBKQ`], names: ["dual spirit"], grants: () => ci("mindAffecting") },
   blessing: { sources: [`${PF1}oQgLbgApcLbll9Cy`], grants: () => [...ci("poison"), ...immune("charm")] },
 
+  // Spells
+  // Resist Energy (Core Rulebook): "The subject gains resist energy 10 against the energy type chosen ... The
+  // value of the energy resistance granted increases to 20 points at 7th level and to a maximum of 30 points
+  // at 11th level." The caster chooses the energy when casting (spells.mjs).
+  resistEnergy: { names: ["resist energy", "resist energy, communal"], buff: true, choice: "item", grants: (l, a, i, e) => resist(l >= 11 ? 30 : l >= 7 ? 20 : 10, e) },
+
   // Templates
   celestial: { sources: [`${TPL}8kHcvgFNoGObDhQ8`], template: true, grants: (l, actor) => planarTemplate(["acid", "cold", "electric"], "evil")(actor) },
   fiendish: { sources: [`${TPL}kDaBd3zlTauG2f9n`], template: true, grants: (l, actor) => planarTemplate(["cold", "fire"], "good")(actor) },
@@ -143,14 +150,16 @@ for (const [key, def] of Object.entries(DEFENSES)) {
 
 /** The DEFENSES entry for a PF1 item, or null. Templates must be template feats. */
 export function defenseKey(item) {
-  if (item?.type !== "feat") return null;
+  if (item?.type !== "feat" && item?.type !== "buff") return null;
   const key = BY_SOURCE.get(item._stats?.compendiumSource) ?? BY_NAME.get(item.name.toLowerCase()) ?? null;
   if (!key) return null;
-  return !!DEFENSES[key].template === (item.system.subType === "template") ? key : null;
+  if (item.type === "buff") return DEFENSES[key].buff ? key : null;
+  return !DEFENSES[key].buff && !!DEFENSES[key].template === (item.system.subType === "template") ? key : null;
 }
 
 /** The level of the item's own class, else of the first listed class the creature has (a skald's rage power). */
 function levelOf(item, def) {
+  if (def.buff) return item.system.level ?? 0;
   const classes = item.actor?.itemTypes.class ?? [];
   for (const tag of [item.system.class, ...(def.classTags ?? [])].filter(Boolean)) {
     const level = classes.find((c) => c.system.tag === tag)?.system.level ?? 0;
@@ -227,7 +236,7 @@ Hooks.on("pf1PrepareDerivedActorData", (actor) => {
   if (!traits) return;
   const grants = [];
   for (const item of [...(actor.itemTypes?.feat ?? []), ...(actor.itemTypes?.buff ?? [])]) {
-    if (!item.flags[MODULE_ID]?.grants && !(item.type === "feat" && defenseKey(item))) continue;
+    if (!item.flags[MODULE_ID]?.grants && !defenseKey(item)) continue;
     for (const g of activeGrants(item)) grants.push({ ...g, source: item.name });
   }
   grants.push(...materialDR(actor)); // adamantine armor
@@ -372,6 +381,8 @@ export async function promptEnergy(item) {
 
 Hooks.on("createItem", (item, options, userId) => {
   if (userId !== game.user.id || !item.actor || options.pf1eRevampNoPrompt) return;
+  // A spell's buff put on by the spell rows: its caster chooses on the card (spells.mjs)
+  if (item.type === "buff" && item.flags[MODULE_ID] && "castBy" in item.flags[MODULE_ID]) return;
   const def = DEFENSES[defenseKey(item)];
   if (def?.choice && !energyOf(item, def)) promptEnergy(item);
 });

@@ -56,8 +56,8 @@ import { abilityDef } from "./ability-effects.mjs";
 import { creatureTypes, energyAsUndead, isLiving } from "./creature-types.mjs";
 import { compendiumBuff, nevelaAppliesBuff } from "./buff-grants.mjs";
 import { isChannel } from "./channel-energy.mjs";
-import { immunitiesOf } from "./defenses.mjs";
-import { esc, evaluate, isActiveGM, onGmRequest, createQueue, tokenDistance, timed, saveResult, wrapMethod } from "./util.mjs";
+import { immunitiesOf, CHOICE as ENERGY_CHOICE } from "./defenses.mjs";
+import { esc, evaluate, isActiveGM, onGmRequest, requestedByOwner, gmWhisper, createQueue, tokenDistance, timed, saveResult, wrapMethod } from "./util.mjs";
 import { registerFootnote } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
 
@@ -284,6 +284,7 @@ onGmRequest(FLAG, (message, data) => {
 async function resolveCard(message) {
   const data = foundry.utils.deepClone(message.getFlag(MODULE_ID, FLAG));
   if (!data || data.resolved) return;
+  data.energy = message.getFlag(MODULE_ID, ENERGY_FLAG) ?? null;
   const caster = ChatMessage.implementation.getSpeakerActor(message.speaker);
   const item = caster?.items.get(message.system.item?.id) ?? message.itemSource;
   const def = data.ability ? abilityDef(item, data.save?.type) : spellDef(item);
@@ -374,6 +375,38 @@ async function resolveCard(message) {
 }
 
 /* -------------------------------------------- */
+/*  The caster's energy choice (Resist Energy)  */
+/* -------------------------------------------- */
+
+// "whichever one of five energy types you select": asked on the caster's game once the card is posted,
+// kept in its own flag (the GM's game writes the rows' flag at the same time)
+const ENERGY_FLAG = "spellEnergy";
+const ENERGIES = { acid: "acid", cold: "cold", electric: "electricity", fire: "fire", sonic: "sonic" };
+Hooks.on("createChatMessage", async (message, options, userId) => {
+  if (userId !== game.user.id || message.type !== "action" || !message.getFlag(MODULE_ID, FLAG)) return;
+  if (!spellDef(message.itemSource)?.energy) return;
+  const energy = await foundry.applications.api.DialogV2.wait({
+    window: { title: `${message.getFlag(MODULE_ID, FLAG).name}: energy type` },
+    content: `<p>Which energy type?</p><select name="energy">${Object.entries(ENERGIES).map(([id, label]) => `<option value="${id}">${label}</option>`).join("")}</select>`,
+    buttons: [{ action: "ok", label: "Choose", default: true, callback: (event, button) => button.form.elements.energy.value }],
+    rejectClose: false,
+  });
+  if (ENERGIES[energy]) await message.setFlag(MODULE_ID, ENERGY_FLAG, energy);
+});
+// Chosen after the rows were applied (an ally needs no save): the GM's game copies it to their buffs
+Hooks.on("updateChatMessage", (message, changes) => {
+  const energy = foundry.utils.getProperty(changes, `flags.${MODULE_ID}.${ENERGY_FLAG}`);
+  if (!isActiveGM() || !ENERGIES[energy]) return;
+  const data = message.getFlag(MODULE_ID, FLAG);
+  queue(async () => {
+    for (const row of data?.rows ?? []) {
+      const buff = actorOf(row.uuid)?.itemTypes.buff.find((b) => b.name === data.name);
+      if (buff && !buff.getFlag(MODULE_ID, ENERGY_CHOICE)) await buff.setFlag(MODULE_ID, ENERGY_CHOICE, energy);
+    }
+  });
+});
+
+/* -------------------------------------------- */
 /*  Saves                                       */
 /* -------------------------------------------- */
 
@@ -384,6 +417,7 @@ Hooks.on("createChatMessage", (save) => {
     const card = fromUuidSync(save.system.reference);
     const data = foundry.utils.deepClone(card?.getFlag?.(MODULE_ID, FLAG));
     if (!data?.resolved || !data.save) return;
+    data.energy = card.getFlag(MODULE_ID, ENERGY_FLAG) ?? null;
     const { token: tokenId, actor: actorId } = save.speaker;
     // By token when the save has one; else by actor, except for unlinked tokens (they share their actor's id)
     const mine = (r) => (tokenId && r.uuid.endsWith(`Token.${tokenId}`)) || (actorOf(r.uuid)?.id === actorId && tokenOf(r.uuid)?.actorLink !== false);
@@ -639,6 +673,16 @@ async function applyEffect(actor, effect, data, caster, token = null) {
       out.push(`${total} damage`);
     }
   }
+  // Lesser Restoration: fatigue, exhaustion, and one ability score
+  if (effect.restore) out.push(...(await restore(actor, effect.restore, data, caster)));
+  // What the caster gains from the creature (Death Knell)
+  if (effect.casterGains && caster) out.push(await casterGains(caster, effect.casterGains, actor, data));
+  // The energy the caster chose (Resist Energy): on the spell's buff; chosen later, it's copied over then
+  if (effect.energy) {
+    const buff = actor.itemTypes.buff.find((b) => b.name === data.name);
+    if (buff && data.energy) await buff.setFlag(MODULE_ID, ENERGY_CHOICE, data.energy);
+    if (!data.energy) out.push("energy type still to choose");
+  }
   // The spell's buff ends when its subject takes damage (Haunted Fey Aspect)
   if (effect.endsOnDamage) await actor.itemTypes.buff.find((b) => b.name === data.name)?.setFlag(MODULE_ID, "endsOnDamage", true);
   // The subject's token sheds light for the duration (Light); one casting per caster
@@ -658,6 +702,126 @@ async function applyEffect(actor, effect, data, caster, token = null) {
   if (effect.note) out.push(effect.note);
   return out;
 }
+
+/**
+ * Lesser Restoration (Core Rulebook): "dispels any magical effects reducing one of the subject's ability scores
+ * or cures 1d4 points of temporary ability damage to one of the subject's ability scores. It also eliminates any
+ * fatigue suffered by the character, and improves an exhausted condition to fatigued. It does not restore
+ * permanent ability drain." Fatigue and exhaustion are handled at once. For the ability score: the only option
+ * is applied; with several (damage on one score, a spell's penalty on another), the caster's owner picks one
+ * on a card.
+ */
+const ABILITIES = ["str", "dex", "con", "int", "wis", "cha"];
+const abilityName = (id) => pf1.config.abilities?.[id] ?? id;
+/** Spells' penalties to an ability score: active spell buffs with a negative change on one. */
+function abilityPenalties(actor) {
+  return actor.itemTypes.buff.filter((b) => b.isActive && (b.system.subType === "spell" || b.flags[MODULE_ID]?.castBy !== undefined) && (b.system.changes ?? []).some((c) => ABILITIES.includes(c.target) && /^\s*-/.test(String(c.formula))));
+}
+async function restore(actor, restore, data, caster) {
+  const out = [];
+  if (actor.statuses.has("exhausted")) {
+    await actor.setConditions({ exhausted: false, fatigued: true });
+    out.push("exhausted improved to fatigued");
+  } else if (actor.statuses.has("fatigued")) {
+    await actor.setConditions({ fatigued: false });
+    out.push("no longer fatigued");
+  }
+  const amount = (await new Roll(restore.damage).evaluate()).total;
+  const options = [
+    ...ABILITIES.filter((id) => (actor.system.abilities?.[id]?.damage ?? 0) > 0).map((id) => ({ kind: "damage", id, label: `heal ${amount} ${abilityName(id)} damage` })),
+    ...abilityPenalties(actor).map((b) => ({ kind: "dispel", id: b.uuid, label: `end ${b.name}` })),
+  ];
+  if (options.length === 1) out.push(await restoreOne(actor, options[0], amount));
+  else if (options.length > 1) {
+    await ChatMessage.implementation.create({
+      speaker: ChatMessage.implementation.getSpeaker({ actor: caster }),
+      whisper: [...new Set([...ownerWhisper(caster ?? actor), ...gmWhisper()])],
+      content: `<p><strong>${esc(data.name)}</strong> on ${esc(actor.name)}: choose one.</p>${options.map((o, i) => `<button type="button" data-${MODULE_ID}-restore="${i}">${esc(o.label)}</button>`).join("")}`,
+      flags: { [MODULE_ID]: { restoreChoice: { actor: actor.uuid, caster: caster?.uuid ?? null, amount, options } } },
+    });
+    out.push("ability score: the caster chooses on a card");
+  }
+  return out;
+}
+async function restoreOne(actor, option, amount) {
+  if (option.kind === "damage") {
+    const damage = actor.system.abilities?.[option.id]?.damage ?? 0;
+    const healed = Math.min(damage, amount);
+    await actor.update({ [`system.abilities.${option.id}.damage`]: damage - healed });
+    return `${healed} ${abilityName(option.id)} damage healed`;
+  }
+  const buff = fromUuidSync(option.id);
+  if (!buff) return "the penalty already ended";
+  const name = buff.name;
+  await buff.delete();
+  return `${name} dispelled`;
+}
+async function chooseRestore(message, index) {
+  const data = message.getFlag(MODULE_ID, "restoreChoice");
+  const option = data?.options?.[index];
+  const actor = data ? fromUuidSync(data.actor) : null;
+  if (!option || !actor || data.done) return;
+  const result = await restoreOne(actor, option, data.amount);
+  await message.update({ content: `<p><strong>${esc(actor.name)}</strong>: ${esc(result)}.</p>`, [`flags.${MODULE_ID}.restoreChoice.done`]: true });
+}
+Hooks.on("renderChatMessageHTML", (message, html) => {
+  const data = message.getFlag(MODULE_ID, "restoreChoice");
+  if (!data) return;
+  html.querySelectorAll(`[data-${MODULE_ID}-restore]`).forEach((b) =>
+    b.addEventListener("click", async () => {
+      const index = Number(b.getAttribute(`data-${MODULE_ID}-restore`));
+      if (game.user.isGM) return chooseRestore(message, index);
+      await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p>${esc(b.textContent)}</p>`, flags: { [MODULE_ID]: { restoreChosen: { message: message.uuid, index } } } });
+    })
+  );
+});
+onGmRequest("restoreChosen", async (request, { message, index }) => {
+  const card = fromUuidSync(message);
+  const caster = card ? fromUuidSync(card.getFlag(MODULE_ID, "restoreChoice")?.caster ?? "") : null;
+  if (card && requestedByOwner(request, caster)) await chooseRestore(card, index);
+  await request.delete();
+});
+
+/**
+ * Death Knell (Core Rulebook): "If the subject fails its saving throw, it dies, and you gain 1d8 temporary hit
+ * points and a +2 enhancement bonus to Strength. Additionally, your effective caster level goes up by +1 ...
+ * These effects last for 10 minutes per HD of the subject creature." The caster gets the spell's buff (Pathfinder
+ * 1e Content's, with the +2 Strength) plus +1 caster level, for that long; the temporary hit points are added
+ * and, when the buff ends, whatever is left of them goes. A new casting replaces the old one.
+ */
+async function casterGains(caster, gains, victim, data) {
+  const hd = Math.max(1, victim.system.attributes?.hd?.total ?? 1);
+  const existing = caster.itemTypes.buff.find((b) => b.name === gains.buff);
+  let temp = caster.system.attributes.hp.temp ?? 0;
+  if (existing) {
+    temp = Math.max(0, temp - (existing.getFlag(MODULE_ID, "tempHp") ?? 0));
+    await existing.delete({ [KEEP_TEMP]: true });
+  }
+  const buff = await compendiumBuff(gains.buff);
+  buff.system.level = data.cl;
+  buff.system.active = true;
+  buff.system.duration = { value: String(gains.roundsPerHD * hd), units: "round" };
+  buff.system.changes = [...(buff.system.changes ?? []), ...(gains.changes ?? []).map((c) => ({ ...c }))];
+  const gained = gains.tempHp ? (await new Roll(gains.tempHp).evaluate()).total : 0;
+  foundry.utils.setProperty(buff, `flags.${MODULE_ID}.tempHp`, gained);
+  await caster.createEmbeddedDocuments("Item", [buff]);
+  await caster.update({ "system.attributes.hp.temp": temp + gained });
+  return `${caster.name} gains ${gains.buff} for ${hd * 10} minutes: ${gained} temporary hit points, +2 Strength, +1 caster level`;
+}
+// The buff ends: the temporary hit points it gave go (those not already lost)
+const KEEP_TEMP = `${MODULE_ID}KeepTemp`;
+async function loseTemp(buff) {
+  const actor = buff.actor;
+  const gained = buff.getFlag(MODULE_ID, "tempHp") ?? 0;
+  if (!actor || !gained) return;
+  await actor.update({ "system.attributes.hp.temp": Math.max(0, (actor.system.attributes.hp.temp ?? 0) - gained) });
+}
+Hooks.on("deleteItem", (item, options, userId) => {
+  if (game.user.id === userId && item.type === "buff" && !options[KEEP_TEMP] && item.isActive && item.flags[MODULE_ID]?.tempHp) loseTemp(item);
+});
+Hooks.on("updateItem", (item, changes, options, userId) => {
+  if (game.user.id === userId && item.type === "buff" && foundry.utils.getProperty(changes, "system.active") === false && item.flags[MODULE_ID]?.tempHp) loseTemp(item);
+});
 
 /**
  * Light (Core Rulebook): "This spell causes a touched object to glow like a torch, shedding normal light in
@@ -838,4 +1002,4 @@ registerFootnote((item) => {
   return [`${parts.join("")}.`];
 });
 
-export const _test = { FLAG, spellDef, templateFromArea, unaffectedBy, penetration, resolveCard, abilityDef };
+export const _test = { FLAG, spellDef, templateFromArea, chooseRestore, unaffectedBy, penetration, resolveCard, abilityDef };

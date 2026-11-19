@@ -58,6 +58,9 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 | Haunted Fey Aspect | A buff on the caster with a reminder of its DR 1/cold iron against one chosen opponent; it ends as soon as the caster takes damage |
 | Light | The target's token sheds light (normal light 20 feet, dim light to 40 feet); with nothing targeted, the caster's token. Casting it again ends the caster's earlier *Light*, and the token's own light comes back when the spell ends |
 | Disguise Self | +10 on Disguise for the caster |
+| Resist Energy | The caster chooses the energy when the card is posted; each subject resists it 10 (20 at caster level 7, 30 at 11). The buff has a button to change the energy |
+| Death Knell | A living creature at −1 hit points or fewer dies on a failed save; the caster gets +2 Strength, +1 caster level and 1d8 temporary hit points for 10 minutes per Hit Die of the creature (the temporary hit points left go when it ends) |
+| Lesser Restoration | Ends fatigue and improves exhausted to fatigued; heals 1d4 damage to one ability score or ends a spell's penalty to one. With more than one option, the caster picks on a card |
 | Endure Elements, Feather Fall, Hide from Animals, Hide from Undead, Undetectable Alignment, Comprehend Languages, Speak with Animals, Pass Without Trace | A buff on each subject for the duration, with a reminder of what it does |
 
 **Utility spells** (the detect spells, *Alarm*, *Identify*, *Silent Image*, *Ventriloquism*, *Magic Mouth*, the summons and others) post PF1's card without rows, like the **utility cantrips** (*Detect Magic*, *Read Magic*, *Mending*, *Prestidigitation*, *Mage Hand*, *Message*, *Ghost Sound*, *Dancing Lights*, *Create Water* and others with nothing to apply to a creature) post PF1's card without rows.
