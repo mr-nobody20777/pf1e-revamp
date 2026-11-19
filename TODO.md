@@ -24,6 +24,9 @@ Next, the focus moves to:
 
 ## Planned
 
+### Lasting areas, phase 3 (designed)
+Damage that continues on later rounds (*Acid Arrow*, *Corrosive Consumption*, *Caustic Eruption*, *Heat Metal*, *Chill Metal*), more lasting areas (*Acid Fog*, *Incendiary Cloud*, *Spike Stones*, *Ice Storm*, *Volcanic Storm*), clouds that drift 10 feet a round away from where they were cast (*Cloudkill*, *Incendiary Cloud*, *Web Cloud*, *Plague Storm*; stopping at walls, the GM can drag them), walls (*Wall of Fire*, *Blade Barrier*: crossing detected along the move) and effects the caster directs (*Flaming Sphere*, *Call Lightning*). Damage each round applies automatically with an Undo. Also: shade only the squares an area really reaches on the template, and count token elevation for flying creatures.
+
 ### Summons and spell-created creatures
 Scheduled after the bulk of the spell library. Build on **Foundry Summons** (MrVauxs; system-agnostic, places compendium creatures without importing them; requires Sequencer, socketlib and tcal), with PF1 rules in this module, as PF2e Summons Assistant does for PF2e:
 - *Summon Monster* and *Summon Nature's Ally* I–IX: a picker for the spell level's list (or 1d3 from one level lower, 1d4+1 from lower still), the celestial or fiendish template by alignment, placed with a click, lasting 1 round per level and dismissed when the spell ends.

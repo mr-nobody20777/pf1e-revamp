@@ -55,6 +55,7 @@ import { MODULE_ID } from "./const.mjs";
 import { esc, isActiveGM, saveResult, rollTotal, timed, dealDamage, restoreDamage, activeBuff, gmWhisper } from "./util.mjs";
 import { creatureTypes, isLiving } from "./creature-types.mjs";
 import { registerMissSource } from "./miss-chance.mjs";
+import { reaches } from "./area-reach.mjs";
 
 const FLAG = "lastingArea"; // template flag: the area's state (below)
 const LINK = "lastingAreaLink"; // buff flag: the template's uuid
@@ -163,10 +164,13 @@ export const LASTING_SPELLS = new Set(BY_NAME.keys());
 /*  Who is inside                               */
 /* -------------------------------------------- */
 
-/** Is the token's center inside the template? Circles and rectangles by their numbers; other shapes by the canvas. */
+/**
+ * Is the token's center inside the template, and does the area reach it past the walls (area-reach.mjs)?
+ * Circles and rectangles by their numbers; other shapes by the canvas.
+ */
 export function insideTemplate(template, token) {
   const size = template.parent.grid.size;
-  return insidePoint(template, token.x + (token.width * size) / 2, token.y + (token.height * size) / 2);
+  return insidePoint(template, token.x + (token.width * size) / 2, token.y + (token.height * size) / 2) && reaches(template, token);
 }
 /** Is a point (canvas pixels) inside the template? `pad` widens it (pixels): next to the area. */
 export function insidePoint(template, cx, cy, pad = 0) {
@@ -377,7 +381,8 @@ async function addBuff(token, template, zone) {
   if (!actor || actor.itemTypes.buff.some((b) => b.flags?.[MODULE_ID]?.[LINK] === template.uuid)) return;
   const b = SPELLS[zone.key].buff;
   await actor.createEmbeddedDocuments("Item", [{
-    name: `${zone.name} (area)`, type: "buff", img: "icons/svg/cloud.svg",
+    // The spell's own icon (Foundry has no cloud icon)
+    name: `${zone.name} (area)`, type: "buff", img: fromUuidSync(zone.message ?? "")?.itemSource?.img ?? "icons/svg/daze.svg",
     system: { active: true, subType: "spell", changes: b.changes, contextNotes: b.note ? [{ text: b.note, target: "attack" }] : [] },
     flags: { [MODULE_ID]: { [LINK]: template.uuid } },
   }]);

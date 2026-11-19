@@ -57,6 +57,7 @@ import { creatureTypes, energyAsUndead, isLiving, hasAlignment } from "./creatur
 import { compendiumBuff, nevelaAppliesBuff } from "./buff-grants.mjs";
 import { isChannel } from "./channel-energy.mjs";
 import { immunitiesOf, CHOICE as ENERGY_CHOICE } from "./defenses.mjs";
+import { reaches } from "./area-reach.mjs";
 import { esc, evaluate, isActiveGM, onGmRequest, requestedByOwner, gmWhisper, createQueue, tokenDistance, timed, saveResult, wrapMethod } from "./util.mjs";
 import { registerFootnote } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
@@ -305,6 +306,7 @@ async function resolveCard(message) {
   // A scroll, wand or potion of a spell with no save, no entry and no spell resistance: nothing to show
   if (!def && !data.save && !data.sr) return message.unsetFlag(MODULE_ID, FLAG);
   const spell = { name: data.name, descriptors: [...(source?.system.descriptors?.total ?? source?.system.descriptors?.base ?? [])], subschools: data.ability ? [] : [...(source?.system.subschool?.base ?? [])], save: data.save?.type, harmless: data.harmless, objectSave: data.objectSave, cl: data.cl ?? 0 };
+  const areaTemplate = message.system.template ? fromUuidSync(message.system.template) : null;
   let attack = message.systemRolls?.attacks?.[0]?.attack ?? null;
   // PF1's data for some touch spells has no attack roll (Chill Touch): roll it here
   const needsTouch = data.touch && data.rows.some((r) => !accepts(data, r, caster));
@@ -319,6 +321,11 @@ async function resolveCard(message) {
     const token = tokenOf(row.uuid);
     if (!actor) {
       row.state = "unaffected";
+      continue;
+    }
+    // A burst doesn't go around corners; a spread does, but only as far as its radius walked around the walls
+    if (areaTemplate && token && !reaches(areaTemplate, token)) {
+      Object.assign(row, { state: "unaffected", why: "out of the area's reach: a wall is in the way" });
       continue;
     }
     const willing = data.harmless && accepts(data, row, caster);

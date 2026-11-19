@@ -4,6 +4,7 @@
 import { createTestActor, cleanup, useTestScene, placeToken, deleteTokens, waitFor } from "./helpers.mjs";
 import * as LA from "../lasting-areas.mjs";
 import { missChances } from "../miss-chance.mjs";
+import { reaches, KIND_FLAG, areaKind } from "../area-reach.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -58,6 +59,31 @@ export function registerLastingAreaTests(quench) {
           await deleteTokens(Object.values(tokens ?? {}));
           await cleanup([caster, walker, small, undead], messagesBefore);
           await ctl?.restore();
+        });
+
+        it("areas and walls: a burst stops at a wall; a spread goes around it as far as its radius allows", async () => {
+          assert.equal(areaKind("webs in a 20-ft.-radius spread"), "spread");
+          assert.equal(areaKind("cone-shaped burst"), "burst");
+          const g = size();
+          const px = (c) => canvas.dimensions.sceneX + c * g;
+          const py = (r) => canvas.dimensions.sceneY + r * g;
+          await moveTo(tokens.walker, 8, 6); // its square: 2 squares right of the point of origin (6, 6)
+          const circle = async (distance, kind) => {
+            const [t] = await canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [{ t: "circle", x: px(6), y: py(6), distance, flags: { [MODULE_ID]: { [KIND_FLAG]: kind } } }]);
+            templates.push(t);
+            return t;
+          };
+          assert.isTrue(reaches(await circle(20, "burst"), tokens.walker), "no wall: reached");
+          // A wall along the grid line between them, from row 4 to row 8
+          const [wall] = await canvas.scene.createEmbeddedDocuments("Wall", [{ c: [px(8), py(4), px(8), py(8)] }]);
+          try {
+            assert.isFalse(reaches(await circle(20, "burst"), tokens.walker), "a burst doesn't turn the corner");
+            assert.isFalse(reaches(await circle(20, "spread"), tokens.walker), "around the wall is 30 feet: a 20-foot spread falls short");
+            assert.isTrue(reaches(await circle(30, "spread"), tokens.walker), "a 30-foot spread reaches around it");
+            assert.isFalse(LA._test.insideTemplate(await circle(20, "spread"), tokens.walker), "the lasting areas use it too");
+          } finally {
+            await wall.delete();
+          }
         });
 
         it("knows who is inside a circle or a rectangle", async () => {

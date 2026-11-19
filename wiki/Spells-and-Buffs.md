@@ -130,6 +130,9 @@ Not automated: Entangle's saves while a creature stays in the area, Grease's Acr
 With **Nevela's Automation Suite**, a spell buff that Nevela applies itself is left to Nevela, and the row says so. PF1e Revamp applies the buffs Nevela doesn't have. See [Compatibility](Compatibility).
 
 ## Lasting areas
+
+**Areas and walls.** A template is the most a spell's area can reach; the walls decide who it really catches. Bursts, emanations, cones and lines need a clear straight line from the point of origin to a creature (they don't go around corners). Spreads (*Fireball*, *Web*, *Cloudkill*) do turn corners, but only as far as their radius measured around the walls. Walls that block movement count, and doors only while closed. This applies to the spell rows and to the lasting areas below. Limits: the map is flat (height isn't counted), a square counts by its center, and on a gridless scene spreads use the straight-line rule.
+
 *Entangle*, *Stinking Cloud*, *Cloudkill*, *Black Tentacles*, *Web*, *Solid Fog* and *Silence* keep working for their whole duration. Their template is tracked from the casting, and the GM's game checks who is inside whenever a token or the template moves:
 - **Casting and entering:** creatures inside when the spell is cast, and those that move in later, make its save (or, for *Black Tentacles*, face the tentacles' grapple check; for *Web*, a combat maneuver or Escape Artist check when moving in), and the result is applied. A card lists what happened, with an **Undo** for the GM.
 - **Every round:** on the caster's turn, *Entangle* (end of the turn) and *Stinking Cloud* give another save to those who saved and stayed; *Cloudkill* deals 1d4 Con; *Black Tentacles* rolls once for everyone inside.
