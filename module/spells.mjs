@@ -636,7 +636,8 @@ async function applyEffect(actor, effect, data, caster, token = null) {
 
   // The spell's buff, at the caster's level and for the spell's duration (unless Nevela applies it)
   const item = caster?.items.get(data.itemId) ?? caster?.items.find((i) => i.type === "spell" && i.name === data.name);
-  if (effect.buff && item && nevelaAppliesBuff(item, data.actionId ?? item.defaultAction?.id, effect.buff)) out.push(`${effect.buff} (applied by Nevela's Automation Suite)`);
+  // Nevela looks for a buff matching the spell's name (Fly, Mass finds none, though its buff is Fly)
+  if (effect.buff && item && nevelaAppliesBuff(item, data.actionId ?? item.defaultAction?.id, data.name)) out.push(`${effect.buff} (applied by Nevela's Automation Suite)`);
   else if (effect.buff) {
     const buff = await compendiumBuff(effect.buff);
     buff.system.level = data.cl;
