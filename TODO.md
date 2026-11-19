@@ -120,6 +120,7 @@ The design reference gives every feat, trait, class and archetype feature, racia
 - **Save roll window: the racial bonus chip has no visible label.** The elf's +2 against enchantment shows as a ticked chip with blank text (the tooltip reads "Racial · vs Enchantment Effects"). The total is correct. Found in the 2026-11-18 field test.
 - **Attack bonuses listed for spells with no attack roll.** *Bless* (+1 on attack rolls) is listed and ticked in the roll window for *Magic Missile*, which never rolls to hit. Harmless, but misleading. Found in the 2026-11-18 field test.
 - **Intense Spells is granted but not automated.** The evoker's +½ level damage on evocation spells is not added to the damage roll. Found in the 2026-11-18 field test.
+- **Test flake: the monster burn test.** "Burn: fire damage, a failed Reflex save sets the target on fire" failed once in a full run (2026-11-18) with "Cannot read properties of undefined (reading 'text')" and passed when its batch ran alone.
 - **Test flake: Staggering Critical's added duration.** "Another hit adds to it" failed once in a full run (5 rounds where at least 6 were expected) and passes on its own; possibly game time moving between the two hits during a full run.
 - **Snap Shot archers don't threaten.** With Snap Shot, an archer threatens squares within 5 feet (more with Improved Snap Shot), which affects flanking and the warning for shooting while threatened. The Snap Shot feat is also missing from the installed compendiums (only the rogue talent of the same name exists).
 

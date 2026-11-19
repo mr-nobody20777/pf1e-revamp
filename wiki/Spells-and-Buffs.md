@@ -57,8 +57,10 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 | Brand | 1 point of damage on a failed Fortitude save, and a buff marking the rune |
 | Haunted Fey Aspect | A buff on the caster with a reminder of its DR 1/cold iron against one chosen opponent; it ends as soon as the caster takes damage |
 | Light | The target's token sheds light (normal light 20 feet, dim light to 40 feet); with nothing targeted, the caster's token. Casting it again ends the caster's earlier *Light*, and the token's own light comes back when the spell ends |
+| Disguise Self | +10 on Disguise for the caster |
+| Endure Elements, Feather Fall, Hide from Animals, Hide from Undead, Undetectable Alignment, Comprehend Languages, Speak with Animals, Pass Without Trace | A buff on each subject for the duration, with a reminder of what it does |
 
-**Utility cantrips** (*Detect Magic*, *Read Magic*, *Mending*, *Prestidigitation*, *Mage Hand*, *Message*, *Ghost Sound*, *Dancing Lights*, *Create Water* and others with nothing to apply to a creature) post PF1's card without rows.
+**Utility spells** (the detect spells, *Alarm*, *Identify*, *Silent Image*, *Ventriloquism*, *Magic Mouth*, the summons and others) post PF1's card without rows, like the **utility cantrips** (*Detect Magic*, *Read Magic*, *Mending*, *Prestidigitation*, *Mage Hand*, *Message*, *Ghost Sound*, *Dancing Lights*, *Create Water* and others with nothing to apply to a creature) post PF1's card without rows.
 
 **Save modifiers.** Hypnotism's +2 in combat (−2 for a lone creature out of combat) and Hideous Laughter's +4 for a creature of a different type from the caster appear as ticked entries in the save window.
 

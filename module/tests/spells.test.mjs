@@ -21,7 +21,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -342,6 +342,21 @@ export function registerSpellTests(quench) {
           } finally {
             await mist.delete();
           }
+        });
+
+        it("Disguise Self: +10 on Disguise for the caster", async () => {
+          const before = wizard.system.skills.dis.mod;
+          await cast("Disguise Self", []);
+          await waitFor(() => wizard.itemTypes.buff.some((b) => b.name === "Disguise Self" && b.isActive), { what: "the buff" });
+          assert.equal(wizard.system.skills.dis.mod, before + 10);
+          await wizard.itemTypes.buff.find((b) => b.name === "Disguise Self").delete();
+        });
+
+        it("Endure Elements: a buff on the ally touched, with its reminder", async () => {
+          const card = await cast("Endure Elements", [friendToken]);
+          await waitFor(() => friend.itemTypes.buff.some((b) => b.name === "Endure Elements"), { what: "the buff" });
+          assert.match(row(card, friend).applied.join(), /Endure Elements/);
+          await friend.itemTypes.buff.find((b) => b.name === "Endure Elements").delete();
         });
 
         it("a personal spell goes on the caster", async () => {
