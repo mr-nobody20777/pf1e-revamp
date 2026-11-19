@@ -21,7 +21,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation", "Hold Monster", "Litany of Madness", "Calcific Touch"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -63,7 +63,7 @@ export function registerSpellTests(quench) {
           uniform = CONFIG.Dice.randomUniform;
           sceneCtl = await useTestScene();
           wizard = await createTestActor("Quench Spell Wizard", { abilities: { int: 18 }, items: [["pf1.races", "Human"], ["pf1.classes", "Wizard", { system: { level: 5 } }]] });
-          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : ["Prayer", "Fear", "Fungal Infestation"].includes(n) ? 3 : 1)]));
+          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : ["Prayer", "Fear", "Fungal Infestation"].includes(n) ? 3 : ["Hold Monster", "Litany of Madness", "Calcific Touch"].includes(n) ? 4 : 1)]));
           human = await createTestActor("Quench Spell Human", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
           ogre = await createTestActor("Quench Spell Ogre", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 6 } }]] });
           friend = await createTestActor("Quench Spell Friend", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
@@ -596,6 +596,38 @@ export function registerSpellTests(quench) {
           assert.equal(human.system.abilities.cha.damage, 1);
           await human.update({ "system.abilities.cha.damage": 0 });
           await human.itemTypes.buff.find((b) => b.name === "Fungal Infestation")?.delete();
+        });
+
+        it("Hold Monster: any living creature, paralyzed with a new save each turn", async () => {
+          const card = await cast("Hold Monster", [ogreToken]);
+          dice(0.99);
+          await save(card, ogre);
+          assert.isTrue(ogre.statuses.has("paralyzed"));
+          await ogre.itemTypes.buff.find((b) => b.name === "Hold Monster").delete();
+          await ogre.setConditions({ paralyzed: false });
+        });
+
+        it("Litany of Madness: confused at once, with the save only at the start of each turn", async () => {
+          const card = await cast("Litany of Madness", [humanToken]);
+          assert.equal(card.getFlag(MODULE_ID, spells.FLAG).save.type, "will");
+          await waitFor(() => human.statuses.has("confused"), { what: "confused without a save" });
+          assert.isOk(human.itemTypes.buff.find((b) => b.name === "Litany of Madness")?.getFlag(MODULE_ID, "resave"));
+          await human.itemTypes.buff.find((b) => b.name === "Litany of Madness").delete();
+          await human.setConditions({ confused: false });
+        });
+
+        it("Calcific Touch: 1d4 Dexterity damage and staggered on a failed save; the damage even on a save", async () => {
+          const { x, y } = humanToken;
+          await humanToken.update({ x: wizardToken.x, y: wizardToken.y + canvas.grid.size }, { animate: false });
+          dice(0.01); // the touch attack hits
+          const card = await cast("Calcific Touch", [humanToken]);
+          await humanToken.update({ x, y }, { animate: false });
+          dice(0.99); // a failed save; 1d4: 1
+          await save(card, human);
+          assert.equal(human.system.abilities.dex.damage, 1);
+          assert.isTrue(human.statuses.has("staggered"));
+          await human.update({ "system.abilities.dex.damage": 0 });
+          await human.setConditions({ staggered: false });
         });
 
         it("a personal spell goes on the caster", async () => {

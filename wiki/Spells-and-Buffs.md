@@ -86,6 +86,10 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 | Retribution, Ward the Faithful | −4 on attacks, skill and ability checks; +2 deflection and resistance (+3 at caster level 12, +4 at 18) |
 | Fungal Infestation, Greater False Life | 1d3 Charisma damage; 2d10 + caster level (max +20) temporary hit points |
 | Strong Jaw | Natural attacks deal damage as if two sizes larger |
+| Mass ability spells, Communal Stoneskin, Death Ward, True Seeing, Greater Darkvision, Spell Immunity, Divine Power, Oath of Peace, Aspect of the Wolf, Dispel Chaos/Evil/Good/Law | The spell's buff on each creature affected |
+| Hold Monster, Overwhelming Presence, Litany of Madness, Greater Command | Paralyzed, helpless and prone, confused, or obeying, with a new save each turn (Litany of Madness: no save when cast) |
+| Rainbow Pattern, Shout, Rebuke, Litany of Thunder, Malfunction, Aura of Doom, Mass Pain Strike | Fascinated (24 HD), deafened 2d6 rounds, staggered, deafened and confused, confused, shaken, sickened |
+| Calcific Touch, Major Curse, Restoration | 1d4 Dexterity damage and staggered; the caster's choice of curse; as Lesser Restoration |
 | Lesser Restoration | Ends fatigue and improves exhausted to fatigued; heals 1d4 damage to one ability score or ends a spell's penalty to one. With more than one option, the caster picks on a card |
 | Endure Elements, Feather Fall, Hide from Animals, Hide from Undead, Undetectable Alignment, Comprehend Languages, Speak with Animals, Pass Without Trace | A buff on each subject for the duration, with a reminder of what it does |
 
