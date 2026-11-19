@@ -165,7 +165,7 @@ Hooks.on("preCreateChatMessage", (message) => {
   // Lasting areas (lasting-areas.mjs) act on the creatures inside at the casting and on those entering later
   if (spellName && (HANDLED_ELSEWHERE.has(spellName.toLowerCase()) || LASTING_SPELLS.has(spellName.toLowerCase()))) return;
   const action = item?.actions?.get(message.system.action?.id);
-  const save = message.system.save?.type ? { type: message.system.save.type, dc: message.system.save.dc } : null;
+  let save = message.system.save?.type ? { type: message.system.save.type, dc: message.system.save.dc } : null;
   // An ability that isn't a spell: only with a save PF1 worked out, and not channel energy (its own flow)
   const ability = !spellName && !!item && !!save && !!action?.save?.type && !isChannel(item);
   if (!spellName && !ability) return;
@@ -173,6 +173,8 @@ Hooks.on("preCreateChatMessage", (message) => {
   if (ability && !def) return; // a correction says its save isn't against the targets
   // A spell with nothing to apply to creatures (Mending, Prestidigitation): PF1's card is all it needs
   if (def?.utility) return;
+  // A save the spell's text calls for but PF1's data lacks (Animate Rope's Reflex save), at the spell's DC
+  if (!save && !ability && def?.save && action) save = { type: def.save, dc: action.getDC(action.getRollData()) };
   // The spell allows a save but PF1 couldn't work out its DC (a broken item): no rows, so nothing lands unsaved
   if (action?.save?.type && !save) return;
   const harmless = !!action?.save?.harmless;
@@ -673,6 +675,8 @@ async function applyEffect(actor, effect, data, caster, token = null) {
       out.push(`${total} damage`);
     }
   }
+  // An attack the spell gives for its duration (Produce Flame)
+  if (effect.attack) out.push(await giveAttack(actor, effect.attack, data));
   // Lesser Restoration: fatigue, exhaustion, and one ability score
   if (effect.restore) out.push(...(await restore(actor, effect.restore, data, caster)));
   // What the caster gains from the creature (Death Knell)
@@ -702,6 +706,68 @@ async function applyEffect(actor, effect, data, caster, token = null) {
   if (effect.note) out.push(effect.note);
   return out;
 }
+
+/**
+ * Produce Flame (Core Rulebook): "You can strike an opponent with a melee touch attack, dealing fire damage equal
+ * to 1d6 + 1 point per caster level (maximum +5). Alternatively, you can hurl the flames up to 120 feet as a
+ * thrown weapon. When doing so, you attack with a ranged touch attack (with no range penalty) ... Each attack you
+ * make reduces the remaining duration by 1 minute. If an attack reduces the remaining duration to 0 minutes or
+ * less, the spell ends after the attack resolves." The caster gets an attack item (Touch, Hurl) while the spell's
+ * buff lasts; each use takes the time off the buff, and the item goes with the buff.
+ */
+const SPELL_ATTACK = "spellAttack"; // attack item flag: { buff: buff id, perUse: seconds }
+async function giveAttack(actor, attack, data) {
+  const buff = actor.itemTypes.buff.find((b) => b.name === data.name);
+  if (!buff) return "no buff to attach the attack to";
+  const old = actor.itemTypes.attack.filter((i) => i.flags[MODULE_ID]?.[SPELL_ATTACK]).map((i) => i.id);
+  if (old.length) await actor.deleteEmbeddedDocuments("Item", old);
+  const formula = attack.damage.replace(/@cl\b/g, String(data.cl ?? 1));
+  const action = (name, actionType, range, ability) => ({
+    _id: foundry.utils.randomID(16),
+    name,
+    actionType,
+    activation: { type: "standard", cost: 1 },
+    range,
+    ability: { attack: ability },
+    damage: { parts: [{ formula, types: [attack.type] }] },
+  });
+  await actor.createEmbeddedDocuments("Item", [
+    {
+      name: data.name,
+      type: "attack",
+      img: buff.img,
+      system: { subType: "misc", actions: [action("Touch", "msak", { units: "touch" }, "str"), action("Hurl", "rsak", { value: String(attack.range), units: "ft", maxIncrements: 1 }, "dex")] },
+      flags: { [MODULE_ID]: { [SPELL_ATTACK]: { buff: buff.id, perUse: attack.perUse } } },
+    },
+  ]);
+  return `${data.name} attack (${formula} ${attack.type})`;
+}
+// Each attack takes its time off the spell; the last one ends it
+Hooks.on("createChatMessage", (message, options, userId) => {
+  if (userId !== game.user.id || message.type !== "action") return;
+  const item = message.itemSource;
+  const flag = item?.flags?.[MODULE_ID]?.[SPELL_ATTACK];
+  const buff = flag && item.actor?.items.get(flag.buff);
+  if (buff) spendDuration(buff, flag.perUse);
+});
+async function spendDuration(buff, seconds) {
+  const effect = buff.effect;
+  const remaining = effect?.duration?.remaining;
+  if (remaining == null) return;
+  if (remaining <= seconds) return buff.delete();
+  await effect.update({ "duration.seconds": effect.duration.seconds - seconds });
+}
+// The attack goes with its spell
+const dropAttack = (buff) => {
+  const ids = buff.actor?.itemTypes.attack.filter((i) => i.flags[MODULE_ID]?.[SPELL_ATTACK]?.buff === buff.id).map((i) => i.id) ?? [];
+  if (ids.length) buff.actor.deleteEmbeddedDocuments("Item", ids);
+};
+Hooks.on("deleteItem", (item, options, userId) => {
+  if (game.user.id === userId && item.type === "buff") dropAttack(item);
+});
+Hooks.on("updateItem", (item, changes, options, userId) => {
+  if (game.user.id === userId && item.type === "buff" && foundry.utils.getProperty(changes, "system.active") === false) dropAttack(item);
+});
 
 /**
  * Lesser Restoration (Core Rulebook): "dispels any magical effects reducing one of the subject's ability scores
@@ -1002,4 +1068,4 @@ registerFootnote((item) => {
   return [`${parts.join("")}.`];
 });
 
-export const _test = { FLAG, spellDef, templateFromArea, chooseRestore, unaffectedBy, penetration, resolveCard, abilityDef };
+export const _test = { FLAG, spellDef, templateFromArea, chooseRestore, spendDuration, unaffectedBy, penetration, resolveCard, abilityDef };

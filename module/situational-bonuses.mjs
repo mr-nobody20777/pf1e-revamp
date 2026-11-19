@@ -15,9 +15,20 @@ import { evaluate, handledFeature, tokenDistance, notesOf } from "./util.mjs";
 import { registerRollEffect, highestOfType } from "./roll-effects.mjs";
 import { TYPE_WORDS, noteLines } from "./save-bonuses.mjs";
 import { mentionsCreatures } from "./creature-types.mjs";
+import { specialMaterial } from "./magic-arms.mjs";
 import { isRaging } from "./defenses.mjs";
 
 const MANEUVERS = { grapple: /\bgrappl\w*/, trip: /\btrip(s|ping)?\b/, disarm: /\bdisarm\w*/, sunder: /\bsunder\w*/, bullRush: /\bbull rush\w*/, overrun: /\boverrun\w*/, reposition: /\breposition\w*/, drag: /\bdrag(s|ging)?\b/, dirtyTrick: /\bdirty tricks?\b/, steal: /\bsteal(s|ing)?\b/ };
+// Armor that isn't metal (PF1's armor has no material field for its base): by name or base type; dragonhide
+// and darkwood armor aren't metal either
+const NONMETAL_ARMOR = /\b(leather|hide|padded|quilted|silken|rosewood|wooden|horn lamellar|stone lamellar|leather lamellar)\b/i;
+function wearsMetalArmor(actor) {
+  return actor.itemTypes.equipment.some((e) => {
+    if (!e.system.equipped || e.system.subType !== "armor") return false;
+    if (["dragonhide", "darkwood"].includes(specialMaterial(e)?.id)) return false;
+    return ![e.name, ...(e.system.baseTypes ?? [])].some((n) => NONMETAL_ARMOR.test(n));
+  });
+}
 const TARGET_CONDITIONS = ["grappled", "prone", "helpless", "stunned", "blinded", "entangled", "dazzled", "shaken", "frightened", "sickened", "flat-footed", "bleeding"];
 const STATUS = { blinded: "blind", "flat-footed": "flatFooted", bleeding: "bleed" };
 
@@ -43,6 +54,8 @@ export const SITUATIONS = [
   { id: "noAllyNear", test: (t) => t.match(/\bno (conscious )?all(y|ies) within (\d+) f(ee)?t/), check: (c, m) => { const near = friendsNear(c, Number(m[3]), { conscious: !!m[1] }); return near === null ? null : !near; }, label: (m) => `with no${m[1] ? " conscious" : ""} ally within ${m[3]} feet` },
   { id: "allyAdjacent", test: (t) => t.match(/\b(an )?adjacent all(y|ies)\b|\ball(y|ies) (is |are )?adjacent\b/), check: (c) => friendsNear(c, 5, { conscious: false }), label: () => "with an ally adjacent" },
   { id: "targetCondition", test: (t) => t.match(new RegExp(`\\b(against|vs\\.?) (an? )?(${TARGET_CONDITIONS.join("|")}) (foe|foes|opponent|opponents|creature|creatures|target|targets|enem(y|ies))\\b`)), check: (c, m) => (c.targets.length ? c.targets.every((t) => t.actor.statuses.has(STATUS[m[3]] ?? m[3])) : null), label: (m) => `against ${m[3]} foes` },
+  // Shocking Grasp: "if the opponent is wearing metal armor" (a metal weapon or a creature made of metal: tick it)
+  { id: "metalArmor", test: (t) => t.match(/\b(if|when|against) (the |an? )?(opponent|target|foe|creature) (is )?wearing metal armor\b/), check: (c) => (c.targets.length ? c.targets.every((t) => wearsMetalArmor(t.actor)) : null), label: () => "against a foe in metal armor" },
   { id: "maneuver", test: (t) => { const id = Object.keys(MANEUVERS).find((k) => MANEUVERS[k].test(t)); return id ? [t.match(MANEUVERS[id])[0], id] : null; }, check: (c, m) => (c.roll.maneuver ? c.roll.maneuver === m[1] : null), label: (m) => `to ${m[1].replace(/[A-Z]/g, (ch) => ` ${ch.toLowerCase()}`)}` },
 ];
 
@@ -120,6 +133,8 @@ const provider = {
       if (item.isActive === false || !notes.length || handledFeature(item)) continue;
       for (const note of notes) {
         if (!targets.includes(note.target)) continue;
+        // A note on a spell or other item about its own attack (Shocking Grasp): only when that item rolls
+        if (note.self && roll.action?.item !== item) continue;
         for (const line of noteLines(note.text ?? "")) {
           const p = parseLine(line);
           if (!p) continue;

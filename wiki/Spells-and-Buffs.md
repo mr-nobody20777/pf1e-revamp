@@ -60,6 +60,14 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 | Disguise Self | +10 on Disguise for the caster |
 | Resist Energy | The caster chooses the energy when the card is posted; each subject resists it 10 (20 at caster level 7, 30 at 11). The buff has a button to change the energy |
 | Death Knell | A living creature at −1 hit points or fewer dies on a failed save; the caster gets +2 Strength, +1 caster level and 1d8 temporary hit points for 10 minutes per Hit Die of the creature (the temporary hit points left go when it ends) |
+| Shillelagh | On the caster's own nonmagical club or quarterstaff: +1 enhancement and damage as if two sizes larger |
+| Lead Blades | Every melee weapon deals damage as if one size larger (with Shillelagh, the larger increase applies) |
+| Shocking Grasp | +3 on its attack against a foe in metal armor; listed in the roll window to tick for a metal weapon or a creature made of metal |
+| Produce Flame | An attack for the caster while it lasts: melee touch, or thrown 120 feet as a ranged touch, 1d6 + caster level (max +5) fire. Each attack takes 1 minute off the spell |
+| Crafter's Curse, Forced Quiet | −5 on Craft; +4 on Stealth (with a reminder of the rest) |
+| Snapdragon Fireworks | Dazzled 1 round on a failed Reflex save |
+| Wrath, Invigorate, Remove Sickness, Hex Ward, Tactical Acumen, Moment of Greatness, Stone Fist, Litany of Sloth, Fumbletongue and about 35 more | A buff on each subject for the duration, with a reminder of what it does |
+| Animate Rope | Ranged touch attack, then a Reflex save (missing from PF1's data); entangled on a failure |
 | Lesser Restoration | Ends fatigue and improves exhausted to fatigued; heals 1d4 damage to one ability score or ends a spell's penalty to one. With more than one option, the caster picks on a card |
 | Endure Elements, Feather Fall, Hide from Animals, Hide from Undead, Undetectable Alignment, Comprehend Languages, Speak with Animals, Pass Without Trace | A buff on each subject for the duration, with a reminder of what it does |
 

@@ -9,6 +9,8 @@
 
 export const DESCRIPTION_NOTES = {
   // Applied when the situation holds (situational-bonuses.mjs) or against the creatures named (creature-bonuses.mjs)
+  // Spells, on their own attack only (self)
+  "shocking grasp": [{ target: "attack", self: true, text: "+[[3]] on attack rolls if the opponent is wearing metal armor" }],
   "orc rampage": [{ target: "attack", text: "+[[1]] on attack and damage rolls against shaken opponents" }],
   "night stalker": [{ target: "attack", text: "+[[2]] on attack rolls against flat-footed enemies" }],
   "shark tear": [{ target: "attack", text: "+[[1]] on attack and damage rolls against bleeding creatures" }],

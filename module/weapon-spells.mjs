@@ -15,6 +15,12 @@
 //     ... Multiple effects that increase a weapon's threat range ... don't stack." Not on a natural weapon.
 //   - Align weapon: "makes a weapon chaotic, evil, good, or lawful, as you choose ... no effect on a weapon that
 //     already has an alignment." Not on a natural weapon.
+//   - Shillelagh: "Your own nonmagical club or quarterstaff becomes a weapon with a +1 enhancement bonus on attack
+//     and damage rolls ... It deals damage as if it were two size categories larger ... These effects only occur
+//     when the weapon is wielded by you." The spell's buff carries the +1 (bound to the weapon like the others).
+//   - Lead Blades (Advanced Player's Guide): "All melee weapons you are carrying when the spell is cast deal damage
+//     as if one size category larger than they actually are." Not bound to one weapon: every melee attack.
+//     Increases to damage size don't stack with each other: the largest applies.
 //   - Bless weapon: "treated as having a +1 enhancement bonus for the purpose of bypassing the DR of evil
 //     creatures or striking evil incorporeal creatures (though the spell doesn't grant an actual enhancement
 //     bonus). The weapon also becomes good-aligned ... (This effect overrides and suppresses any other
@@ -40,6 +46,7 @@ const SPELLS = [
   { key: "keenEdge", re: /^keen edge$/i, qualities: ["Keen"] },
   { key: "alignWeapon", re: /^align weapon(?: \((lawful|chaotic|good|evil)\))?$/i, align: true },
   { key: "blessWeapon", re: /^bless weapon$/i, bless: true },
+  { key: "shillelagh", re: /^shillelagh$/i, enh: () => 1, sizeSteps: 2 },
 ];
 
 /** The weapon spell a buff is, or null. */
@@ -61,6 +68,8 @@ function fits(spell, w) {
   if (!["weapon", "attack"].includes(w?.type)) return false;
   if (!spell.bless && isNatural(w)) return false; // "You can't cast this spell on a natural weapon"
   if (spell.key === "keenEdge") return damageTypes(w).some((t) => t === "piercing" || t === "slashing");
+  // "nonmagical oak club or quarterstaff"
+  if (spell.key === "shillelagh") return w.type === "weapon" && (w.system.baseTypes ?? []).some((b) => /^(club|quarterstaff)$/i.test(b)) && !(w.system.enh > 0);
   return true;
 }
 const candidates = (actor, spell) => [...(actor?.itemTypes?.weapon ?? []), ...(actor?.itemTypes?.attack ?? [])].filter((w) => (w.type === "attack" || w.system.equipped) && fits(spell, w));
@@ -102,6 +111,29 @@ Hooks.once("init", () => {
     const changes = wrapped(...args);
     return changes.some((c) => c.parent?.flags?.[MODULE_ID]?.[FLAG]) ? changes.filter((c) => { const id = c.parent?.flags?.[MODULE_ID]?.[FLAG]; return !id || id === this.id; }) : changes;
   });
+});
+
+// Damage as if larger (Shillelagh on its weapon, Lead Blades on every melee attack): the weapon's size in
+// its roll data, read by the damage dice ("sizeRoll(1, 6, @size)"). PF1 has already worked out the attack's
+// size modifier when this runs, so only the damage changes.
+const SIZE_MAX = 8; // colossal
+function damageSizeSteps(action) {
+  const item = action?.item;
+  const actor = item?.actor;
+  if (!actor || (item.type !== "weapon" && item.type !== "attack")) return 0;
+  let steps = 0;
+  for (const buff of actor.itemTypes.buff) {
+    if (!buff.isActive) continue;
+    if (/^lead blades$/i.test(buff.name) && action.actionType === "mwak") steps = Math.max(steps, 1);
+    const id = buff.flags?.[MODULE_ID]?.[FLAG];
+    if (id === item.id) steps = Math.max(steps, spellOf(buff)?.sizeSteps ?? 0);
+  }
+  return steps;
+}
+Hooks.on("pf1GetRollData", (action, rollData) => {
+  if (!(action instanceof pf1.components.ItemAction)) return;
+  const steps = damageSizeSteps(action);
+  if (steps && Number.isFinite(rollData.size)) rollData.size = Math.min(SIZE_MAX, rollData.size + steps);
 });
 
 // Against damage reduction (PF1's damage math reads only the weapon's own enhancement and alignment boxes):
@@ -230,4 +262,4 @@ Hooks.on("renderChatMessagePF", (message, html) => {
   });
 });
 
-export const _test = { SPELLS, spellOf, candidates, bind, FLAG, ALIGN_FLAG };
+export const _test = { SPELLS, spellOf, candidates, bind, FLAG, ALIGN_FLAG, damageSizeSteps };

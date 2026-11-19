@@ -1,6 +1,6 @@
 // Situational bonuses (phase 2A): notes whose bonus depends on a situation, checked in the roll window.
 
-import { createTestActor, cleanup, addItems } from "./helpers.mjs";
+import { createTestActor, cleanup, addItems, useTestScene, placeToken, setTargets, deleteTokens } from "./helpers.mjs";
 import * as SB from "../situational-bonuses.mjs";
 import { creatureBonuses } from "../creature-bonuses.mjs";
 import { notesOf, rollSaveAgainst } from "../util.mjs";
@@ -110,6 +110,30 @@ export function registerSituationalBonusTests(quench) {
           assert.equal(e.roll, 4);
           assert.isUndefined(entry(SB._test.collect(actor, { kind: "skill", skillId: "per" }), "Maze Expert"), "only on Survival");
           await actor.items.getName("Maze Expert").delete();
+        });
+
+        it("Shocking Grasp: +3 on its own attack against a foe in metal armor, not in leather, not on other attacks", async () => {
+          const sceneCtl = await useTestScene();
+          const foe = await createTestActor("Quench Situations Foe");
+          const [plate] = await addItems(foe, [["pf1.armors-and-shields", "Breastplate", { system: { equipped: true } }]]);
+          const [grasp] = await addItems(actor, [["pf1.spells", "Shocking Grasp", { system: { spellbook: "primary", level: 1 } }]]);
+          const tokens = [await placeToken(actor, 1, 1), await placeToken(foe, 2, 1, { disposition: -1 })];
+          try {
+            setTargets([tokens[1]]);
+            const spellAttack = () => entry(SB._test.collect(actor, { kind: "attack", action: grasp.defaultAction, flags: {} }), "Shocking Grasp");
+            const e = spellAttack();
+            assert.isTrue(e.applies, "breastplate: metal");
+            assert.equal(e.atk, 3);
+            assert.isUndefined(entry(attack(), "Shocking Grasp"), "not on the sword's attack");
+            await plate.update({ name: "Leather Armor", "system.baseTypes": ["Leather Armor"] });
+            assert.isFalse(spellAttack().applies, "leather: listed to tick");
+          } finally {
+            setTargets([]);
+            await deleteTokens(tokens);
+            await grasp.delete();
+            await cleanup([foe], messagesBefore);
+            await sceneCtl.restore();
+          }
         });
 
         it("features the module automates on their own are skipped (no double count)", async () => {

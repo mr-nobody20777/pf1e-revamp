@@ -44,6 +44,9 @@
 //   effect.light        { bright, dim } in feet: the subject's token sheds light for the duration (Light)
 //   effect.casterGains  { buff, changes, tempHp, roundsPerHD }: the caster gets the buff (plus these changes and
 //              temporary hit points) for that many rounds per Hit Die of the creature (Death Knell)
+//   save       the save its text calls for when PF1's data has none ("ref"), at the spell's DC (Animate Rope)
+//   effect.attack       { damage, type, range, perUse }: an attack item (melee touch, ranged touch) while the
+//              spell's buff lasts; each use takes perUse seconds off the buff (Produce Flame)
 //   effect.restore      { damage }: Lesser Restoration's fatigue, exhaustion and one ability score (spells.mjs)
 //   energy     the caster chooses an energy type when casting (Resist Energy); effect.energy puts it on the
 //              spell's buff, whose resistance defenses.mjs applies
@@ -132,9 +135,103 @@ export const SPELLS = {
   // ability damage to one of the subject's ability scores. It also eliminates any fatigue ... and improves an
   // exhausted condition to fatigued."
   "restoration, lesser": { effect: { restore: { damage: "1d4" } } },
+  // "it must be thrown near the intended target. Doing so requires a successful ranged touch attack roll ... it can
+  // be used ... to cause a single opponent that fails a Reflex saving throw to become entangled ... A typical
+  // 1-inch-diameter hemp rope has 2 hit points, AC 10, and requires a DC 23 Strength check to burst it."
+  "animate rope": { save: "ref", touchAttack: "ranged", effect: { conditions: [["entangled", null]], note: "until it bursts the rope (DC 23 Strength; the rope has AC 10, 2 hit points) or escapes; a bound spellcaster needs a concentration check to cast" } },
+  // "fire damage equal to 1d6 + 1 point per caster level (maximum +5) ... hurl the flames up to 120 feet ...
+  // Each attack you make reduces the remaining duration by 1 minute"
+  "produce flame": { self: true, effect: { marker: true, attack: { damage: "1d6 + min(@cl, 5)", type: "fire", range: 120, perUse: 60 } } },
+  // "Your own nonmagical club or quarterstaff becomes a weapon with a +1 enhancement bonus on attack and damage
+  // rolls ... It deals damage as if it were two size categories larger" (weapon-spells.mjs binds it and sizes it)
+  shillelagh: { self: true, effect: { changes: [{ target: "attack", formula: "1", type: "enh" }, { target: "wdamage", formula: "1", type: "enh" }], note: "on your club or quarterstaff: +1, damage as if two sizes larger" } },
   // "grants a creature limited protection from damage of whichever one of five energy types you select"
   "resist energy": { energy: true, effect: { marker: true, energy: true } },
   "resist energy, communal": { energy: true, effect: { marker: true, energy: true } },
+  // 1st level, Advanced Player's Guide, Ultimate Magic, Ultimate Combat: nothing to apply to creatures
+  // (objects, senses, summons, corpses, a choice made later, or a reroll granted at once)
+  "abundant ammunition": { utility: true },
+  "alter winds": { utility: true },
+  "borrow skill": { utility: true },
+  bowstaff: { utility: true },
+  break: { utility: true },
+  "call animal": { utility: true },
+  "damp powder": { utility: true },
+  "dancing lantern": { utility: true },
+  "decompose corpse": { utility: true },
+  "detect aberration": { utility: true },
+  "diagnose disease": { utility: true },
+  "expeditious excavation": { utility: true },
+  "fabricate bullets": { utility: true },
+  "hero's defiance": { utility: true },
+  "horn of pursuit": { utility: true },
+  "jury-rig": { utility: true },
+  "know the enemy": { utility: true },
+  "liberating command": { utility: true },
+  "mask dweomer": { utility: true },
+  peacebond: { utility: true },
+  "play instrument": { utility: true },
+  "polypurpose panacea": { utility: true },
+  "rally point": { utility: true },
+  "reinforce armaments": { utility: true },
+  "residual tracking": { utility: true },
+  "restore corpse": { utility: true },
+  "returning weapon": { utility: true },
+  "sanctify corpse": { utility: true },
+  "saving finale": { utility: true },
+  "sculpt corpse": { utility: true },
+  "solid note": { utility: true },
+  "summon minor ally": { utility: true },
+  "summon minor monster": { utility: true },
+  "timely inspiration": { utility: true },
+  "weaken powder": { utility: true },
+  "word of resolve": { utility: true },
+  "youthful appearance": { utility: true },
+  // 1st level, Advanced Player's Guide, Ultimate Magic, Ultimate Combat: tracked for their duration, with a reminder
+  "abjuring step": { self: true, effect: { marker: true, note: "two 5-foot steps a round; casting doesn't provoke; ends on an attack, a harmful spell or moving more than 5 feet" } },
+  "air bubble": { effect: { marker: true, note: "breathes underwater or without air" } },
+  "bomber's eye": { self: true, effect: { marker: true, note: "+1 insight on attack rolls with thrown weapons; thrown weapons' range +10 feet" } },
+  bristle: { effect: { marker: true, note: "each round (swift action) may trade natural armor for an enhancement bonus on natural attack damage, up to 1 per 3 caster levels" } },
+  "cloak of shade": { effect: { marker: true, note: "sun heat one step less; penalties from sunlight reduced by 1" } },
+  "compel hostility": { self: true, effect: { marker: true, note: "immediate action: a threatening creature attacking an ally attacks you instead (spell resistance, Will negates)" } },
+  // "takes a -5 penalty on all Craft skill checks"
+  "crafter's curse": { effect: { changes: [{ target: "skill.crf", formula: "-5", type: "untyped" }] } },
+  "feather step": { effect: { marker: true, note: "ignores difficult terrain's movement effects; can 5-foot step in it" } },
+  // "The target gains a +4 circumstance bonus on Stealth checks"
+  "forced quiet": { effect: { changes: [{ target: "skill.ste", formula: "4", type: "circumstance" }], note: "can't yell; its sonic effects' DCs -2; +2 on saves against sonic effects" } },
+  fumbletongue: { effect: { marker: true, note: "can't speak intelligibly: 20% failure for spells with verbal components and command words" } },
+  glide: { self: true, effect: { marker: true, note: "no falling damage; glides 5 feet horizontally per foot fallen; ends on landing" } },
+  grace: { self: true, effect: { marker: true, note: "movement doesn't provoke until the end of your turn" } },
+  "healing thief": { effect: { marker: true, note: "healing spells and supernatural healing on it: half to it, half to the caster (within 25 ft + 5 ft per two levels; up to 5 hp per caster level)" } },
+  "hex ward": { effect: { marker: true, note: "+4 resistance on saves against witch hexes" } },
+  "honeyed tongue": { self: true, effect: { marker: true, note: "Diplomacy to change attitude: roll twice, take the higher; or +5 competence to gather information" } },
+  "illusion of calm": { self: true, effect: { marker: true, note: "casting, thrown attacks and moving out of your first square don't provoke; a creature that hits you can disbelieve (Will)" } },
+  innocence: { self: true, effect: { buff: "Innocence" } },
+  interrogation: { effect: { marker: true, note: "one question per two caster levels: answer or take 1d4 + your Wisdom bonus damage; -4 on Bluff to lie to you" } },
+  invigorate: { effect: { marker: true, note: "no penalties from fatigued or exhausted; when it ends: 1d6 nonlethal and the conditions return" } },
+  "lend judgment": { effect: { marker: true, note: "gains one of the caster's active judgments" } },
+  "litany of sloth": { effect: { marker: true, note: "can't make attacks of opportunity or cast defensively; can't be the target of another litany" } },
+  "mirror strike": { self: true, effect: { marker: true, note: "next melee attack before the end of your next turn: compare against two foes in reach (+2 if they flank you); hit both for half damage each" } },
+  "moment of greatness": { affects: "allies", effect: { marker: true, note: "once: double a morale bonus on one roll, chosen before rolling" } },
+  "persuasive goad": { effect: { marker: true, note: "the caster has +4 circumstance on Intimidate against it for 1 minute" } },
+  "remove sickness": { effect: { marker: true, note: "+4 morale on saves against disease, nausea and sickened; such effects already on it are suppressed" } },
+  "restful sleep": { effect: { marker: true, note: "a full night's rest heals as a full day of bed rest (a full day's rest: three times its level); waking ends it" } },
+  "see alignment": { self: true, effect: { marker: true, note: "creatures of the chosen alignment glow for you" } },
+  "share language": { effect: { marker: true, note: "can use one language the caster knows (one more per 5 caster levels)" } },
+  "stone fist": { self: true, effect: { marker: true, note: "unarmed strikes don't provoke, deal 1d6 lethal bludgeoning (1d4 Small), and ignore hardness below 8" } },
+  "sun metal": { effect: { marker: true, note: "the weapon deals +1d4 fire on a hit (not multiplied on a critical); doesn't stack with flaming" } },
+  "tactical acumen": { affects: "allies", effect: { marker: true, note: "+1 insight on positional attack and AC bonuses (flanking, higher ground, cover), +1 per 5 caster levels above 5th (max +4)" } },
+  "targeted bomb admixture": { self: true, effect: { marker: true, note: "bombs don't splash and deal base damage plus double your Intelligence modifier" } },
+  "tireless pursuit": { self: true, effect: { marker: true, note: "half damage from hustling and forced marches; ignore the fatigue from them" } },
+  "unnatural lust": { effect: { marker: true, note: "next turn: rushes to the chosen creature or object to kiss or caress it, nothing else (+4 on the save if it wouldn't normally desire it)" } },
+  "vocal alteration": { effect: { marker: true, note: "voice altered: +10 on Disguise checks against listeners" } },
+  "warding weapon": { self: true, effect: { marker: true, note: "casting doesn't provoke (except from creatures with Disruptive)" } },
+  "wartrain mount": { effect: { marker: true, note: "trained for combat (general purpose) for the duration" } },
+  "negate aroma": { effect: { marker: true, note: "no scent: can't be tracked or noticed by scent" } },
+  wrath: { self: true, effect: { marker: true, note: "+1 morale per three caster levels (max +3) on attack and weapon damage rolls and spell penetration against the chosen enemy; Improved Critical against it at 12th level" } },
+  // "Creatures in the target square take 1d4 points of fire damage and are dazzled for 1 round (Reflex half, a
+  // successful save negates the dazzled condition)"
+  "snapdragon fireworks": { effect: { conditions: [["dazzled", 1]] } },
   "pass without trace": { effect: { buff: "Pass Without Trace" } },
   "undetectable alignment": { effect: { marker: true, note: "alignment can't be detected by divinations" } },
 

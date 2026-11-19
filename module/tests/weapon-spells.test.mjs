@@ -128,6 +128,31 @@ export function registerWeaponSpellTests(quench) {
           assert.isFalse(blessConfirms(sword, evil), "a keen weapon already has a critical effect");
         });
 
+        it("shillelagh: only a nonmagical club or quarterstaff; +1 and damage two sizes larger on it alone", async () => {
+          const sword = await weapon("Longsword", "Longsword");
+          const club = await weapon("Club", "Club");
+          const size = (w) => w.defaultAction.getRollData().size;
+          const before = size(club);
+          const b = await buff("Shillelagh", { changes: enhChanges });
+          assert.equal(b.getFlag(MODULE_ID, _test.FLAG), club.id, "the club, not the sword");
+          assert.equal(size(club), before + 2);
+          assert.equal(size(sword), before, "the sword is unchanged");
+          assert.isTrue(evaluate(club, neutral).isMagic);
+          await b.update({ "system.active": false });
+          assert.equal(size(club), before);
+        });
+
+        it("lead blades: every melee weapon deals damage one size larger, not more with shillelagh", async () => {
+          const sword = await weapon("Longsword", "Longsword");
+          const club = await weapon("Club", "Club");
+          const size = (w) => w.defaultAction.getRollData().size;
+          const before = size(sword);
+          await fighter.createEmbeddedDocuments("Item", [{ name: "Lead Blades", type: "buff", system: { subType: "spell", active: true, level: 5 } }]);
+          assert.equal(size(sword), before + 1);
+          await buff("Shillelagh", { changes: enhChanges, on: club });
+          assert.equal(size(club), before + 2, "the larger increase only");
+        });
+
         it("a buff turned off takes its effects with it", async () => {
           const sword = await weapon("Longsword", "Longsword");
           const b = await buff("Keen Edge");

@@ -21,7 +21,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -107,6 +107,7 @@ export function registerSpellTests(quench) {
               if (e.buff && !buffNames.has(e.buff)) problems.push(`${name}: no buff "${e.buff}"`);
               for (const [id] of e.conditions ?? []) if (!pf1.registry.conditions.get(id)) problems.push(`${name}: no condition "${id}"`);
               for (const c of [...(e.changes ?? []), ...(e.penalty ? [e.penalty] : [])]) if (!targets.has(c.target) && !/^skill\.\w+$/.test(c.target)) problems.push(`${name}: no change target "${c.target}"`);
+              for (const c of e.changes ?? []) if (!pf1.config.bonusTypes[c.type]) problems.push(`${name}: no bonus type "${c.type}"`);
             }
           }
           assert.deepEqual(problems, []);
@@ -434,6 +435,41 @@ export function registerSpellTests(quench) {
           } finally {
             await friend.update({ "system.abilities.str.damage": 0, "system.abilities.con.damage": 0 });
           }
+        });
+
+        it("Produce Flame: an attack while it lasts (1d6 + 5 fire at caster level 5); each attack takes a minute off; the last one ends it", async () => {
+          await cast("Produce Flame", []);
+          const buff = await waitFor(() => wizard.itemTypes.buff.find((b) => b.name === "Produce Flame"), { what: "the buff" });
+          const attack = await waitFor(() => wizard.itemTypes.attack.find((i) => i.name === "Produce Flame"), { what: "the attack" });
+          assert.deepEqual(attack.actions.map((a) => a.actionType), ["msak", "rsak"]);
+          assert.equal(attack.actions.contents[1].damage.parts[0].formula, "1d6 + min(5, 5)");
+          await waitFor(() => buff.effect?.duration?.remaining > 0, { what: "the buff's timer" });
+          const left = buff.effect.duration.remaining;
+          await attack.use({ actionId: attack.actions.contents[1].id, skipDialog: true });
+          await waitFor(() => buff.effect.duration.remaining === left - 60, { what: "a minute off" });
+          await spells.spendDuration(buff, buff.effect.duration.remaining);
+          await waitFor(() => !wizard.itemTypes.buff.some((b) => b.name === "Produce Flame") && !wizard.itemTypes.attack.some((i) => i.name === "Produce Flame"), { what: "the spell and its attack gone" });
+        });
+
+        it("Animate Rope: a ranged touch attack, then the Reflex save PF1's data lacks; entangled on a failure", async () => {
+          dice(0.01); // the ranged touch attack hits
+          const card = await cast("Animate Rope", [humanToken]);
+          assert.equal(card.getFlag(MODULE_ID, spells.FLAG).save.type, "ref");
+          assert.isAbove(card.getFlag(MODULE_ID, spells.FLAG).save.dc, 10);
+          assert.isTrue(card.getFlag(MODULE_ID, spells.FLAG).touchRoll.ranged);
+          dice(0.99);
+          await save(card, human);
+          assert.isTrue(human.statuses.has("entangled"));
+          await human.setConditions({ entangled: false });
+        });
+
+        it("Crafter's Curse: -5 on Craft on a failed Will save", async () => {
+          const before = human.system.skills.crf.mod;
+          const card = await cast("Crafter's Curse", [humanToken]);
+          dice(0.99);
+          await save(card, human);
+          assert.equal(human.system.skills.crf.mod, before - 5);
+          await human.itemTypes.buff.find((b) => b.name === "Crafter's Curse").delete();
         });
 
         it("a personal spell goes on the caster", async () => {
