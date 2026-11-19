@@ -21,7 +21,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation", "Hold Monster", "Litany of Madness", "Calcific Touch", "Waves of Fatigue", "Stunning Finale", "Eyebite", "Hold Person, Mass", "Fly, Mass", "Power Word Stun", "Power Word Kill", "Freedom", "Holy Smite", "Holy Word"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation", "Hold Monster", "Litany of Madness", "Calcific Touch", "Waves of Fatigue", "Stunning Finale", "Eyebite", "Hold Person, Mass", "Fly, Mass", "Power Word Stun", "Power Word Kill", "Freedom", "Holy Smite", "Holy Word", "Heal", "Enervation", "Poison", "Contagion"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -63,7 +63,7 @@ export function registerSpellTests(quench) {
           uniform = CONFIG.Dice.randomUniform;
           sceneCtl = await useTestScene();
           wizard = await createTestActor("Quench Spell Wizard", { abilities: { int: 18 }, items: [["pf1.races", "Human"], ["pf1.classes", "Wizard", { system: { level: 5 } }]] });
-          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : ["Prayer", "Fear", "Fungal Infestation"].includes(n) ? 3 : ["Hold Monster", "Litany of Madness", "Calcific Touch"].includes(n) ? 4 : ["Waves of Fatigue", "Stunning Finale"].includes(n) ? 5 : ["Eyebite", "Hold Person, Mass"].includes(n) ? 6 : ["Fly, Mass"].includes(n) ? 7 : ["Power Word Stun"].includes(n) ? 8 : ["Power Word Kill", "Freedom"].includes(n) ? 9 : ["Holy Smite"].includes(n) ? 4 : ["Holy Word"].includes(n) ? 7 : 1)]));
+          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : ["Prayer", "Fear", "Fungal Infestation"].includes(n) ? 3 : ["Hold Monster", "Litany of Madness", "Calcific Touch"].includes(n) ? 4 : ["Waves of Fatigue", "Stunning Finale"].includes(n) ? 5 : ["Eyebite", "Hold Person, Mass"].includes(n) ? 6 : ["Fly, Mass"].includes(n) ? 7 : ["Power Word Stun"].includes(n) ? 8 : ["Power Word Kill", "Freedom"].includes(n) ? 9 : ["Holy Smite"].includes(n) ? 4 : ["Holy Word"].includes(n) ? 7 : ["Heal"].includes(n) ? 6 : ["Enervation", "Poison", "Contagion"].includes(n) ? 4 : 1)]));
           human = await createTestActor("Quench Spell Human", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
           ogre = await createTestActor("Quench Spell Ogre", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 6 } }]] });
           friend = await createTestActor("Quench Spell Friend", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
@@ -752,6 +752,56 @@ export function registerSpellTests(quench) {
             await human.setConditions({ deaf: false, blind: false });
             await human.update({ "system.details.alignment": "tn" });
           }
+        });
+
+        const adjacent = async (token, fn) => {
+          const { x, y } = token;
+          await token.update({ x: wizardToken.x, y: wizardToken.y + canvas.grid.size }, { animate: false });
+          try {
+            return await fn();
+          } finally {
+            await token.update({ x, y }, { animate: false });
+          }
+        };
+        const afflictions = (a) => a.itemTypes.buff.filter((b) => b.getFlag(MODULE_ID, "affliction"));
+
+        it("Heal: ends the listed conditions and ability damage on a living ally", async () => {
+          await friend.setConditions({ blind: true, nauseated: true });
+          await friend.update({ "system.abilities.str.damage": 3 });
+          await cast("Heal", [friendToken]);
+          await waitFor(() => !friend.statuses.has("blind") && !friend.statuses.has("nauseated") && friend.system.abilities.str.damage === 0, { what: "healed" });
+        });
+
+        it("Enervation: negative levels on a hit; undead gain temporary hit points instead", async () => {
+          dice(0.01); // the ray hits; 1d4: 4
+          await cast("Enervation", [humanToken]);
+          await waitFor(() => human.system.attributes.energyDrain === 4, { what: "4 negative levels" });
+          await human.update({ "system.attributes.energyDrain": 0 });
+        });
+
+        it("Poison: contracted at once on a failed save, as a poison of its own at the spell's DC (Constitution damage)", async () => {
+          dice(0.01); // the touch hits
+          const card = await adjacent(humanToken, () => cast("Poison", [humanToken]));
+          dice(0.99);
+          await save(card, human);
+          // Out of combat a creature no player owns resolves a /round poison's saves at once (afflictions.mjs)
+          const dc = card.getFlag(MODULE_ID, spells.FLAG).save.dc;
+          assert.match(row(card, human).applied.join(), new RegExp(`DC ${dc}\\): Poison \\(spell\\) contracted: \\d+ CON damage`));
+          assert.isAbove(human.system.abilities.con.damage, 0);
+          for (const b of afflictions(human)) await b.delete();
+          await human.update({ "system.abilities.con.damage": 0 });
+        });
+
+        it("Contagion: the caster's chosen disease, contracted at once", async () => {
+          dice(0.01);
+          const card = await adjacent(humanToken, () => cast("Contagion", [humanToken]));
+          await waitFor(() => [...foundry.applications.instances.values()].some((a) => /Which disease/.test(a.title ?? "")), { what: "the dialog" });
+          for (const a of [...foundry.applications.instances.values()]) if (/Which disease/.test(a.title ?? "")) await a.close();
+          await card.setFlag(MODULE_ID, "spellChoice", "filthfever");
+          dice(0.99);
+          await save(card, human);
+          const disease = await waitFor(() => afflictions(human).find((b) => b.getFlag(MODULE_ID, "affliction").name === "Filth Fever"), { what: "filth fever" });
+          await disease.delete();
         });
 
         it("a personal spell goes on the caster", async () => {

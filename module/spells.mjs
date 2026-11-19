@@ -49,7 +49,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { remainingSeconds, dealDamage, restoreDamage, ownerWhisper } from "./util.mjs";
-import { cureAfflictions } from "./afflictions.mjs";
+import { cureAfflictions, contract, afflictionOfItem } from "./afflictions.mjs";
 import { LASTING_SPELLS } from "./lasting-areas.mjs";
 import { SPELLS } from "./spell-data.mjs";
 import { abilityDef } from "./ability-effects.mjs";
@@ -828,6 +828,35 @@ async function applyEffect(actor, effect, data, caster, token = null) {
   if (effect.tempHp) out.push(await giveTempHp(actor, effect, data, rollData));
   // An attack the spell gives for its duration (Produce Flame)
   if (effect.attack) out.push(await giveAttack(actor, effect.attack, data));
+  // Heal and kin: diseases and poisons end, ability damage is cured (no checks)
+  for (const kind of effect.endAfflictions ?? []) {
+    const result = await cureAfflictions(actor, kind, data.cl ?? 1, { automatic: true });
+    if (!/^no /.test(result)) out.push(result);
+  }
+  if (effect.healAbilityDamage) {
+    const damaged = Object.entries(actor.system.abilities ?? {}).filter(([, a]) => (a.damage ?? 0) > 0);
+    if (damaged.length) {
+      await actor.update(Object.fromEntries(damaged.map(([id]) => [`system.abilities.${id}.damage`, 0])));
+      out.push("ability damage cured");
+    }
+  }
+  // Negative levels (Enervation, Energy Drain) in PF1's field; undead gain 5 temporary hit points per level instead
+  if (effect.negativeLevels) {
+    const levels = (await new Roll(String(effect.negativeLevels), rollData).evaluate()).total;
+    if (creatureTypes(actor).types.has("undead")) {
+      await actor.update({ "system.attributes.hp.temp": (actor.system.attributes.hp.temp ?? 0) + levels * 5 });
+      out.push(`${levels * 5} temporary hit points (undead; 1 hour)`);
+    } else {
+      await actor.update({ "system.attributes.energyDrain": (actor.system.attributes.energyDrain ?? 0) + levels });
+      out.push(`${levels} negative level${levels === 1 ? "" : "s"}`);
+    }
+  }
+  if (effect.clearNegativeLevels && (actor.system.attributes.energyDrain ?? 0) > 0) {
+    await actor.update({ "system.attributes.energyDrain": 0 });
+    out.push("negative levels removed");
+  }
+  // A disease or poison contracted at once, its save already failed (Contagion: the caster's choice; Poison)
+  if (effect.contract) out.push(await contractFromSpell(actor, effect.contract, data));
   // Lesser Restoration: fatigue, exhaustion, and one ability score
   if (effect.restore) out.push(...(await restore(actor, effect.restore, data, caster)));
   // What the caster gains from the creature (Death Knell)
@@ -920,6 +949,30 @@ Hooks.on("deleteItem", (item, options, userId) => {
 Hooks.on("updateItem", (item, changes, options, userId) => {
   if (game.user.id === userId && item.type === "buff" && foundry.utils.getProperty(changes, "system.active") === false) dropAttack(item);
 });
+
+/**
+ * Contagion (Core Rulebook): "The subject contracts one of the following diseases ... The disease is contracted
+ * immediately (the onset period does not apply). Use the disease's listed frequency and save DC." The disease is
+ * Pathfinder 1e Content's (pf-maladies), chosen by the caster; Greater Contagion's "cannot overcome the disease
+ * without magic". Poison (Core Rulebook): "1d3 Constitution damage per round for 6 rounds. Poisoned creatures can
+ * make a Fortitude save each round to negate the damage and end the affliction", at the spell's DC.
+ */
+async function contractFromSpell(actor, how, data) {
+  let spec;
+  if (how.spec) spec = { ...how.spec, dc: data.save?.dc ?? how.spec.dc, name: how.spec.name };
+  else {
+    const name = how.options?.[data.choice];
+    if (!name) return "the caster hasn't chosen the disease yet: expose it by hand";
+    const pack = game.packs.get("pf-content.pf-maladies");
+    const entry = pack?.index.find((e) => e.name === name);
+    spec = entry ? afflictionOfItem(await pack.getDocument(entry._id)) : null;
+    if (!spec) return `${name}: not found in Pathfinder 1e Content's maladies`;
+    spec = { ...spec, onset: null, kind: "disease" };
+    if (how.magicOnly) spec.cure = null;
+  }
+  const result = await contract(actor, spec, { source: data.name, failed: true });
+  return result?.text ?? `contracts ${spec.name}`;
+}
 
 /**
  * Lesser Restoration (Core Rulebook): "dispels any magical effects reducing one of the subject's ability scores
@@ -1144,7 +1197,7 @@ Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
 });
 
 // Cure spells harm undead, inflict spells heal them (from the card's buttons)
-const REVERSED = /^(mass )?(cure|inflict) \w+ wounds\b/i;
+const REVERSED = /^(mass )?(cure|inflict) \w+ wounds\b|^(heal|harm)(, mass)?$/i;
 Hooks.on("pf1ApplyDamage", (actor, options) => {
   const item = options.action?.item ?? options.message?.itemSource;
   if (!REVERSED.test(spellNameOf(item) ?? "") || !energyAsUndead(actor) || options[`${MODULE_ID}Reversed`]) return;

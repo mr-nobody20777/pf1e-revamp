@@ -452,12 +452,18 @@ Hooks.on("updateWorldTime", (worldTime, delta) => {
  * Neutralize poison, remove disease, remove curse: a caster level check against each affliction of that kind;
  * those beaten end (damage already dealt stays). Returns a short description.
  */
-export async function cureAfflictions(actor, kind, cl) {
+export async function cureAfflictions(actor, kind, cl, { automatic = false } = {}) {
   const list = afflictionsOf(actor).filter((b) => b.flags[MODULE_ID][FLAG].kind === kind);
   if (!list.length) return `no ${kind} to cure`;
   const out = [];
   for (const buff of list) {
     const data = buff.flags[MODULE_ID][FLAG];
+    // Heal: "immediately ends ... diseased ... poisoned" (no caster level check)
+    if (automatic) {
+      await endAffliction(buff);
+      out.push(`${data.name} ended`);
+      continue;
+    }
     const penalty = pernicious(actor, kind) ? 4 : 0;
     const roll = await new Roll(`1d20 + ${cl}${penalty ? " - 4" : ""}`).evaluate();
     if (roll.total >= data.dc) {

@@ -98,6 +98,10 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 | Holy Aura, Unholy Aura, Cloak of Chaos, Shield of Law, Communal Mind Blank, Greater Spell Immunity, Mass Fly, Mind Blank | The spell's buff on each creature affected |
 | Power Word Stun, Power Word Blind | By the target's current hit points; unaffected above 150 (Stun) or 200 (Blind) |
 | Scintillating Pattern, Sunburst | A pool of caster level Hit Dice, unconscious, stunned or confused by Hit Dice; blinded |
+| Heal, Mass Heal | End the listed conditions, all ability damage, diseases and poisons on a living creature; harm undead |
+| Enervation, Energy Drain | 1d4 or 2d4 negative levels on a hit (undead: 5 temporary hit points per level) |
+| Restoration, Greater Restoration | Negative levels removed (Greater: all ability damage too) |
+| Contagion, Greater Contagion, Epidemic, Plague Storm, Poison | The caster's chosen disease (or the spell's own poison), contracted at once on a failed save and tracked like any affliction |
 | Lesser Restoration | Ends fatigue and improves exhausted to fatigued; heals 1d4 damage to one ability score or ends a spell's penalty to one. With more than one option, the caster picks on a card |
 | Endure Elements, Feather Fall, Hide from Animals, Hide from Undead, Undetectable Alignment, Comprehend Languages, Speak with Animals, Pass Without Trace | A buff on each subject for the duration, with a reminder of what it does |
 
