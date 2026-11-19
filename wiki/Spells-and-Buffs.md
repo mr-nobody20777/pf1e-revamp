@@ -90,6 +90,9 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 | Hold Monster, Overwhelming Presence, Litany of Madness, Greater Command | Paralyzed, helpless and prone, confused, or obeying, with a new save each turn (Litany of Madness: no save when cast) |
 | Rainbow Pattern, Shout, Rebuke, Litany of Thunder, Malfunction, Aura of Doom, Mass Pain Strike | Fascinated (24 HD), deafened 2d6 rounds, staggered, deafened and confused, confused, shaken, sickened |
 | Calcific Touch, Major Curse, Restoration | 1d4 Dexterity damage and staggered; the caster's choice of curse; as Lesser Restoration |
+| Greater Heroism, Spell Resistance, Communal Spell Immunity, Mass Invisibility, Mind Fog, Righteous Might, Mislead, Greater Age Resistance | The spell's buff on each creature affected |
+| Waves of Fatigue, Stunning Finale, Ki Shout, Icy Prison, Tar Pool, Deafening Song Bolt, Mass Cacophonous Call, Mass Castigate | Fatigued, stunned (staggered on a save), helpless (entangled on a save), entangled, deafened, nauseated, cowering |
+| Cleanse | Ends blinded, confused, dazzled, deafened, exhausted, fatigued, nauseated and sickened on the caster |
 | Lesser Restoration | Ends fatigue and improves exhausted to fatigued; heals 1d4 damage to one ability score or ends a spell's penalty to one. With more than one option, the caster picks on a card |
 | Endure Elements, Feather Fall, Hide from Animals, Hide from Undead, Undetectable Alignment, Comprehend Languages, Speak with Animals, Pass Without Trace | A buff on each subject for the duration, with a reminder of what it does |
 

@@ -21,7 +21,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation", "Hold Monster", "Litany of Madness", "Calcific Touch"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation", "Hold Monster", "Litany of Madness", "Calcific Touch", "Waves of Fatigue", "Stunning Finale"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -63,7 +63,7 @@ export function registerSpellTests(quench) {
           uniform = CONFIG.Dice.randomUniform;
           sceneCtl = await useTestScene();
           wizard = await createTestActor("Quench Spell Wizard", { abilities: { int: 18 }, items: [["pf1.races", "Human"], ["pf1.classes", "Wizard", { system: { level: 5 } }]] });
-          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : ["Prayer", "Fear", "Fungal Infestation"].includes(n) ? 3 : ["Hold Monster", "Litany of Madness", "Calcific Touch"].includes(n) ? 4 : 1)]));
+          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : ["Prayer", "Fear", "Fungal Infestation"].includes(n) ? 3 : ["Hold Monster", "Litany of Madness", "Calcific Touch"].includes(n) ? 4 : ["Waves of Fatigue", "Stunning Finale"].includes(n) ? 5 : 1)]));
           human = await createTestActor("Quench Spell Human", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
           ogre = await createTestActor("Quench Spell Ogre", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 6 } }]] });
           friend = await createTestActor("Quench Spell Friend", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
@@ -628,6 +628,28 @@ export function registerSpellTests(quench) {
           assert.isTrue(human.statuses.has("staggered"));
           await human.update({ "system.abilities.dex.damage": 0 });
           await human.setConditions({ staggered: false });
+        });
+
+        it("Waves of Fatigue: living creatures fatigued, no save; the zombie and the already fatigued unaffected", async () => {
+          await ogre.setConditions({ fatigued: true });
+          const card = await cast("Waves of Fatigue", [humanToken, ogreToken, zombieToken]);
+          await waitFor(() => human.statuses.has("fatigued"), { what: "fatigued" });
+          assert.equal(row(card, zombie).state, "unaffected");
+          assert.equal(row(card, ogre).state, "unaffected");
+          await human.setConditions({ fatigued: false });
+          await ogre.setConditions({ fatigued: false });
+        });
+
+        it("Stunning Finale: stunned 1 round, staggered 1 round on a save", async () => {
+          const card = await cast("Stunning Finale", [humanToken, ogreToken]);
+          dice(0.99);
+          await save(card, human);
+          dice(0.01);
+          await save(card, ogre);
+          assert.isTrue(human.statuses.has("stunned"));
+          assert.isTrue(ogre.statuses.has("staggered"));
+          await human.setConditions({ stunned: false });
+          await ogre.setConditions({ staggered: false });
         });
 
         it("a personal spell goes on the caster", async () => {
