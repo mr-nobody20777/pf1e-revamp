@@ -106,7 +106,7 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 - Its foes take the full damage, or half on a save, and its effect on a failed save (for a bolt, outsiders only). Outsiders of that alignment take 1d6 per caster level (max 10d6) instead of 1d8 per two levels (max 5d8).
 - Creatures neither the one nor the other take half damage; a burst's save halves it again.
 - The words stack their effects by Hit Dice below the caster level (equal, 1, 5 and 10 or more below), with one save for all of them. More Hit Dice than the caster level: unaffected. Banishing extraplanar creatures stays with the GM (a reminder on their row).
-- The module rolls the damage once for the casting; each row shows what that creature takes, with an **Apply** button for the GM (then **Undo**).
+- The module rolls the damage once for the casting; each row shows what that creature takes, with an **Apply** button (then **Undo**). The GM sees it on every row, plus **Apply all** for the whole card; a player sees it on the rows of their own creatures.
 
 **Utility spells** (the detect spells, *Alarm*, *Identify*, *Silent Image*, *Ventriloquism*, *Magic Mouth*, the summons and others) post PF1's card without rows, like the **utility cantrips** (*Detect Magic*, *Read Magic*, *Mending*, *Prestidigitation*, *Mage Hand*, *Message*, *Ghost Sound*, *Dancing Lights*, *Create Water* and others with nothing to apply to a creature) post PF1's card without rows.
 

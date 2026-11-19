@@ -662,17 +662,37 @@ async function alignmentRow(row, def, data, caster, actor, saved) {
   row.applied = applied;
 }
 
-/** The GM applies a row's damage, or gives it back. */
-async function applyRowDamage(message, index) {
+/**
+ * Apply a row's damage, or give it back (GM). `indexes`: the rows; "all" applies every row not applied yet (the
+ * card's Apply all). A creature's owner asks the GM's game for its own row (the card isn't the owner's to change).
+ */
+async function applyRowDamage(message, indexes) {
   const data = foundry.utils.deepClone(message.getFlag(MODULE_ID, FLAG));
-  const row = data?.rows?.[index];
-  const actor = row && actorOf(row.uuid);
-  if (!row?.damage || !actor) return;
-  if (row.damage.lost) {
-    await restoreDamage(actor, row.damage.lost);
-    delete row.damage.lost;
-  } else row.damage.lost = await dealDamage(actor, row.damage.amount, []);
+  if (!data?.rows) return;
+  const all = indexes === "all";
+  const list = all ? data.rows.map((r, i) => i).filter((i) => data.rows[i].damage && !data.rows[i].damage.lost) : [indexes].flat();
+  for (const index of list) {
+    const row = data.rows[index];
+    const actor = row && actorOf(row.uuid);
+    if (!row?.damage || !actor) continue;
+    if (row.damage.lost) {
+      await restoreDamage(actor, row.damage.lost);
+      delete row.damage.lost;
+    } else row.damage.lost = await dealDamage(actor, row.damage.amount, []);
+  }
   await message.setFlag(MODULE_ID, FLAG, data);
+}
+onGmRequest("spellDamage", (request, { message, index }) => {
+  queue(async () => {
+    const card = fromUuidSync(message);
+    const row = card?.getFlag(MODULE_ID, FLAG)?.rows?.[index];
+    if (row && requestedByOwner(request, actorOf(row.uuid))) await applyRowDamage(card, index);
+    await request.delete();
+  });
+});
+function clickDamage(message, index) {
+  if (game.user.isGM) return applyRowDamage(message, index);
+  return ChatMessage.implementation.create({ whisper: gmWhisper(), content: "<p>Spell damage on a card</p>", flags: { [MODULE_ID]: { spellDamage: { message: message.uuid, index } } } });
 }
 
 /** The effect by the creature's current hit points (the power words). */
@@ -1150,6 +1170,21 @@ Hooks.on("renderChatMessagePF", (message, html) => {
     const token = tokenOf(row.uuid);
     if (game.user.isGM || !token?.hidden || token.isOwner) box.append(rowElement(message, data, row, index));
   });
+  // The GM: every row's damage at once
+  const pending = data.rows.filter((r) => r.damage && !r.damage.lost);
+  if (game.user.isGM && pending.length > 1) {
+    const all = document.createElement("button");
+    all.type = "button";
+    all.textContent = `Apply all (${pending.length})`;
+    all.dataset.tooltip = "Deal each creature the damage its row shows";
+    all.style.cssText = "width: auto; line-height: 1.4; margin: 0.2em 0; padding: 0 6px;";
+    all.addEventListener("click", (event) => {
+      event.preventDefault();
+      all.disabled = true;
+      applyRowDamage(message, "all");
+    });
+    box.append(all);
+  }
   // Under the targets and the save button, above the card's info tags
   const footer = html.querySelector(".chat-card .card-footer");
   if (footer) footer.before(box);
@@ -1173,7 +1208,8 @@ function rowElement(message, data, row, index) {
   if (row.applied?.length) parts.push(row.applied.map(esc).join(", "));
   if (!row.state) parts.push("…");
   div.innerHTML = `<strong>${esc(row.name)}</strong>${parts.length ? `: ${parts.join(" · ")}` : ""}`;
-  if (row.damage && gm && actor) {
+  // The damage: the GM on every row, a creature's owner on its own
+  if (row.damage && actor && (gm || actor.isOwner)) {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = row.damage.lost ? "Undo" : `Apply ${row.damage.amount}`;
@@ -1182,7 +1218,7 @@ function rowElement(message, data, row, index) {
     button.addEventListener("click", (event) => {
       event.preventDefault();
       button.disabled = true;
-      applyRowDamage(message, index);
+      clickDamage(message, index);
     });
     div.append(" ", button);
   }

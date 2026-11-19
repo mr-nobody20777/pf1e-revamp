@@ -727,6 +727,12 @@ export function registerSpellTests(quench) {
             assert.equal(human.system.attributes.hp.value, hp - 16);
             await spells.applyRowDamage(card, index);
             assert.equal(human.system.attributes.hp.value, hp, "undone");
+            const ogreHp = ogre.system.attributes.hp.value;
+            await spells.applyRowDamage(card, "all");
+            assert.equal(human.system.attributes.hp.value, hp - 16, "Apply all: the evil creature");
+            assert.equal(ogre.system.attributes.hp.value, ogreHp - 4, "and the neutral one");
+            await human.update({ "system.attributes.hp.value": hp });
+            await ogre.update({ "system.attributes.hp.value": ogreHp });
           } finally {
             await human.setConditions({ blind: false });
             for (const a of [human, ogre, friend]) await a.update({ "system.details.alignment": "tn" });
