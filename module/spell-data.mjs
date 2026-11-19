@@ -1211,6 +1211,55 @@ export const SPELLS = {
   // hit points is unaffected"
   "power word blind": { hpTiers: [[50, { conditions: [["blind", null]] }], [100, { conditions: [["blind", "10 * (1d4 + 1)"]] }], [200, { conditions: [["blind", "1d4 + 1"]] }]] },
 
+  // 9th level, the four core books: nothing to apply to the creatures in the rows
+  "astral projection": { utility: true },
+  "crushing hand": { utility: true },
+  "elemental swarm": { utility: true },
+  gate: { utility: true },
+  "mage's disjunction": { utility: true },
+  miracle: { utility: true },
+  "prismatic sphere": { utility: true },
+  shades: { utility: true },
+  shambler: { utility: true },
+  "soul bind": { utility: true },
+  "summon monster ix": { utility: true },
+  "summon nature's ally ix": { utility: true },
+  "true resurrection": { utility: true },
+  wish: { utility: true },
+  "siege of trees, greater": { utility: true },
+  "create demiplane, greater": { utility: true },
+  "cursed earth": { utility: true },
+  "interplanetary teleport": { utility: true },
+  "summon elder worm": { utility: true },
+  "summon froghemoth": { utility: true },
+  "wooden phalanx": { utility: true },
+  "world wave": { utility: true },
+  "wall of suppression": { utility: true },
+  // 9th level, the four core books: on the caster, with a reminder
+  "fiery body": { self: true, effect: { marker: true, note: "living flame: immune to fire (healed by it) and more (see the spell)" } },
+  "winds of vengeance": { self: true, effect: { marker: true, note: "fly 60 feet (perfect); winds shield you from ranged attacks (see the spell)" } },
+  shapechange: { self: true, effect: { marker: true, note: "change into any form of alter self, beast shape IV, elemental body IV, form of the dragon III, giant form II or plant shape III: apply it by hand" } },
+  "time stop": { self: true, effect: { marker: true, note: "1d4+1 rounds of apparent time to act" } },
+  "ride the lightning": { self: true, effect: { marker: true, note: "standard action: travel as lightning up to 120 feet in a line" } },
+  // 9th level, the four core books
+  foresight: { effect: { marker: true, note: "never surprised or flat-footed; +2 insight to AC and on Reflex saves" } },
+  "spell immunity, greater communal": { effect: { buff: "Spell Immunity", note: "spells of 8th level or lower" } },
+  "hold monster, mass": { living: true, effect: { conditions: [["paralyzed", "@cl"]], marker: true, resave: { every: true, save: "will", removes: ["paralyzed"], action: "a full-round action" } } },
+  "icy prison, mass": { effect: { conditions: [["helpless", null]], marker: true, note: "trapped in ice: 1 cold damage each round; break out with Strength or damage (see the spell)" }, onSave: { conditions: [["entangled", null]], note: "1 cold damage each round while in the ice" } },
+  "suffocation, mass": { effect: { marker: true, note: "suffocating: unconscious next turn, then dying (see the spell)" }, onSave: { conditions: [["staggered", "1"]] } },
+  "energy drain": { effect: { marker: true, note: "2d4 temporary negative levels; a Fortitude save for each after 24 hours or it becomes permanent" } },
+  // "freed from spells and effects that restrict movement, including binding, entangle, grappling, imprisonment, maze,
+  // paralysis, petrification, pinning, sleep, slow, stunning, temporal stasis, and web"
+  freedom: { effect: { remove: ["entangled", "grappled", "paralyzed", "petrified", "pinned", "sleep", "stunned"], note: "also ends binding, imprisonment, maze, slow, temporal stasis and web" } },
+  // "a +4 morale bonus on attack and damage rolls, gain 2d8+4 temporary hit points, and become immune to both fear and
+  // charm effects"
+  "heroic invocation": { effect: { changes: [{ target: "attack", formula: "4", type: "morale" }, { target: "damage", formula: "4", type: "morale" }], tempHp: "2d8 + 4", note: "immune to fear and charm effects" } },
+  // "Any creature that currently has 101 or more hit points is unaffected by power word kill"
+  "power word kill": { living: true, hpTiers: [[100, { conditions: [["dead", null]] }]] },
+  "transmute blood to acid": { living: true, effect: { marker: true, note: "1d6 acid per two caster levels each round (Fortitude half each round); staggered and sickened while it lasts" } },
+  // "Each creature under the cloud must succeed on a Fortitude save or be deafened for 1d4 x 10 minutes"
+  "storm of vengeance": { effect: { conditions: [["deaf", "100 * 1d4"]], note: "while you concentrate, the storm's later rounds (acid, lightning, hail) apply by hand" } },
+
   "pass without trace": { effect: { buff: "Pass Without Trace" } },
   "undetectable alignment": { effect: { marker: true, note: "alignment can't be detected by divinations" } },
 
