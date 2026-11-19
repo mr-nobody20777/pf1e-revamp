@@ -48,12 +48,12 @@
 // the row says whether the creature takes full or half.
 
 import { MODULE_ID } from "./const.mjs";
-import { remainingSeconds, dealDamage, ownerWhisper } from "./util.mjs";
+import { remainingSeconds, dealDamage, restoreDamage, ownerWhisper } from "./util.mjs";
 import { cureAfflictions } from "./afflictions.mjs";
 import { LASTING_SPELLS } from "./lasting-areas.mjs";
 import { SPELLS } from "./spell-data.mjs";
 import { abilityDef } from "./ability-effects.mjs";
-import { creatureTypes, energyAsUndead, isLiving } from "./creature-types.mjs";
+import { creatureTypes, energyAsUndead, isLiving, hasAlignment } from "./creature-types.mjs";
 import { compendiumBuff, nevelaAppliesBuff } from "./buff-grants.mjs";
 import { isChannel } from "./channel-energy.mjs";
 import { immunitiesOf, CHOICE as ENERGY_CHOICE } from "./defenses.mjs";
@@ -240,6 +240,12 @@ function unaffectedBy(def, actor, spell) {
   const hd = actor.system.attributes?.hd?.total ?? 0;
   if (def?.types && !def.types.some((t) => types.has(t) || subtypes.has(t))) return `only ${def.types.join(" or ")} creatures`;
   if (def?.hdMax != null && hd > def.hdMax) return `${def.hdMax} HD or less only`;
+  if (def?.align) {
+    const side = alignmentSide(def, actor);
+    if (def.align.kind !== "whisper" && side === "own") return `no effect on ${def.align.self} creatures`;
+    if (def.align.kind === "whisper" && side === "neutral") return "no effect on creatures neither good nor evil";
+    if (def.align.kind === "word" && hd > (spell.cl ?? 0)) return "Hit Dice above the caster level";
+  }
   // Power words: "Any creature that currently has 151 or more hit points is unaffected"
   if (def?.hpTiers && (actor.system.attributes?.hp?.value ?? 0) > def.hpTiers.at(-1)[0]) return `only a creature with ${def.hpTiers.at(-1)[0]} hit points or less`;
   const undeadOrConstruct = !isLiving(null, types);
@@ -298,7 +304,7 @@ async function resolveCard(message) {
   if (data.sr === null) data.sr = !!source?.system.sr;
   // A scroll, wand or potion of a spell with no save, no entry and no spell resistance: nothing to show
   if (!def && !data.save && !data.sr) return message.unsetFlag(MODULE_ID, FLAG);
-  const spell = { name: data.name, descriptors: [...(source?.system.descriptors?.total ?? source?.system.descriptors?.base ?? [])], subschools: data.ability ? [] : [...(source?.system.subschool?.base ?? [])], save: data.save?.type, harmless: data.harmless, objectSave: data.objectSave };
+  const spell = { name: data.name, descriptors: [...(source?.system.descriptors?.total ?? source?.system.descriptors?.base ?? [])], subschools: data.ability ? [] : [...(source?.system.subschool?.base ?? [])], save: data.save?.type, harmless: data.harmless, objectSave: data.objectSave, cl: data.cl ?? 0 };
   let attack = message.systemRolls?.attacks?.[0]?.attack ?? null;
   // PF1's data for some touch spells has no attack roll (Chill Touch): roll it here
   const needsTouch = data.touch && data.rows.some((r) => !accepts(data, r, caster));
@@ -356,6 +362,8 @@ async function resolveCard(message) {
       row.hitDamage = `${roll.total} ${onHit.damage.type} damage${lost.hp + lost.temp < roll.total ? ` (${lost.hp + lost.temp} after resistance)` : ""}`;
     }
     row.state = data.save && !willing && rowDef(def, row)?.initialSave !== false ? "save" : "apply";
+    // Holy Whisper's good creatures gain its bonus without a save
+    if (def?.align?.kind === "whisper" && alignmentSide(def, actor) === "own") row.state = "apply";
   }
 
   // A pool of Hit Dice (Sleep): fewest HD first, then nearest to the spell's origin
@@ -375,6 +383,11 @@ async function resolveCard(message) {
     }
   }
 
+  // Alignment spells: one damage roll for the casting (and the bigger one against outsiders)
+  if (def?.align?.dice) {
+    data.alignRoll = {};
+    for (const [key, formula] of Object.entries(def.align.dice)) data.alignRoll[key] = (await new Roll(formula, { cl: data.cl ?? 0 }).evaluate()).total;
+  }
   for (const row of data.rows) if (row.state === "apply") await applyRow(row, rowDef(def, row), data, caster, { saved: false });
   data.resolved = true;
   await message.setFlag(MODULE_ID, FLAG, data);
@@ -562,6 +575,7 @@ async function endEffect(row, data, passed) {
 async function applyRow(row, def, data, caster, { saved }) {
   row.state = "done";
   const actor = actorOf(row.uuid);
+  if (def?.align && actor) return alignmentRow(row, def, data, caster, actor, saved);
   // A creature not on the caster's side gets the spell's foe effect when it has one (Prayer)
   const foe = !!def?.foe && !accepts(data, row, caster);
   const effect = !def ? null : saved ? def.onSave : def.tiers ? tierFor(def, actor) : def.hpTiers ? hpTierFor(def, actor) : def.choice ? def.choice.effects[data.choice] ?? null : foe ? def.foe : def.effect;
@@ -580,6 +594,85 @@ async function applyRow(row, def, data, caster, { saved }) {
   if (!saved && def?.unread && !data.damage) applied.push("apply its effect by hand (see the ability)");
   if (def?.cooldown && actor && !saved) await actor.setFlag(MODULE_ID, "spellCooldown", { [data.name.toLowerCase()]: game.time.worldTime + def.cooldown * 6 });
   row.applied = applied;
+}
+
+/**
+ * Alignment spells (Core Rulebook, Advanced Player's Guide, Ultimate Magic): the creature's alignment decides
+ * the damage and the effect. Bolts and bursts ("Only evil and neutral creatures are harmed by the spell; good
+ * creatures are unaffected"): the spell's foes take its damage (an outsider of that alignment the bigger dice),
+ * half on a save, and its effect on a failed save (for a bolt, outsiders only); creatures neither the one nor the
+ * other take half, and for a burst a save halves it again ("down to one-quarter"). Words ("Any nongood creature
+ * ... HD equal to caster level, up to caster level -1, -5, -10 ... The effects are cumulative and concurrent ...
+ * Creatures affected by multiple effects make only one save"): effects by Hit Dice below the caster level, each
+ * reduced on a save as its text says; killed (undead destroyed), or 3d6 + caster level (max +25) on a save.
+ * Holy Whisper: evil creatures save or are sickened (evil outsiders, evil dragons and undead also take 2d8); good
+ * ones get +2 sacred on attack and damage rolls for 1 round. Damage rounds down; the row shows the amount, and the
+ * GM applies it (and can undo it). Alignment: PF1's alignment (a creature with none counts as neutral).
+ */
+function alignmentSide(def, actor) {
+  if (hasAlignment(actor, def.align.self) === true) return "own";
+  if (def.align.foe && hasAlignment(actor, def.align.foe) === true) return "foe";
+  return "neutral";
+}
+const WORD_STEPS = [0, 1, 5]; // Hit Dice below the caster level for each further effect
+async function alignmentRow(row, def, data, caster, actor, saved) {
+  const al = def.align;
+  const side = alignmentSide(def, actor);
+  const roll = data.alignRoll ?? {};
+  const { types, subtypes } = creatureTypes(actor);
+  const applied = [];
+  let damage = 0;
+  let effect = null;
+  if (al.kind === "bolt" || al.kind === "burst") {
+    const outsider = side === "foe" && types.has("outsider");
+    const base = (outsider ? roll.outsider : roll.base) ?? 0;
+    if (side === "foe") {
+      damage = saved ? Math.floor(base / 2) : base;
+      if (!saved && (al.kind === "burst" || outsider)) effect = al.effect;
+    } else damage = al.kind === "burst" && saved ? Math.floor(Math.floor(base / 2) / 2) : Math.floor(base / 2);
+  } else if (al.kind === "whisper") {
+    if (side === "own") effect = al.goodEffect;
+    else if (!saved) {
+      effect = al.effect;
+      if ((types.has("outsider") && subtypes.has("evil")) || types.has("dragon") || types.has("undead")) damage = roll.base ?? 0;
+    }
+  } else if (al.kind === "word") {
+    const below = (data.cl ?? 0) - (actor.system.attributes?.hd?.total ?? 0);
+    const conditions = [];
+    let penalty = null;
+    al.tiers.forEach((tier, i) => {
+      if (below < WORD_STEPS[i]) return;
+      const e = saved ? tier.save : tier.fail;
+      if (e?.conditions) conditions.push(...e.conditions);
+      if (e?.penalty) penalty = e.penalty;
+    });
+    if (below >= 10) {
+      if (!saved) conditions.push(["dead", null]);
+      else damage = (await new Roll("3d6 + min(@cl, 25)", { cl: data.cl ?? 0 }).evaluate()).total;
+    }
+    if (conditions.length || penalty) effect = { conditions, ...(penalty ? { penalty } : {}) };
+    if (al.note && subtypes.has("extraplanar")) applied.push(al.note);
+  }
+  if (effect) applied.push(...(await applyEffect(actor, effect, data, caster, tokenOf(row.uuid))));
+  if (damage > 0) {
+    row.damage = { amount: damage };
+    applied.push(`${damage} damage${side === "neutral" && al.kind !== "word" ? " (neither one nor the other)" : ""}`);
+  }
+  if (!applied.length) applied.push("no effect");
+  row.applied = applied;
+}
+
+/** The GM applies a row's damage, or gives it back. */
+async function applyRowDamage(message, index) {
+  const data = foundry.utils.deepClone(message.getFlag(MODULE_ID, FLAG));
+  const row = data?.rows?.[index];
+  const actor = row && actorOf(row.uuid);
+  if (!row?.damage || !actor) return;
+  if (row.damage.lost) {
+    await restoreDamage(actor, row.damage.lost);
+    delete row.damage.lost;
+  } else row.damage.lost = await dealDamage(actor, row.damage.amount, []);
+  await message.setFlag(MODULE_ID, FLAG, data);
 }
 
 /** The effect by the creature's current hit points (the power words). */
@@ -664,8 +757,10 @@ async function applyEffect(actor, effect, data, caster, token = null) {
   // A buff named after the spell that Nevela applies itself (Prayer): left to Nevela, as for the compendium buffs
   const byNevela = !!item && !effect.buff && (effect.changes || effect.marker) && nevelaAppliesBuff(item, data.actionId ?? item.defaultAction?.id, data.name);
   if (byNevela) out.push(`${data.name} (applied by Nevela's Automation Suite)`);
+  // A duration of its own in rounds (Holy Whisper's 1 round, a slow of 1d6 rounds), else the spell's
+  const ownDuration = async (formula) => ({ value: String(Math.max(1, (await new Roll(String(formula), rollData).evaluate()).total)), units: "round" });
   if (effect.changes && !byNevela) {
-    const duration = spellDuration(item, data.cl);
+    const duration = effect.rounds ? await ownDuration(effect.rounds) : spellDuration(item, data.cl);
     // Values rolled once for the casting (Touch of Idiocy's 1d6) go into the formulas
     const changes = effect.changes.map((c) => ({ ...c, formula: String(c.formula).replace(/@(\w+)/g, (m, k) => (effect.roll && k in effect.roll ? String(rollData[k]) : m)) }));
     const existing = actor.itemTypes.buff.find((b) => b.name === data.name);
@@ -694,7 +789,7 @@ async function applyEffect(actor, effect, data, caster, token = null) {
     const label = `−${value} ${pf1.config.abilities?.[p.target] ?? p.target}`;
     if (existing && current >= value) out.push(`${label} (a higher penalty already applies)`);
     else {
-      const duration = spellDuration(item, data.cl);
+      const duration = p.rounds ? await ownDuration(p.rounds) : spellDuration(item, data.cl);
       const changes = [{ formula: String(-value), target: p.target, type: "untyped" }];
       if (existing) await existing.update({ "system.changes": changes, ...byUpdate, ...(duration ? { "system.duration": duration } : {}) });
       else await actor.createEmbeddedDocuments("Item", [stamp({ name: data.name, type: "buff", img: item?.img, system: { subType: "spell", active: true, level: data.cl, changes, ...(duration ? { duration } : {}) } })]);
@@ -1078,6 +1173,19 @@ function rowElement(message, data, row, index) {
   if (row.applied?.length) parts.push(row.applied.map(esc).join(", "));
   if (!row.state) parts.push("…");
   div.innerHTML = `<strong>${esc(row.name)}</strong>${parts.length ? `: ${parts.join(" · ")}` : ""}`;
+  if (row.damage && gm && actor) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = row.damage.lost ? "Undo" : `Apply ${row.damage.amount}`;
+    button.dataset.tooltip = row.damage.lost ? "Give the hit points back" : `Deal ${row.damage.amount} damage to ${actor.name}`;
+    button.style.cssText = "width: auto; line-height: 1.4; margin: 0 0.25em; padding: 0 6px;";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      button.disabled = true;
+      applyRowDamage(message, index);
+    });
+    div.append(" ", button);
+  }
   if (row.state === "save") {
     if (actor?.isOwner) {
       const button = document.createElement("button");
@@ -1117,4 +1225,4 @@ registerFootnote((item) => {
   return [`${parts.join("")}.`];
 });
 
-export const _test = { FLAG, spellDef, templateFromArea, chooseRestore, spendDuration, unaffectedBy, penetration, resolveCard, abilityDef };
+export const _test = { FLAG, spellDef, templateFromArea, chooseRestore, spendDuration, applyRowDamage, unaffectedBy, penetration, resolveCard, abilityDef };

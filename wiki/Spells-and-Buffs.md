@@ -101,6 +101,13 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 | Lesser Restoration | Ends fatigue and improves exhausted to fatigued; heals 1d4 damage to one ability score or ends a spell's penalty to one. With more than one option, the caster picks on a card |
 | Endure Elements, Feather Fall, Hide from Animals, Hide from Undead, Undetectable Alignment, Comprehend Languages, Speak with Animals, Pass Without Trace | A buff on each subject for the duration, with a reminder of what it does |
 
+**Alignment spells.** *Spear of Purity*, *Dread Bolt*, *Arrow of Law*, *Shard of Chaos*, *Holy Smite*, *Unholy Blight*, *Order's Wrath*, *Chaos Hammer*, *Holy Word*, *Blasphemy*, *Dictum*, *Word of Chaos* and *Holy Whisper* work by each creature's alignment (PF1's alignment field; a creature without one counts as neutral):
+- Creatures of the spell's alignment are unaffected (*Holy Smite* doesn't harm good creatures).
+- Its foes take the full damage, or half on a save, and its effect on a failed save (for a bolt, outsiders only). Outsiders of that alignment take 1d6 per caster level (max 10d6) instead of 1d8 per two levels (max 5d8).
+- Creatures neither the one nor the other take half damage; a burst's save halves it again.
+- The words stack their effects by Hit Dice below the caster level (equal, 1, 5 and 10 or more below), with one save for all of them. More Hit Dice than the caster level: unaffected. Banishing extraplanar creatures stays with the GM (a reminder on their row).
+- The module rolls the damage once for the casting; each row shows what that creature takes, with an **Apply** button for the GM (then **Undo**).
+
 **Utility spells** (the detect spells, *Alarm*, *Identify*, *Silent Image*, *Ventriloquism*, *Magic Mouth*, the summons and others) post PF1's card without rows, like the **utility cantrips** (*Detect Magic*, *Read Magic*, *Mending*, *Prestidigitation*, *Mage Hand*, *Message*, *Ghost Sound*, *Dancing Lights*, *Create Water* and others with nothing to apply to a creature) post PF1's card without rows.
 
 **Save modifiers.** Hypnotism's +2 in combat (−2 for a lone creature out of combat) and Hideous Laughter's +4 for a creature of a different type from the caster appear as ticked entries in the save window.

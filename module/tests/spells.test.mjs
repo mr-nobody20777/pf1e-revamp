@@ -21,7 +21,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation", "Hold Monster", "Litany of Madness", "Calcific Touch", "Waves of Fatigue", "Stunning Finale", "Eyebite", "Hold Person, Mass", "Fly, Mass", "Power Word Stun", "Power Word Kill", "Freedom"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation", "Hold Monster", "Litany of Madness", "Calcific Touch", "Waves of Fatigue", "Stunning Finale", "Eyebite", "Hold Person, Mass", "Fly, Mass", "Power Word Stun", "Power Word Kill", "Freedom", "Holy Smite", "Holy Word"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -63,7 +63,7 @@ export function registerSpellTests(quench) {
           uniform = CONFIG.Dice.randomUniform;
           sceneCtl = await useTestScene();
           wizard = await createTestActor("Quench Spell Wizard", { abilities: { int: 18 }, items: [["pf1.races", "Human"], ["pf1.classes", "Wizard", { system: { level: 5 } }]] });
-          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : ["Prayer", "Fear", "Fungal Infestation"].includes(n) ? 3 : ["Hold Monster", "Litany of Madness", "Calcific Touch"].includes(n) ? 4 : ["Waves of Fatigue", "Stunning Finale"].includes(n) ? 5 : ["Eyebite", "Hold Person, Mass"].includes(n) ? 6 : ["Fly, Mass"].includes(n) ? 7 : ["Power Word Stun"].includes(n) ? 8 : ["Power Word Kill", "Freedom"].includes(n) ? 9 : 1)]));
+          await addItems(wizard, SPELL_NAMES.map((n) => ["pf1.spells", n, spell(["Daze", "Touch of Fatigue", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect"].includes(n) ? 0 : ["Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules"].includes(n) ? 2 : ["Prayer", "Fear", "Fungal Infestation"].includes(n) ? 3 : ["Hold Monster", "Litany of Madness", "Calcific Touch"].includes(n) ? 4 : ["Waves of Fatigue", "Stunning Finale"].includes(n) ? 5 : ["Eyebite", "Hold Person, Mass"].includes(n) ? 6 : ["Fly, Mass"].includes(n) ? 7 : ["Power Word Stun"].includes(n) ? 8 : ["Power Word Kill", "Freedom"].includes(n) ? 9 : ["Holy Smite"].includes(n) ? 4 : ["Holy Word"].includes(n) ? 7 : 1)]));
           human = await createTestActor("Quench Spell Human", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
           ogre = await createTestActor("Quench Spell Ogre", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 6 } }]] });
           friend = await createTestActor("Quench Spell Friend", { items: [["pf1.races", "Human"], ["pf1.classes", "Warrior", { system: { level: 1 } }]] });
@@ -703,6 +703,49 @@ export function registerSpellTests(quench) {
           await friend.setConditions({ paralyzed: true, entangled: true });
           await cast("Freedom", [friendToken]);
           await waitFor(() => !friend.statuses.has("paralyzed") && !friend.statuses.has("entangled"), { what: "freed" });
+        });
+
+        it("Holy Smite: evil full damage and blinded, neutral a quarter on a save, good unaffected; the GM applies and undoes the damage", async () => {
+          await human.update({ "system.details.alignment": "ce" });
+          await ogre.update({ "system.details.alignment": "tn" });
+          await friend.update({ "system.details.alignment": "lg" });
+          try {
+            dice(0.01); // the damage: 2d8 = 16
+            const card = await cast("Holy Smite", [humanToken, ogreToken, friendToken]);
+            assert.equal(row(card, friend).state, "unaffected");
+            dice(0.99);
+            await save(card, human);
+            dice(0.01);
+            await save(card, ogre);
+            assert.equal(row(card, human).damage.amount, 16);
+            assert.isTrue(human.statuses.has("blind"));
+            assert.equal(row(card, ogre).damage.amount, 4, "neutral: half, then half again on the save");
+            assert.isFalse(ogre.statuses.has("blind"));
+            const hp = human.system.attributes.hp.value;
+            const index = rows(card).findIndex((r) => r.name === human.name);
+            await spells.applyRowDamage(card, index);
+            assert.equal(human.system.attributes.hp.value, hp - 16);
+            await spells.applyRowDamage(card, index);
+            assert.equal(human.system.attributes.hp.value, hp, "undone");
+          } finally {
+            await human.setConditions({ blind: false });
+            for (const a of [human, ogre, friend]) await a.update({ "system.details.alignment": "tn" });
+          }
+        });
+
+        it("Holy Word: effects by Hit Dice below the caster level; more Hit Dice than the caster level, unaffected", async () => {
+          await human.update({ "system.details.alignment": "ce" });
+          try {
+            const card = await cast("Holy Word", [humanToken, ogreToken]);
+            assert.equal(row(card, ogre).state, "unaffected", "6 HD against caster level 5");
+            dice(0.99);
+            await save(card, human);
+            assert.isTrue(human.statuses.has("deaf") && human.statuses.has("blind"), "4 below: deafened and blinded");
+            assert.isFalse(human.statuses.has("paralyzed"), "not 5 below");
+          } finally {
+            await human.setConditions({ deaf: false, blind: false });
+            await human.update({ "system.details.alignment": "tn" });
+          }
         });
 
         it("a personal spell goes on the caster", async () => {

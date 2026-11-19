@@ -10,6 +10,9 @@
 //   wounded    only a creature below its maximum hit points (Touch of Bloodletting)
 //   sighted    sightless creatures are unaffected
 //   intMin     creatures with a lower Intelligence (or none) are unaffected
+//   align      alignment spells (spells.mjs, alignmentRow): { kind: "bolt" | "burst" | "word" | "whisper", foe, self,
+//              dice: { base, outsider }, effect, goodEffect, tiers: [{ fail, save }, ...], note }
+//   effect.rounds  a duration of its own in rounds for the changes (Holy Whisper); penalty.rounds the same
 //   foe        the effect on creatures not on the caster's side, when it differs (Prayer)
 //   intMax     creatures with a higher Intelligence are unaffected (Animal Trance: 1 or 2)
 //   choice     { title, options: { id: label }, effects: { id: effect } }: the caster picks the effect when
@@ -1260,6 +1263,30 @@ export const SPELLS = {
   // "Each creature under the cloud must succeed on a Fortitude save or be deafened for 1d4 x 10 minutes"
   "storm of vengeance": { effect: { conditions: [["deaf", "100 * 1d4"]], note: "while you concentrate, the storm's later rounds (acid, lightning, hail) apply by hand" } },
 
+  // Alignment spells: damage and effects by the creature's alignment (spells.mjs, alignmentRow)
+  // "A good creature struck by dread bolt ... A good outsider instead takes 1d6 points of damage per caster level
+  // (maximum 10d6) and is sickened for 1 round ... only half damage to creatures that are neither good nor evil"
+  "spear of purity": { align: { kind: "bolt", foe: "evil", self: "good", dice: { base: "(min(floor(@cl / 2), 5))d8", outsider: "(min(@cl, 10))d6" }, effect: { conditions: [["blind", "1"]] } }, touchAttack: "ranged" },
+  "dread bolt": { align: { kind: "bolt", foe: "good", self: "evil", dice: { base: "(min(floor(@cl / 2), 5))d8", outsider: "(min(@cl, 10))d6" }, effect: { conditions: [["sickened", "1"]] } }, touchAttack: "ranged" },
+  "arrow of law": { align: { kind: "bolt", foe: "chaotic", self: "lawful", dice: { base: "(min(floor(@cl / 2), 5))d8", outsider: "(min(@cl, 10))d6" }, effect: { conditions: [["dazed", "1"]] } }, touchAttack: "ranged" },
+  "shard of chaos": { align: { kind: "bolt", foe: "lawful", self: "chaotic", dice: { base: "(min(floor(@cl / 2), 5))d8", outsider: "(min(@cl, 10))d6" }, effect: { roll: { r: "1" }, conditions: [["staggered", "@r"]], changes: [{ target: "attack", formula: "-1", type: "untyped" }, { target: "ac", formula: "-1", type: "untyped" }, { target: "ref", formula: "-1", type: "untyped" }], rounds: "@r", note: "slowed (as the spell)" } }, touchAttack: "ranged" },
+  // "Only evil and neutral creatures are harmed by the spell ... Such a creature can reduce that damage by half
+  // (down to one-quarter of the roll) with a successful Will save"
+  "holy smite": { align: { kind: "burst", foe: "evil", self: "good", dice: { base: "(min(floor(@cl / 2), 5))d8", outsider: "(min(@cl, 10))d6" }, effect: { conditions: [["blind", "1"]] } } },
+  "unholy blight": { align: { kind: "burst", foe: "good", self: "evil", dice: { base: "(min(floor(@cl / 2), 5))d8", outsider: "(min(@cl, 10))d6" }, effect: { conditions: [["sickened", "1d4"]] } } },
+  "order's wrath": { align: { kind: "burst", foe: "chaotic", self: "lawful", dice: { base: "(min(floor(@cl / 2), 5))d8", outsider: "(min(@cl, 10))d6" }, effect: { conditions: [["dazed", "1"]] } } },
+  "chaos hammer": { align: { kind: "burst", foe: "lawful", self: "chaotic", dice: { base: "(min(floor(@cl / 2), 5))d8", outsider: "(min(@cl, 10))d6" }, effect: { roll: { r: "1d6" }, conditions: [["staggered", "@r"]], changes: [{ target: "attack", formula: "-1", type: "untyped" }, { target: "ac", formula: "-1", type: "untyped" }, { target: "ref", formula: "-1", type: "untyped" }], rounds: "@r", note: "slowed (as the spell)" } } },
+  // "HD equal to caster level: Deafened; Up to caster level -1: Blinded, deafened; Up to caster level -5:
+  // Paralyzed ...; Up to caster level -10: Killed" (each spell's effects, reduced on a save as its text says)
+  "holy word": { align: { kind: "word", self: "good", tiers: [{ fail: { conditions: [["deaf", "1d4"]] }, save: null }, { fail: { conditions: [["blind", "2d4"]] }, save: { conditions: [["blind", "1d4"]] } }, { fail: { conditions: [["paralyzed", "10 * 1d10"]] }, save: { conditions: [["paralyzed", "1"]] } }], note: "extraplanar: banished if you're on your home plane (Will at -4 negates)" } },
+  blasphemy: { align: { kind: "word", self: "evil", tiers: [{ fail: { conditions: [["dazed", "1"]] }, save: null }, { fail: { penalty: { target: "str", formula: "2d6", rounds: "2d4" } }, save: { penalty: { target: "str", formula: "2d6", half: true, rounds: "2d4" } } }, { fail: { conditions: [["paralyzed", "10 * 1d10"]] }, save: { conditions: [["paralyzed", "1"]] } }], note: "extraplanar: banished if you're on your home plane (Will at -4 negates)" } },
+  dictum: { align: { kind: "word", self: "lawful", tiers: [{ fail: { conditions: [["deaf", "1d4"]] }, save: null }, { fail: { conditions: [["staggered", "2d4"]] }, save: { conditions: [["staggered", "1d4"]] } }, { fail: { conditions: [["paralyzed", "10 * 1d10"]] }, save: { conditions: [["paralyzed", "1"]] } }], note: "extraplanar: banished if you're on your home plane (Will at -4 negates)" } },
+  "word of chaos": { align: { kind: "word", self: "chaotic", tiers: [{ fail: { conditions: [["deaf", "1d4"]] }, save: null }, { fail: { conditions: [["stunned", "1"]] }, save: null }, { fail: { conditions: [["confused", "10 * 1d10"]] }, save: { conditions: [["confused", "1"]] } }], note: "extraplanar: banished if you're on your home plane (Will at -4 negates)" } },
+  // "Evil creatures within the burst must make a Fortitude saving throw or become sickened for 1 round/level. Evil
+  // outsiders with the evil subtype, evil-aligned dragons, and undead in the burst also take 2d8 points of damage if
+  // they fail their saves. Good-aligned creatures in the burst gain a +2 sacred bonus on attack and damage rolls for
+  // 1 round."
+  "holy whisper": { align: { kind: "whisper", foe: "evil", self: "good", dice: { base: "2d8" }, effect: { conditions: [["sickened", "@cl"]] }, goodEffect: { changes: [{ target: "attack", formula: "2", type: "sacred" }, { target: "damage", formula: "2", type: "sacred" }], rounds: "1" } } },
   "pass without trace": { effect: { buff: "Pass Without Trace" } },
   "undetectable alignment": { effect: { marker: true, note: "alignment can't be detected by divinations" } },
 
