@@ -49,6 +49,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { remainingSeconds, dealDamage, restoreDamage, ownerWhisper } from "./util.mjs";
+import { baseSpellName, metamagicOf, metamagicFormula, extendFactor, hasMetamagic } from "./metamagic.mjs";
 import { cureAfflictions, contract, afflictionOfItem } from "./afflictions.mjs";
 import { LASTING_SPELLS } from "./lasting-areas.mjs";
 import { SPELLS } from "./spell-data.mjs";
@@ -58,6 +59,12 @@ import { compendiumBuff, nevelaAppliesBuff } from "./buff-grants.mjs";
 import { isChannel } from "./channel-energy.mjs";
 import { immunitiesOf, CHOICE as ENERGY_CHOICE } from "./defenses.mjs";
 import { reaches } from "./area-reach.mjs";
+import { startOngoing } from "./ongoing-damage.mjs";
+import "./call-lightning.mjs";
+import "./summons.mjs";
+import "./attackers.mjs";
+import { setBurning } from "./burning.mjs";
+import { handlesSpell as polymorphHandles, sizeBlocked, openPicker, morphinActive } from "./polymorph.mjs";
 import { esc, evaluate, isActiveGM, onGmRequest, requestedByOwner, gmWhisper, createQueue, tokenDistance, timed, saveResult, wrapMethod } from "./util.mjs";
 import { registerFootnote } from "./footnote.mjs";
 import { registerRollEffect } from "./roll-effects.mjs";
@@ -75,11 +82,12 @@ function abilityTouch(item, action) {
 const SAVE_NAMES = { fort: "Fortitude", ref: "Reflex", will: "Will" };
 const queue = createQueue("spell results");
 // Spells another feature already puts on their targets (buff-grants.mjs)
-const HANDLED_ELSEWHERE = new Set(["guidance"]);
+// Their own engines: Guidance (guidance.mjs), the bolts of Call Lightning (call-lightning.mjs)
+const HANDLED_ELSEWHERE = new Set(["guidance", "call lightning", "call lightning storm"]);
 
 /** The spell an item casts: the spell itself, or a scroll, wand or potion of it ("Wand of Daze"). */
 function spellNameOf(item) {
-  if (item?.type === "spell") return item.name;
+  if (item?.type === "spell") return baseSpellName(item);
   if (item?.type === "consumable" && ["scroll", "wand", "potion"].includes(item.system.subType)) return item.name.replace(/^(scroll|wand|potion) of /i, "");
   return null;
 }
@@ -113,6 +121,10 @@ export function spellDef(item) {
   return name ? (SPELLS[name.toLowerCase().replace(/\s*\((?:mythic|communal)\)$/, "")] ?? null) : null;
 }
 
+// Walls: a line as long as the spell allows (20 feet per level); the GM shortens it, or makes it a ring (circle)
+// Flaming Sphere: a 5-foot sphere (lasting-areas.mjs moves it onto creatures)
+const WALL_TEMPLATES = { "wall of fire": { type: "ray", size: "20 * @cl" }, "blade barrier": { type: "ray", size: "20 * @cl" }, "wall of clockwork": { type: "ray", size: "5 * @cl" }, "flaming sphere": { type: "circle", size: "2.5" } };
+for (const name of ["flaming sphere, greater", "aggressive thundercloud", "aggressive thundercloud, greater"]) WALL_TEMPLATES[name] = WALL_TEMPLATES["flaming sphere"];
 // Supply the template while the item is prepared (not saved: the item's own data is unchanged)
 Hooks.once("init", () => {
   wrapMethod("pf1.documents.item.ItemPF.prototype._prepareActions", function (wrapped, ...args) {
@@ -121,7 +133,7 @@ Hooks.once("init", () => {
     for (const action of this.actions) {
       const mt = action.measureTemplate;
       if (!mt || (mt.type && mt.size)) continue;
-      const t = templateFromArea(action.area, action.effect, action.range);
+      const t = WALL_TEMPLATES[spellNameOf(this).toLowerCase()] ?? templateFromArea(action.area, action.effect, action.range);
       if (t) Object.assign(mt, t);
     }
     return result;
@@ -164,7 +176,7 @@ Hooks.on("preCreateChatMessage", (message) => {
   const item = message.itemSource;
   const spellName = spellNameOf(item);
   // Lasting areas (lasting-areas.mjs) act on the creatures inside at the casting and on those entering later
-  if (spellName && (HANDLED_ELSEWHERE.has(spellName.toLowerCase()) || LASTING_SPELLS.has(spellName.toLowerCase()))) return;
+  if (spellName && (HANDLED_ELSEWHERE.has(spellName.toLowerCase()) || LASTING_SPELLS.has(spellName.toLowerCase()) || polymorphHandles(spellName))) return;
   const action = item?.actions?.get(message.system.action?.id);
   let save = message.system.save?.type ? { type: message.system.save.type, dc: message.system.save.dc } : null;
   // An ability that isn't a spell: only with a save PF1 worked out, and not channel energy (its own flow)
@@ -196,6 +208,14 @@ Hooks.on("preCreateChatMessage", (message) => {
     targets = targets.filter((uuid) => (def.affects === "allies") === ally(uuid));
   }
   if (!targets.length) return;
+  const metamagic = ability ? null : metamagicOf(message);
+  // Dazing Spell: "If the spell does not allow a save, the target can make a Will save to negate the daze effect"
+  let dazingSave = false;
+  if (hasMetamagic(metamagic, "dazing") && action?.damage?.parts?.length && !save) {
+    save = { type: "will", dc: action.getDC(action.getRollData()) };
+    dazingSave = true;
+  }
+  const excluded = new Set(metamagic?.excluded ?? []);
   message.updateSource({
     [`flags.${MODULE_ID}.${FLAG}`]: {
       name: spellName ?? item.name,
@@ -220,7 +240,9 @@ Hooks.on("preCreateChatMessage", (message) => {
       // A save that also works on objects isn't one undead and constructs are immune to
       objectSave: /object/i.test(action?.save?.description ?? ""),
       casterDisposition: casterToken?.disposition ?? null,
-      rows: targets.map((uuid) => ({ uuid, name: tokenOf(uuid)?.name ?? actorOf(uuid)?.name ?? "?" })),
+      metamagic,
+      dazingSave,
+      rows: targets.map((uuid) => ({ uuid, name: tokenOf(uuid)?.name ?? actorOf(uuid)?.name ?? "?", ...(excluded.has(uuid) ? { excluded: true } : {}) })),
     },
   });
 });
@@ -317,6 +339,10 @@ async function resolveCard(message) {
   const natural = attack?.dice?.[0]?.total;
 
   for (const row of data.rows) {
+    if (row.excluded) {
+      Object.assign(row, { state: "unaffected", why: "excluded by the caster (Selective Spell)" });
+      continue;
+    }
     const actor = actorOf(row.uuid);
     const token = tokenOf(row.uuid);
     if (!actor) {
@@ -362,7 +388,7 @@ async function resolveCard(message) {
     // Damage PF1's card doesn't have (Chill Touch), on a hit
     const onHit = rowDef(def, row)?.onHit;
     if (onHit?.damage) {
-      const roll = await new Roll(onHit.damage.formula, { cl: data.cl }).evaluate();
+      const roll = await new Roll(metamagicFormula(onHit.damage.formula, data.metamagic, { cl: data.cl }), { cl: data.cl }).evaluate();
       // Typed, so energy resistance, immunities and DR apply (PF1's ids: "negative energy" is "negative")
       const type = { "negative energy": "negative", "positive energy": "positive" }[onHit.damage.type] ?? onHit.damage.type;
       const lost = await dealDamage(actor, roll.total, [type]);
@@ -375,7 +401,8 @@ async function resolveCard(message) {
 
   // A pool of Hit Dice (Sleep): fewest HD first, then nearest to the spell's origin
   if (def?.pool) {
-    let left = (await new Roll(def.pool, { cl: data.cl ?? 0 }).evaluate()).total;
+    // Empower and Maximize: a pool of Hit Dice is a variable number (Sleep's 4 HD isn't: no dice, no change)
+    let left = (await new Roll(metamagicFormula(def.pool, data.metamagic, { cl: data.cl ?? 0 }), { cl: data.cl ?? 0 }).evaluate()).total;
     data.pool = left;
     const origin = fromUuidSync(message.system.template ?? "") ?? caster?.getActiveTokens()[0]?.document;
     const dist = (row) => {
@@ -393,7 +420,7 @@ async function resolveCard(message) {
   // Alignment spells: one damage roll for the casting (and the bigger one against outsiders)
   if (def?.align?.dice) {
     data.alignRoll = {};
-    for (const [key, formula] of Object.entries(def.align.dice)) data.alignRoll[key] = (await new Roll(formula, { cl: data.cl ?? 0 }).evaluate()).total;
+    for (const [key, formula] of Object.entries(def.align.dice)) data.alignRoll[key] = (await new Roll(metamagicFormula(formula, data.metamagic, { cl: data.cl ?? 0 }), { cl: data.cl ?? 0 }).evaluate()).total;
   }
   for (const row of data.rows) if (row.state === "apply") await applyRow(row, rowDef(def, row), data, caster, { saved: false });
   data.resolved = true;
@@ -465,6 +492,14 @@ Hooks.on("createChatMessage", (save) => {
     const row = data.rows.find((r) => r.state === "save" && mine(r) && saveOf(data, r).type === save.system.subject.save);
     if (!row) return;
     const { total, passed } = saveResult(save, data.save.dc);
+    // Persistent Spell: "Whenever a creature ... succeeds on its saving throw against the spell, it must make
+    // another saving throw"; failing the second, "it suffers the full effects of the spell"
+    if (passed && hasMetamagic(data.metamagic, "persistent") && !row.persistent && !data.ends) {
+      row.persistent = { first: total };
+      row.save = { total, passed };
+      await card.setFlag(MODULE_ID, FLAG, data);
+      return;
+    }
     row.save = { total, passed };
     if (data.ends) await endEffect(row, data, passed);
     else {
@@ -585,17 +620,32 @@ async function applyRow(row, def, data, caster, { saved }) {
   if (def?.align && actor) return alignmentRow(row, def, data, caster, actor, saved);
   // A creature not on the caster's side gets the spell's foe effect when it has one (Prayer)
   const foe = !!def?.foe && !accepts(data, row, caster);
-  const effect = !def ? null : saved ? def.onSave : def.tiers ? tierFor(def, actor) : def.hpTiers ? hpTierFor(def, actor) : def.choice ? def.choice.effects[data.choice] ?? null : foe ? def.foe : def.effect;
-  if (def?.choice && !saved && !data.choice) row.pendingChoice = true;
+  // Dazing Spell's added Will save negates only the daze: the spell's own effect applies whatever the save
+  const spellSaved = saved && !data.dazingSave;
+  const effect = !def ? null : spellSaved ? def.onSave : def.tiers ? tierFor(def, actor) : def.hpTiers ? hpTierFor(def, actor) : def.choice ? def.choice.effects[data.choice] ?? null : foe ? def.foe : def.effect;
+  if (def?.choice && !spellSaved && !data.choice) row.pendingChoice = true;
   const applied = [];
   // A healing spell heals the living; undead take it as damage (half on a save), and inflict spells heal them
   const reversed = !!actor && energyAsUndead(actor) && REVERSED.test(data.name);
   if (actor && data.heal !== reversed) applied.push("healing");
   else if (saved && data.damage) applied.push("half damage");
   else if (data.damage) applied.push("full damage");
-  if (saved && def && !def.onSave && !data.damage) applied.push(row.hitDamage ? "no further effect" : "no effect");
+  if (spellSaved && def && !def.onSave && !data.damage) applied.push(row.hitDamage ? "no further effect" : "no effect");
   if (row.pendingChoice) applied.push("the caster hasn't chosen the effect yet: apply it by hand");
   if (effect && actor) applied.push(...(await applyEffect(actor, effect, data, caster, tokenOf(row.uuid))));
+  // Dazing Spell: dazed "for a number of rounds equal to the original level of the spell"; a successful save negates it
+  if (actor && !saved && hasMetamagic(data.metamagic, "dazing") && (data.damage || data.dazingSave)) {
+    const rounds = Math.max(1, data.metamagic.originalLevel ?? 1);
+    if (actor.getConditionImmunities?.()?.has?.("dazed")) applied.push("immune to dazed");
+    else {
+      await actor.setConditions({ dazed: { duration: timed(rounds) } });
+      applied.push(`dazed ${rounds} round${rounds === 1 ? "" : "s"} (Dazing Spell)`);
+    }
+  }
+  if (data.dazingSave) {
+    row.applied = applied.filter((a) => a !== "full damage" && a !== "half damage");
+    return;
+  }
   // An ability whose effect couldn't be read from its text: the GM applies it (DECISIONS.md)
   if (!saved && def?.reminder?.length) applied.push(`${def.reminder.join(", ")}: its duration isn't in the text, apply by hand`);
   if (!saved && def?.unread && !data.damage) applied.push("apply its effect by hand (see the ability)");
@@ -742,7 +792,7 @@ async function applyEffect(actor, effect, data, caster, token = null) {
       out.push(condition.name.toLowerCase());
       continue;
     }
-    const rounds = Math.max(1, (await new Roll(String(formula), rollData).evaluate()).total);
+    const rounds = Math.max(1, (await new Roll(String(formula), rollData).evaluate()).total) * extendFactor(data.metamagic);
     // Already under it: PF1 keeps the old effect, so a longer new duration replaces it
     const left = remainingSeconds(actor, id);
     if (left === Infinity || left >= rounds * (CONFIG.time.roundTime || 6)) {
@@ -762,15 +812,25 @@ async function applyEffect(actor, effect, data, caster, token = null) {
     }
   }
 
+  // Spells that change size have no effect on a polymorphed creature (polymorph.mjs)
+  const blocked = sizeBlocked(data.name, actor);
+  if (blocked) return [...out, blocked];
+  // Baleful Polymorph: the GM picks the Small animal (Mighty Morphin's Beast Shape III); other polymorphs end
+  if (effect.morph && morphinActive()) {
+    const opened = await openPicker(actor, effect.morph.fn, effect.morph.level, data.cl ?? 1, { nameOverride: data.name, replace: false, end: true });
+    if (opened) out.push(`choose the form in Mighty Morphin's window`);
+  }
   // The spell's buff, at the caster's level and for the spell's duration (unless Nevela applies it)
   const item = caster?.items.get(data.itemId) ?? caster?.items.find((i) => i.type === "spell" && i.name === data.name);
   // Nevela looks for a buff matching the spell's name (Fly, Mass finds none, though its buff is Fly)
-  if (effect.buff && item && nevelaAppliesBuff(item, data.actionId ?? item.defaultAction?.id, data.name)) out.push(`${effect.buff} (applied by Nevela's Automation Suite)`);
+  // A metamagic casting is the module's to apply (Nevela knows neither the renamed copy nor the doubled duration)
+  const nevela = !data.metamagic && !!item && nevelaAppliesBuff(item, data.actionId ?? item.defaultAction?.id, data.name);
+  if (effect.buff && nevela) out.push(`${effect.buff} (applied by Nevela's Automation Suite)`);
   else if (effect.buff) {
     const buff = await compendiumBuff(effect.buff);
     buff.system.level = data.cl;
     stamp(buff);
-    const duration = spellDuration(item, data.cl);
+    const duration = spellDuration(item, data.cl, data.metamagic);
     if (duration) buff.system.duration = duration;
     const existing = actor.itemTypes.buff.find((b) => b.name === buff.name);
     // Recast by a lower-level caster: the stronger one stays
@@ -782,12 +842,12 @@ async function applyEffect(actor, effect, data, caster, token = null) {
     }
   }
   // A buff named after the spell that Nevela applies itself (Prayer): left to Nevela, as for the compendium buffs
-  const byNevela = !!item && !effect.buff && (effect.changes || effect.marker) && nevelaAppliesBuff(item, data.actionId ?? item.defaultAction?.id, data.name);
+  const byNevela = !effect.buff && (effect.changes || effect.marker) && nevela;
   if (byNevela) out.push(`${data.name} (applied by Nevela's Automation Suite)`);
   // A duration of its own in rounds (Holy Whisper's 1 round, a slow of 1d6 rounds), else the spell's
-  const ownDuration = async (formula) => ({ value: String(Math.max(1, (await new Roll(String(formula), rollData).evaluate()).total)), units: "round" });
+  const ownDuration = async (formula) => ({ value: String(Math.max(1, (await new Roll(String(formula), rollData).evaluate()).total) * extendFactor(data.metamagic)), units: "round" });
   if (effect.changes && !byNevela) {
-    const duration = effect.rounds ? await ownDuration(effect.rounds) : spellDuration(item, data.cl);
+    const duration = effect.rounds ? await ownDuration(effect.rounds) : spellDuration(item, data.cl, data.metamagic);
     // Values rolled once for the casting (Touch of Idiocy's 1d6) go into the formulas
     const changes = effect.changes.map((c) => ({ ...c, formula: String(c.formula).replace(/@(\w+)/g, (m, k) => (effect.roll && k in effect.roll ? String(rollData[k]) : m)) }));
     const existing = actor.itemTypes.buff.find((b) => b.name === data.name);
@@ -798,7 +858,7 @@ async function applyEffect(actor, effect, data, caster, token = null) {
   // Neutralize poison, remove disease, remove curse: a caster level check against each affliction of the kind
   if (effect.cure) out.push(await cureAfflictions(actor, effect.cure, data.cl ?? 1));
   if (effect.marker && !effect.buff && !byNevela) {
-    const duration = spellDuration(item, data.cl);
+    const duration = spellDuration(item, data.cl, data.metamagic);
     const existing = actor.itemTypes.buff.find((b) => b.name === data.name);
     const marker = { name: data.name, type: "buff", img: item?.img, system: { subType: "spell", active: true, level: data.cl, ...(duration ? { duration } : {}) } };
     if (existing) await existing.update({ "system.active": true, ...byUpdate, ...(duration ? { "system.duration": duration } : {}) });
@@ -816,7 +876,7 @@ async function applyEffect(actor, effect, data, caster, token = null) {
     const label = `−${value} ${pf1.config.abilities?.[p.target] ?? p.target}`;
     if (existing && current >= value) out.push(`${label} (a higher penalty already applies)`);
     else {
-      const duration = p.rounds ? await ownDuration(p.rounds) : spellDuration(item, data.cl);
+      const duration = p.rounds ? await ownDuration(p.rounds) : spellDuration(item, data.cl, data.metamagic);
       const changes = [{ formula: String(-value), target: p.target, type: "untyped" }];
       if (existing) await existing.update({ "system.changes": changes, ...byUpdate, ...(duration ? { "system.duration": duration } : {}) });
       else await actor.createEmbeddedDocuments("Item", [stamp({ name: data.name, type: "buff", img: item?.img, system: { subType: "spell", active: true, level: data.cl, changes, ...(duration ? { duration } : {}) } })]);
@@ -825,11 +885,22 @@ async function applyEffect(actor, effect, data, caster, token = null) {
   }
   // Hit point damage on a failed save (Brand: 1 point)
   if (effect.damage) {
-    const total = (await new Roll(String(effect.damage.formula), rollData).evaluate()).total;
+    const total = (await new Roll(metamagicFormula(effect.damage.formula, data.metamagic, rollData), rollData).evaluate()).total;
     if (total > 0) {
       await dealDamage(actor, total, effect.damage.type ? [effect.damage.type] : []);
       out.push(`${total} damage`);
     }
+  }
+  // Damage on later rounds, on the caster's turns (Acid Arrow, Heat Metal: ongoing-damage.mjs)
+  if (effect.ongoing) {
+    const item = caster?.items.get(data.itemId) ?? caster?.items.find((i) => i.type === "spell" && i.name === data.name);
+    const started = await startOngoing(actor, effect.ongoing, data, caster, rollData, item?.img);
+    if (started) out.push(started);
+  }
+  // Set on fire (Core Rulebook, catching on fire: 1d6 a round, a DC 15 Reflex save to put it out): burning.mjs
+  if (effect.burning) {
+    await setBurning(actor, { formula: effect.burning.formula ?? "1d6", dc: effect.burning.dc ?? 15, source: data.name });
+    out.push("catches fire");
   }
   // Temporary hit points for the spell's duration (Aid, False Life): they go when its buff ends
   if (effect.tempHp) out.push(await giveTempHp(actor, effect, data, rollData));
@@ -964,7 +1035,7 @@ Hooks.on("updateItem", (item, changes, options, userId) => {
  * without magic". Poison (Core Rulebook): "1d3 Constitution damage per round for 6 rounds. Poisoned creatures can
  * make a Fortitude save each round to negate the damage and end the affliction", at the spell's DC.
  */
-async function contractFromSpell(actor, how, data) {
+export async function contractFromSpell(actor, how, data) {
   let spec;
   if (how.spec) spec = { ...how.spec, dc: data.save?.dc ?? how.spec.dc, name: how.spec.name };
   else {
@@ -1066,7 +1137,7 @@ async function giveTempHp(actor, effect, data, rollData) {
   if (!buff) return "no buff to hold the temporary hit points";
   let temp = actor.system.attributes.hp.temp ?? 0;
   temp = Math.max(0, temp - (buff.getFlag(MODULE_ID, "tempHp") ?? 0));
-  const gained = (await new Roll(effect.tempHp, rollData).evaluate()).total;
+  const gained = (await new Roll(metamagicFormula(effect.tempHp, data.metamagic, rollData), rollData).evaluate()).total;
   await buff.setFlag(MODULE_ID, "tempHp", gained);
   await actor.update({ "system.attributes.hp.temp": temp + gained });
   return `${gained} temporary hit points`;
@@ -1183,10 +1254,11 @@ function stackedFear(actor, id) {
 export { remainingSeconds }; // moved to util.mjs
 
 /** The spell's duration as a buff duration ({ value, units }), when it's a plain one. */
-function spellDuration(item, cl) {
+function spellDuration(item, cl, metamagic = null) {
   const d = item?.defaultAction?.duration;
   if (!d?.units || !["round", "minute", "hour", "day"].includes(d.units)) return null;
-  const value = evaluate(String(d.value || "1"), item, { cl, item: { level: item.system.level } });
+  // Extend Spell: twice as long (concentration, instantaneous and permanent durations never reach here)
+  const value = evaluate(String(d.value || "1"), item, { cl, item: { level: item.system.level } }) * extendFactor(metamagic);
   return value > 0 ? { value: String(value), units: d.units } : null;
 }
 
@@ -1198,7 +1270,7 @@ const missiles = (cl) => Math.max(1, Math.min(5, Math.floor((cl + 1) / 2)));
 
 // Magic Missile: one 1d4+1 per missile
 Hooks.on("pf1PreDamageRoll", (action, rollData, parts) => {
-  if (action.item?.type !== "spell" || action.item.name !== "Magic Missile" || !parts[0]) return;
+  if (action.item?.type !== "spell" || baseSpellName(action.item) !== "Magic Missile" || !parts[0]) return;
   const n = missiles(rollData.cl ?? 1);
   if (n > 1) parts[0].base = `${n}d4 + ${n}`;
 });
@@ -1264,7 +1336,8 @@ function rowElement(message, data, row, index) {
   if (row.hitDamage) parts.push(esc(row.hitDamage));
   if (row.state === "unaffected") parts.push(`unaffected${gm && row.why ? ` (${esc(row.why)})` : ""}`);
   const save = saveOf(data, row);
-  if (row.save) parts.push(`${SAVE_NAMES[save.type]} ${row.save.total}: ${row.save.passed ? "saved" : "failed"}`);
+  if (row.persistent && row.state === "save") parts.push(`${SAVE_NAMES[save.type]} ${row.persistent.first}: saved; Persistent Spell: it saves again`);
+  else if (row.save) parts.push(`${row.persistent ? `${SAVE_NAMES[save.type]} ${row.persistent.first}: saved, then ` : `${SAVE_NAMES[save.type]} `}${row.save.total}: ${row.save.passed ? "saved" : "failed"}`);
   if (row.applied?.length) parts.push(row.applied.map(esc).join(", "));
   if (!row.state) parts.push("…");
   div.innerHTML = `<strong>${esc(row.name)}</strong>${parts.length ? `: ${parts.join(" · ")}` : ""}`;

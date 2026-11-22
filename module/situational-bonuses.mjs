@@ -22,7 +22,7 @@ const MANEUVERS = { grapple: /\bgrappl\w*/, trip: /\btrip(s|ping)?\b/, disarm: /
 // Armor that isn't metal (PF1's armor has no material field for its base): by name or base type; dragonhide
 // and darkwood armor aren't metal either
 const NONMETAL_ARMOR = /\b(leather|hide|padded|quilted|silken|rosewood|wooden|horn lamellar|stone lamellar|leather lamellar)\b/i;
-function wearsMetalArmor(actor) {
+export function wearsMetalArmor(actor) {
   return actor.itemTypes.equipment.some((e) => {
     if (!e.system.equipped || e.system.subType !== "armor") return false;
     if (["dragonhide", "darkwood"].includes(specialMaterial(e)?.id)) return false;

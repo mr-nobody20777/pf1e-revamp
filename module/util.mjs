@@ -247,6 +247,18 @@ export async function oncePerRound(actor, flag, combat, round = combat.round) {
   return true;
 }
 
+/**
+ * The creatures whose turn it is: the combatant, and the creatures it summoned (summons.mjs: they have no place in
+ * the tracker and act on their summoner's turn, so what happens at the start of their turn happens then).
+ */
+export function turnActors(combat, combatant = combat?.combatant) {
+  const actor = combatant?.actor;
+  if (!actor) return [];
+  // Summons and spell-created attackers are linked world actors (summons.mjs, attackers.mjs): no token scan needed
+  const summons = game.actors.filter((a) => a.flags?.[MODULE_ID]?.summon?.summoner === actor.uuid);
+  return [actor, ...summons];
+}
+
 /** combatTurnChange: the tracker was stepped back, not forward. */
 export const steppedBack = (prior, current) => !!prior && !!current && (current.round < prior.round || (current.round === prior.round && current.turn < prior.turn));
 
@@ -281,7 +293,9 @@ export const handledFeature = (item) => handled.some((re) => re.test(item?.name 
  */
 export function notesOf(item) {
   const own = item?.system?.contextNotes ?? [];
-  const extra = DESCRIPTION_NOTES[item?.name?.toLowerCase?.() ?? ""];
+  // A prepared metamagic copy ("Empowered Shocking Grasp") reads its spell's notes (metamagic.mjs)
+  const name = item?.flags?.[MODULE_ID]?.metamagic?.baseName ?? item?.name;
+  const extra = DESCRIPTION_NOTES[name?.toLowerCase?.() ?? ""];
   return extra ? [...own, ...extra] : own;
 }
 

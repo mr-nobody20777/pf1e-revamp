@@ -9,7 +9,7 @@
 // bypasses any damage reduction the creature might possess." A higher bleed replaces a lower one.
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM, onGmRequest, requestedByOwner, gmWhisper, ownerWhisper } from "./util.mjs";
+import { esc, isActiveGM, onGmRequest, requestedByOwner, gmWhisper, ownerWhisper, turnActors } from "./util.mjs";
 
 const FLAG = "bleed";
 const HEALED = `${MODULE_ID}BleedHealed`;
@@ -39,7 +39,10 @@ export const bleedOf = (actor) => (actor?.statuses.has("bleed") ? (actor.getFlag
 // Start of the bleeding creature's turn
 Hooks.on("updateCombat", async (combat, changes, options) => {
   if (!isActiveGM() || !("turn" in changes || "round" in changes) || options.direction === -1) return;
-  const actor = combat.combatant?.actor;
+  for (const actor of turnActors(combat)) await bleedTurn(combat, actor);
+});
+
+async function bleedTurn(combat, actor) {
   const bleed = bleedOf(actor);
   if (!bleed) return;
   // Once a round: stepping the tracker back and forward again doesn't bleed it twice
@@ -54,7 +57,7 @@ Hooks.on("updateCombat", async (combat, changes, options) => {
       <button type="button" data-action="${MODULE_ID}-stop-bleed">Heal check succeeded: stop the bleeding</button>`,
     flags: { [MODULE_ID]: { bleedTurn: { actor: actor.uuid } } },
   });
-});
+}
 
 Hooks.on("renderChatMessageHTML", (message, html) => {
   const data = message.getFlag(MODULE_ID, "bleedTurn");

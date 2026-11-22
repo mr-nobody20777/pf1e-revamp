@@ -19,7 +19,7 @@
 // spells that give fast healing (Infernal Healing and Celestial Healing, lesser and greater).
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM, ownerWhisper } from "./util.mjs";
+import { esc, isActiveGM, ownerWhisper, turnActors } from "./util.mjs";
 
 const STOPPED = "regenStopped"; // actor flag: the damage types that stop its next regeneration
 const TICK = "healedRound"; // actor flag: `${combat}.${round}` of the last healing, so it heals once a round
@@ -57,15 +57,15 @@ export function healingOf(actor) {
 // Start of the creature's turn
 Hooks.on("updateCombat", async (combat, changes, options) => {
   if (!isActiveGM() || !("turn" in changes || "round" in changes) || options.direction === -1) return;
-  const actor = combat.combatant?.actor;
-  if (!actor) return;
-  const { fast, regen } = healingOf(actor);
-  if (!fast && !regen) return;
-  // Once a round: stepping the tracker back and forward again doesn't heal twice
-  const tick = `${combat.id}.${combat.round}`;
-  if (actor.getFlag(MODULE_ID, TICK) === tick) return;
-  await actor.setFlag(MODULE_ID, TICK, tick);
-  await healTurn(actor);
+  for (const actor of turnActors(combat)) {
+    const { fast, regen } = healingOf(actor);
+    if (!fast && !regen) continue;
+    // Once a round: stepping the tracker back and forward again doesn't heal twice
+    const tick = `${combat.id}.${combat.round}`;
+    if (actor.getFlag(MODULE_ID, TICK) === tick) continue;
+    await actor.setFlag(MODULE_ID, TICK, tick);
+    await healTurn(actor);
+  }
 });
 
 /** Heal the creature for its turn; returns the line posted, or null. */

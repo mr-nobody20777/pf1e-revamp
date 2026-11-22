@@ -13,6 +13,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { registerFootnote } from "./footnote.mjs";
 import { esc, evaluate, isActiveGM, onGmRequest } from "./util.mjs";
+import { baseSpellName } from "./metamagic.mjs";
 
 const NEVELA = "nevelas-automation-suite";
 
@@ -23,7 +24,7 @@ const GRANTS = {
 };
 
 function grantFor(item) {
-  const grant = item && GRANTS[item.name.toLowerCase()];
+  const grant = item && GRANTS[baseSpellName(item).toLowerCase()];
   return grant && item.type === grant.type ? grant : null;
 }
 

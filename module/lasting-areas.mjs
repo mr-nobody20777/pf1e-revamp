@@ -44,18 +44,65 @@
 //     throw to avoid falling into it ... any creature ending its turn on a square adjacent to the pit must make
 //     a Reflex saving throw with a +2 bonus to avoid falling into it ... Creatures who fall into the pit take
 //     falling damage as normal." Depth: 10 feet per two caster levels (maximum 30 feet).
+//   - Smoke (burning entanglement): "Creatures can see things in the smoke within 5 feet clearly, but attacks
+//     against anything farther away in the smoke must contend with concealment (20% miss chance)".
+//   - Concealment (flashfire's smoke): "providing concealment within" (20%, near or far).
 //   - Fog cloud (obscuring mist, solid fog, stinking cloud, cloudkill): "A creature within 5 feet has
 //     concealment (attacks have a 20% miss chance). Creatures farther away have total concealment (50% miss
 //     chance". Fog between the two counts as well as fog around either.
+//   - Acid fog: "like the solid fog spell ... Each round on your turn, starting when you cast the spell, the fog
+//     deals 2d6 points of acid damage to each creature and object within it."
+//   - Incendiary cloud: "The smoke obscures all sight as a fog cloud does ... deal 6d6 points of fire damage to
+//     everything within the cloud on your turn each round. All targets can make Reflex saves each round to take
+//     half damage. As with a cloudkill spell, the smoke moves away from you at 10 feet per round."
+//   - Spike stones: as spike growth, "1d8 points of piercing damage for each 5 feet of movement".
+//   - Ice storm, volcanic storm: the damage "only occurs once, when the spell is cast" (PF1's card); then
+//     "Creatures inside this area take a -4 penalty on Perception skill checks and the entire area is treated
+//     as difficult terrain."
+//   - Web cloud: "billows and flows much like a cloudkill spell ... Creatures trapped in the webbing remain
+//     trapped even after the cloud passes ... The cloud otherwise acts like a web spell. A creature in the cloud
+//     at the start of its turn must save against the cloud or be affected."
+//   - Plague storm: "Creatures in the area must save or contract one of the following diseases ... Unlike a fog
+//     cloud, the plague storm moves away from you at 10 feet per round" (the casting's rows are spells.mjs's;
+//     a creature the cloud reaches later saves once).
+//   - Drift (cloudkill, incendiary cloud, web cloud, plague storm): "Figure out the cloud's new spread each round
+//     based on its new point of origin, which is 10 feet farther away from the point of origin where you cast
+//     the spell." On the caster's turn, before the cloud acts, its center moves 10 feet along the line from where
+//     the caster stood at the casting through the cloud's center; a wall in the way stops it there (the spread
+//     still flows around corners: area-reach.mjs). A cloud cast on the caster's own square has no direction until
+//     the GM drags it once. Rulings: DECISIONS.md, "Drifting clouds".
+//   - Wall of fire: "One side of the wall, selected by you, sends forth waves of heat, dealing 2d4 points of fire
+//     damage to creatures within 10 feet and 1d4 points of fire damage to those past 10 feet but within 20 feet.
+//     The wall deals this damage when it appears, and to all creatures in the area on your turn each round. In
+//     addition, the wall deals 2d6 points of fire damage + 1 point of fire damage per caster level (maximum +20)
+//     to any creature passing through it. The wall deals double damage to undead creatures. If you evoke the wall
+//     so that it appears where creatures are, each creature takes damage as if passing through the wall."
+//   - Blade barrier: "Any creature passing through the wall takes 1d6 points of damage per caster level (maximum
+//     15d6), with a Reflex save for half damage. If you evoke the barrier so that it appears where creatures
+//     are, each creature takes damage as if passing through the wall. Each such creature can avoid the wall
+//     (ending up on the side of its choice) and thus take no damage by making a successful Reflex save."
+//   Walls are a line template (a ring when the GM makes it a circle). A creature passes through when its move
+//   crosses the line, or ends in the wall's own squares (within half a square of it); leaving the wall's squares
+//   isn't another crossing. The hot side of a wall of fire is the side away from the caster unless the GM
+//   switches it (a button on its card).
+//   - Flaming sphere: "It moves 30 feet per round ... If it enters a space with a creature, it stops moving for the
+//     round and deals 3d6 points of fire damage to that creature, though a successful Reflex save negates that
+//     damage." A small template the GM (or caster) drags; it strikes a creature when it's moved into its space
+//     (the template's center inside the creature's squares), not when a creature walks into it.
 // Rulings (2026-11-17): the template is removed when the spell ends, with a note to the GM; entering creatures'
 // saves and checks are rolled automatically, with an Undo; (phase 2, movement through an area: the straight
 // line from where the move started to where it ended).
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM, saveResult, rollTotal, timed, dealDamage, restoreDamage, activeBuff, gmWhisper } from "./util.mjs";
+import { esc, isActiveGM, saveResult, rollTotal, timed, dealDamage, restoreDamage, activeBuff, gmWhisper, turnActors } from "./util.mjs";
+import { baseSpellName, metamagicOf, extendFactor, metamagicFormula } from "./metamagic.mjs";
 import { creatureTypes, isLiving } from "./creature-types.mjs";
 import { registerMissSource } from "./miss-chance.mjs";
 import { reaches } from "./area-reach.mjs";
+import { setBurning } from "./burning.mjs";
+import { setBleed } from "./bleed.mjs";
+import { contractFromSpell } from "./spells.mjs";
+import { SPELLS as SPELL_DATA } from "./spell-data.mjs";
 
 const FLAG = "lastingArea"; // template flag: the area's state (below)
 const LINK = "lastingAreaLink"; // buff flag: the template's uuid
@@ -73,23 +120,118 @@ const SAVE = { fort: "Fortitude", ref: "Reflex", will: "Will" };
 // Each: when it acts. enter(ctx) for creatures inside at the casting and those entering; casterTurnStart /
 // casterTurnEnd for each creature inside; leave and end for each creature leaving or still inside at the end.
 // ctx: { zone, actor, token, save(type), note(text), hold(conditions), release(conditions, duration) }
+// lingers: { condition: rounds formula | null }: held conditions that outlast the area (null: until ended otherwise),
+// applied when the template is deleted by hand (leaving the area does it in the spell's leave handler)
 const SPELLS = {
+  // Thorny Entanglement "functions as entangle" (its thorn volleys are rolled by hand)
   entangle: {
-    names: ["entangle"],
+    names: ["entangle", "thorny entanglement"],
     enter: async (c) => c.saveOrHold("ref", ["entangled"]),
     casterTurnEnd: async (c) => (c.holds("entangled") ? null : c.saveOrHold("ref", ["entangled"])),
     leave: async (c) => c.release(["entangled"]),
   },
+  // Impossible Angles: "Any creature entering the area must succeed at a Will save or become disoriented. Disoriented
+  // characters treat the area as difficult terrain and are sickened ... An affected creature can attempt a new Will save
+  // each round to end the disoriented effect. A creature that leaves the area and re-enters must attempt the saving
+  // throw again" (the random direction of its first 5 feet each round: by hand)
+  impossibleAngles: {
+    names: ["impossible angles"],
+    enter: async (c) => c.saveOrHold("will", ["sickened"]),
+    ownTurnStart: async (c) => (c.holds("sickened") && (await c.save("will")) ? c.release(["sickened"]) : null),
+    leave: async (c) => c.release(["sickened"]),
+  },
+  // Thirsting Entanglement: "functions as entangle, except ... Any creature that fails a save to avoid becoming
+  // entangled or fails a check to break free takes 1d2 points of Constitution damage" (the checks to break free: by hand)
+  thirstingEntanglement: {
+    names: ["thirsting entanglement"],
+    enter: async (c) => c.thirst(),
+    casterTurnEnd: async (c) => (c.holds("entangled") ? null : c.thirst()),
+    leave: async (c) => c.release(["entangled"]),
+  },
+  // Sickening Entanglement: "functions as entangle, except ... Any creature that enters the area or ends its turn
+  // there must succeed at a Fortitude save or be sickened as long as it remains in the area and for 1d4 rounds
+  // afterward. This is a poison effect."
+  sickeningEntanglement: {
+    names: ["sickening entanglement"],
+    lingers: { sickened: "1d4" },
+    enter: async (c) => {
+      await c.saveOrHold("ref", ["entangled"]);
+      if (poisonImmune(c.actor)) c.note("immune to poison");
+      else await c.saveOrHold("fort", ["sickened"]);
+    },
+    casterTurnEnd: async (c) => (c.holds("entangled") ? null : c.saveOrHold("ref", ["entangled"])),
+    ownTurnEnd: async (c) => (poisonImmune(c.actor) || c.holds("sickened") ? null : c.saveOrHold("fort", ["sickened"])),
+    leave: async (c) => {
+      await c.release(["entangled"]);
+      await c.release(["sickened"], "1d4");
+    },
+  },
+  // Burning Entanglement: "functions as per entangle, except it sets the foliage on fire. A creature that begins its
+  // turn entangled by the spell takes 4d6 points of fire damage (Reflex half), and a creature that begins its turn in
+  // the area but is not entangled takes 2d6 points of fire damage (Reflex negates). Smoke ... Creatures can see things
+  // in the smoke within 5 feet clearly, but attacks against anything farther away in the smoke must contend with
+  // concealment (20% miss chance)"
+  burningEntanglement: {
+    names: ["burning entanglement"],
+    fog: "smoke",
+    enter: async (c) => c.saveOrHold("ref", ["entangled"]),
+    casterTurnEnd: async (c) => (c.holds("entangled") ? null : c.saveOrHold("ref", ["entangled"])),
+    ownTurnStart: async (c) => {
+      if (c.holds("entangled")) await c.damage("4d6", "fire", { half: "ref" });
+      else if (!(await c.save("ref"))) await c.damage("2d6", "fire");
+    },
+    leave: async (c) => c.release(["entangled"]),
+  },
+  // Flashfire: "These flames deal 1d6 points of fire damage for every 3 caster levels you have (maximum 5d6) to each
+  // creature that enters a burning area or begins its turn in the area; these creatures also catch on fire. A creature
+  // that succeeds at a Reflex save negates the damage and avoids catching on fire. The area ... smoky, providing
+  // concealment within"
+  flashfire: {
+    names: ["flashfire"],
+    fog: "concealment",
+    enter: async (c) => c.flashfire(),
+    ownTurnStart: async (c) => c.flashfire(),
+  },
   stinkingCloud: {
     names: ["stinking cloud"],
     fog: "fog",
+    lingers: { nauseated: "1d4+1" },
     enter: async (c) => (!living(c.actor) ? c.note("not living: unaffected") : poisonImmune(c.actor) ? c.note("immune to poison") : c.saveOrHold("fort", ["nauseated"])),
     casterTurnStart: async (c) => (!living(c.actor) || poisonImmune(c.actor) || c.holds("nauseated") ? null : c.saveOrHold("fort", ["nauseated"])),
     leave: async (c) => c.release(["nauseated"], "1d4+1"),
   },
+  // Drunkard's Breath "functions like Stinking Cloud" but "is barely visible and does not obscure vision"
+  drunkardsBreath: {
+    names: ["drunkard's breath"],
+    lingers: { nauseated: "1d4+1" },
+    enter: async (c) => (!living(c.actor) ? c.note("not living: unaffected") : poisonImmune(c.actor) ? c.note("immune to poison") : c.saveOrHold("fort", ["nauseated"])),
+    casterTurnStart: async (c) => (!living(c.actor) || poisonImmune(c.actor) || c.holds("nauseated") ? null : c.saveOrHold("fort", ["nauseated"])),
+    leave: async (c) => c.release(["nauseated"], "1d4+1"),
+  },
+  // Euphoric Cloud: "a bank of fog similar to that created by fog cloud except its vapors are intoxicating. Living
+  // creatures in the cloud become fascinated. This condition lasts as long as a creature is in the cloud and for 1d4+1
+  // rounds after it leaves. Any creature that succeeds at its save but remains in the cloud must continue to save"
+  euphoricCloud: {
+    names: ["euphoric cloud"],
+    fog: "fog",
+    lingers: { fascinated: "1d4+1" },
+    enter: async (c) => (!living(c.actor) ? c.note("not living: unaffected") : c.saveOrHold("fort", ["fascinated"])),
+    casterTurnStart: async (c) => (!living(c.actor) || c.holds("fascinated") ? null : c.saveOrHold("fort", ["fascinated"])),
+    leave: async (c) => c.release(["fascinated"], "1d4+1"),
+  },
+  // Cloud of Seasickness: "functions like stinking cloud ... the vapors make creatures sickened instead of nauseated"
+  cloudOfSeasickness: {
+    names: ["cloud of seasickness"],
+    fog: "fog",
+    lingers: { sickened: "1d4+1" },
+    enter: async (c) => (!living(c.actor) ? c.note("not living: unaffected") : poisonImmune(c.actor) ? c.note("immune to poison") : c.saveOrHold("fort", ["sickened"])),
+    casterTurnStart: async (c) => (!living(c.actor) || poisonImmune(c.actor) || c.holds("sickened") ? null : c.saveOrHold("fort", ["sickened"])),
+    leave: async (c) => c.release(["sickened"], "1d4+1"),
+  },
   cloudkill: {
     names: ["cloudkill"],
     fog: "fog",
+    drift: true,
     enter: async (c) => {
       if (!living(c.actor) || poisonImmune(c.actor)) return c.note("unaffected (not living, or immune to poison)");
       const hd = hdOf(c.actor);
@@ -110,6 +252,15 @@ const SPELLS = {
       return c.con(amount);
     },
   },
+  // Poisonous Cloud [poison]: "a bank of fog like that created by fog cloud, except that the vapors are toxic. The cloud
+  // deals 1d2 points of Constitution damage per round to living creatures that fail their Fortitude saves. A creature
+  // that succeeds at its save but remains in the cloud must continue to attempt a new saving throw each round on your turn"
+  poisonousCloud: {
+    names: ["poisonous cloud"],
+    fog: "fog",
+    enter: async (c) => c.poisonousCloud(),
+    casterTurnStart: async (c) => c.poisonousCloud(),
+  },
   blackTentacles: {
     names: ["black tentacles"],
     // The round's single roll, rolled at the start of the caster's turn (and at the casting)
@@ -123,8 +274,9 @@ const SPELLS = {
     enter: async (c) => (c.atCasting ? c.saveOrHold("ref", ["grappled"]) : c.webMove()),
     leave: async (c) => c.release(["grappled"]),
   },
+  // Greater Grease "functions like Grease" over more squares
   grease: {
-    names: ["grease"],
+    names: ["grease", "grease, greater"],
     enter: async (c) => (c.atCasting ? c.saveOrFall("ref") : c.footing({ save: true })),
     moved: async (c) => c.footing({ save: true }),
   },
@@ -139,17 +291,170 @@ const SPELLS = {
     enter: async (c) => (c.atCasting ? null : c.spikes()),
     moved: async (c) => c.spikes(),
   },
+  // Sawtooth Terrain: "Any creature in the area when the spell is first cast must attempt a Reflex save to avoid taking
+  // 3d8 points of piercing damage from the blades and an additional 2d6 points of bleed damage. A creature that fails the
+  // save also has its speed reduced by half for 24 hours or until the injured creature benefits from a 'cure' spell ...
+  // any creature that moves into or through the area takes 1d8 points of piercing damage"
+  sawtoothTerrain: {
+    names: ["sawtooth terrain"],
+    enter: async (c) => (c.atCasting ? c.sawtooth() : c.damage("1d8", "piercing")),
+  },
   createPit: {
     names: ["create pit"],
     enter: async (c) => (c.atCasting ? c.saveOrPit(0) : c.pit("walked into the pit")),
     adjacentTurnEnd: async (c) => c.saveOrPit(2),
   },
+  acidFog: {
+    names: ["acid fog"],
+    fog: "fog",
+    buff: { changes: [{ formula: "-2", target: "mattack", type: "untyped" }, { formula: "-2", target: "mdamage", type: "untyped" }], note: "half speed; no 5-foot step; ranged weapon attacks don't work (rays do)" },
+    enter: async (c) => (c.atCasting ? c.damage("2d6", "acid") : null),
+    casterTurnStart: async (c) => c.damage("2d6", "acid"),
+  },
+  incendiaryCloud: {
+    names: ["incendiary cloud"],
+    fog: "fog",
+    drift: true,
+    reminder: "it can move up to 60 feet a round while the caster concentrates (drag it); the part beyond the caster's range dissipates; wind disperses it",
+    enter: async (c) => (c.atCasting ? c.damage("6d6", "fire", { half: "ref" }) : null),
+    casterTurnStart: async (c) => c.damage("6d6", "fire", { half: "ref" }),
+  },
+  spikeStones: {
+    names: ["spike stones"],
+    enter: async (c) => (c.atCasting ? null : c.spikes(8, "Spike Stones")),
+    moved: async (c) => c.spikes(8, "Spike Stones"),
+  },
+  iceStorm: {
+    // Gravel Vortex: "This damage is dealt only once ... Creatures other than stone giants inside this area take a -4
+    // penalty on Perception skill checks, and the entire area is treated as difficult terrain"
+    names: ["ice storm", "volcanic storm", "gravel vortex"],
+    buff: { changes: [{ formula: "-4", target: "skill.per", type: "untyped" }], note: "difficult terrain (heavy snow, sleet or ash)" },
+  },
+  webCloud: {
+    names: ["web cloud"],
+    // "Creatures trapped in the webbing remain trapped even after the cloud passes"
+    lingers: { grappled: null },
+    drift: true,
+    // Rolled over by the cloud (or there at the casting): a Reflex save; walking in: as web
+    enter: async (c) => (c.atCasting || c.drifted ? c.saveOrHold("ref", ["grappled"]) : c.webMove()),
+    ownTurnStart: async (c) => (c.holds("grappled") ? null : c.saveOrHold("ref", ["grappled"])),
+    // "Creatures trapped in the webbing remain trapped even after the cloud passes": no leave
+  },
+  plagueStorm: {
+    names: ["plague storm"],
+    drift: true,
+    rows: true, // the casting's saves and diseases are the spell card's rows
+    enter: async (c) => (c.atCasting || c.marked("exposed") ? null : c.plague()),
+  },
+  wallOfFire: {
+    names: ["wall of fire"],
+    wall: true,
+    // Passing through: 2d6 + caster level (max +20), double for undead
+    cross: async (c) => c.damage(`2d6 + ${Math.min(20, c.zone.cl)}`, "fire", { undeadDouble: true }),
+    // Within 10 feet of the hot side 2d4, within 20 feet 1d4 (when it appears and on the caster's turn)
+    heat: async (c) => c.damage(c.feet <= 10 ? "2d4" : "1d4", "fire", { undeadDouble: true }),
+  },
+  bladeBarrier: {
+    names: ["blade barrier"],
+    wall: true,
+    // Caught where it appears: a Reflex save avoids it entirely; otherwise as passing through, unhalved
+    appear: async (c) => ((await c.save("ref")) ? c.note("avoids the wall (ends on the side of its choice)") : c.damage(`${Math.min(15, c.zone.cl)}d6`, null)),
+    cross: async (c) => c.damage(`${Math.min(15, c.zone.cl)}d6`, null, { half: "ref" }),
+    reminder: "cover through it (+4 AC, +2 on Reflex saves) against attacks made through the wall",
+  },
+  // Wall of Clockwork: "Any creature passing through the wall takes 1d6 points of piercing and slashing damage per 2
+  // caster levels (maximum 10d6); a successful Reflex save halves the damage. The wall cannot be conjured so that it
+  // occupies the same space as a creature ... provides cover (+4 bonus to AC, +2 bonus on Reflex saves)"
+  wallOfClockwork: {
+    names: ["wall of clockwork"],
+    wall: true,
+    appear: async (c) => c.note("the wall can't appear in a creature's space: place it again"),
+    cross: async (c) => c.damage(`${Math.min(10, Math.max(1, Math.floor(c.zone.cl / 2)))}d6`, null, { half: "ref" }),
+    reminder: "cover through it (+4 AC, +2 on Reflex saves) against attacks made through the wall",
+  },
+  flamingSphere: {
+    names: ["flaming sphere"],
+    sphere: true,
+    strikes: "Reflex negates 3d6 fire",
+    strike: async (c) => ((await c.save("ref")) ? null : c.damage("3d6", "fire")),
+    reminder: "it stops for the round when it strikes a creature; moving it is the caster's move action (30 feet); it sheds light as a torch",
+  },
+  // Flaming Sphere, Greater: "deals 6d6 points of fire damage to any creature it strikes. Any creature that fails its
+  // save against the sphere catches on fire ... the DC to extinguish the flames is equal to the DC of this spell"
+  flamingSphereGreater: {
+    names: ["flaming sphere, greater"],
+    sphere: true,
+    strikes: "Reflex negates 6d6 fire and catching fire",
+    strike: async (c) => {
+      if (await c.save("ref")) return;
+      await c.damage("6d6", "fire");
+      await setBurning(c.actor, { formula: "1d6", dc: c.zone.dc, source: c.zone.name });
+      c.note("catches fire");
+    },
+    reminder: "it stops for the round when it strikes a creature; moving it is the caster's move action (30 feet); it sheds light as a torch",
+  },
+  // Aggressive Thundercloud: "If it enters a space that contains a creature, the storm stops moving for the round and
+  // deals 3d6 points of electricity damage to that creature, though a successful Reflex save negates that damage. It
+  // provides concealment (20% miss chance) to anything within it". Greater: "6d6 ... The first creature damaged by the
+  // cloud is also stunned for 1 round (Fortitude negates)"
+  aggressiveThundercloud: {
+    names: ["aggressive thundercloud"],
+    sphere: true,
+    strikes: "Reflex negates 3d6 electricity",
+    fog: "concealment",
+    strike: async (c) => ((await c.save("ref")) ? null : c.damage("3d6", "electric")),
+    reminder: "it stops for the round when it strikes a creature; moving it is the caster's move action (fly 20 feet, perfect); winds move it as a Small creature",
+  },
+  aggressiveThundercloudGreater: {
+    names: ["aggressive thundercloud, greater"],
+    sphere: true,
+    strikes: "Reflex negates 6d6 electricity",
+    fog: "concealment",
+    strike: async (c) => ((await c.save("ref")) ? null : c.damage("6d6", "electric")),
+    reminder: "the first creature it damages is also stunned for 1 round (Fortitude negates); it stops for the round when it strikes a creature; moving it is the caster's move action (fly 20 feet, perfect)",
+  },
   fogCloud: { names: ["fog cloud"], fog: "fog" },
   obscuringMist: { names: ["obscuring mist"], fog: "fog" },
+  // Barrow Haze: "a bank of fog similar to that created by fog cloud ... The vapors do not interfere with your vision"
+  barrowHaze: { names: ["barrow haze"], fog: "fog", casterSees: true },
+  // Virulent Miasma: "creates fog like fog cloud ... Living creatures take a -4 penalty on saving throws against disease
+  // effects as long as they remain within the cloud and for 1d4+1 rounds after leaving ... a Fortitude save to negate"
+  virulentMiasma: {
+    names: ["virulent miasma"],
+    fog: "fog",
+    enter: async (c) => (!living(c.actor) ? c.note("not living: unaffected") : (await c.save("fort")) ? null : c.note("-4 on saves against disease while inside, and 1d4+1 rounds after")),
+  },
+  // Hungry Darkness: "as deeper darkness ... Any creatures beginning its turn within the hungry darkness is gnawed ...
+  // dealing 3d6 points of force damage and 2 points of Constitution damage per round. Once a creature leaves the cloud,
+  // it continues to take 1d6 points of bleed damage each round until it receives magical healing or enters an area of
+  // bright light" (the darkness itself: Foundry's light by hand)
+  hungryDarkness: {
+    names: ["hungry darkness"],
+    ownTurnStart: async (c) => {
+      await c.damage("3d6", "force");
+      await c.con(2);
+    },
+    leave: async (c) => c.note("bleeds 1d6 each round until it receives magical healing or enters bright light"),
+  },
+  // Twilight Haze: "a gray haze that obscures sight (as fog cloud)"; an illusion, so wind doesn't move it
+  twilightHaze: { names: ["twilight haze"], fog: "fog" },
+  // Winter Grasp: "A creature that begins its turn in the affected area takes 1d6 points of cold damage and takes a
+  // -2 penalty on saving throws against" cold; the ice (2 squares of movement, Acrobatics DC +5) is the GM's
+  winterGrasp: {
+    names: ["winter grasp"],
+    ownTurnStart: async (c) => c.damage("1d6", "cold"),
+  },
   solidFog: {
     names: ["solid fog"],
     fog: "fog",
     buff: { changes: [{ formula: "-2", target: "mattack", type: "untyped" }, { formula: "-2", target: "mdamage", type: "untyped" }], note: "half speed; no 5-foot step; ranged weapon attacks don't work (rays do)" },
+  },
+  // Condensed Ether: "move at only half their normal speed and can't take 5-foot steps. This slowing of movement doesn't
+  // stack with solid fog ... a -2 penalty to Armor Class and on Reflex saves, and condensed ether prevents effective
+  // ranged weapon attacks. Even magic rays ... suffer a 20% miss chance ... not based on concealment"
+  condensedEther: {
+    names: ["condensed ether"],
+    buff: { changes: [{ formula: "-2", target: "ac", type: "untyped" }, { formula: "-2", target: "ref", type: "untyped" }], note: "half speed (even incorporeal); no 5-foot step; ranged weapon attacks don't work; rays 20% miss chance (not concealment)" },
   },
   silence: {
     names: ["silence"],
@@ -157,8 +462,8 @@ const SPELLS = {
   },
 };
 const BY_NAME = new Map(Object.entries(SPELLS).flatMap(([key, s]) => s.names.map((n) => [n, key])));
-/** The lasting-area spells (their spell rows are left to this engine). */
-export const LASTING_SPELLS = new Set(BY_NAME.keys());
+/** The lasting-area spells (their spell rows are left to this engine, unless the spell keeps them). */
+export const LASTING_SPELLS = new Set([...BY_NAME].filter(([, key]) => !SPELLS[key].rows).map(([name]) => name));
 
 /* -------------------------------------------- */
 /*  Who is inside                               */
@@ -170,6 +475,8 @@ export const LASTING_SPELLS = new Set(BY_NAME.keys());
  */
 export function insideTemplate(template, token) {
   const size = template.parent.grid.size;
+  // A flaming sphere is in a creature's space: its center within the creature's squares
+  if (SPELLS[zoneOf(template)?.key]?.sphere) return template.x >= token.x - 1 && template.x <= token.x + token.width * size + 1 && template.y >= token.y - 1 && template.y <= token.y + token.height * size + 1;
   return insidePoint(template, token.x + (token.width * size) / 2, token.y + (token.height * size) / 2) && reaches(template, token);
 }
 /** Is a point (canvas pixels) inside the template? `pad` widens it (pixels): next to the area. */
@@ -234,7 +541,7 @@ function context(template, zone, token, { atCasting = false, lines, undo, ...opt
   undo.push(record);
   const line = (text) => lines.push(`${token.name}: ${text}`);
   const c = {
-    zone, actor, token, atCasting,
+    zone, actor, token, atCasting, drifted: !!opts.drifted, feet: opts.feet?.[token.id] ?? null,
     async save(type) {
       const result = await actor.rollSavingThrow(type, { skipDialog: true, dc: zone.dc, reference: zone.message });
       const r = saveResult(result, zone.dc);
@@ -245,6 +552,44 @@ function context(template, zone, token, { atCasting = false, lines, undo, ...opt
     marked: (m) => state.marks.includes(m),
     mark: (m) => state.marks.push(m),
     note: (text) => line(text),
+    /** Typed damage from the area, halved on a successful save when `half` names one; doubled for undead if asked. */
+    async damage(formula, type, { half = null, undeadDouble = false } = {}) {
+      // Empower and Maximize: the area's damage is the spell's variable number
+      let amount = await rollTotal(metamagicFormula(formula, zone.metamagic));
+      if (half && (await c.save(half))) amount = Math.floor(amount / 2);
+      const undead = undeadDouble && creatureTypes(actor).types.has("undead");
+      if (undead) amount *= 2;
+      const taken = amount > 0 ? await hurt(amount, type ? [type] : []) : 0;
+      line(`${amount}${type ? ` ${type}` : ""} damage${undead ? " (doubled: undead)" : ""}${taken < amount ? ` (${taken} after resistance)` : ""}`);
+    },
+    /** Thirsting entanglement: a failed Reflex save entangles and drains 1d2 Con. */
+    async thirst() {
+      if (await c.save("ref")) return;
+      await c.hold(["entangled"]);
+      await c.con(await rollTotal("1d2"));
+    },
+    /** Poisonous cloud: living creatures not immune to poison, a Fortitude save or 1d2 Con damage. */
+    async poisonousCloud() {
+      if (!living(actor) || poisonImmune(actor)) return line("unaffected (not living, or immune to poison)");
+      if (!(await c.save("fort"))) await c.con(await rollTotal("1d2"));
+    },
+    /** Flashfire: Reflex negates the fire damage and catching fire. */
+    async flashfire() {
+      if (await c.save("ref")) return;
+      await c.damage(`${Math.min(5, Math.max(1, Math.floor(zone.cl / 3)))}d6`, "fire");
+      await setBurning(actor, { formula: "1d6", dc: 15, source: zone.name });
+      line("catches fire");
+    },
+    /** Plague storm reaching a creature after the casting: a Fortitude save or the caster's disease. */
+    async plague() {
+      c.mark("exposed");
+      if (!living(c.actor)) return line("not living: unaffected");
+      if (await c.save("fort")) return;
+      const message = fromUuidSync(zone.message ?? "");
+      const choice = message?.getFlag(MODULE_ID, "spellChoice");
+      const how = SPELL_DATA["plague storm"].choice.effects[choice]?.contract;
+      line(how ? await contractFromSpell(actor, how, { choice, name: zone.name, save: { dc: zone.dc } }) : "the caster hasn't chosen the disease: expose it by hand");
+    },
     async hold(ids) {
       const add = ids.filter((id) => !actor.statuses.has(id));
       if (add.length) await actor.setConditions(Object.fromEntries(add.map((id) => [id, true])));
@@ -322,20 +667,28 @@ function context(template, zone, token, { atCasting = false, lines, undo, ...opt
       line("can't move this round");
       if (save) await c.saveOrFall("ref");
     },
-    /** Spike growth: 1d4 piercing per 5 feet moved through the area, then a Reflex save or half land speed for 24 hours. */
-    async spikes() {
+    /** Spike growth (spike stones: d8): 1d4 piercing per 5 feet moved through the area, then a Reflex save or half land speed for 24 hours. */
+    async spikes(die = 4, name = "Spike Growth") {
       const to = centerOf(token);
       const from = opts.from ?? to;
       const feet = Math.max(5, Math.round(feetInside(template, from.x, from.y, to.x, to.y)));
       const n = Math.max(1, Math.floor(feet / 5));
-      const dmg = await rollTotal(`${n}d4`);
+      const dmg = await rollTotal(`${n}d${die}`);
       const taken = await hurt(dmg, ["piercing"]);
       line(`${feet} feet through the spikes: ${dmg} piercing damage${taken < dmg ? ` (${taken} after DR)` : ""}`);
       if (!taken) return; // "Any creature that takes damage from this spell must also succeed on a Reflex save"
-      if (activeBuff(actor, /^spike growth injury/i)) return;
+      if (activeBuff(actor, /^spike (growth|stones) injury/i)) return;
       if (await c.save("ref")) return;
-      await actor.createEmbeddedDocuments("Item", [{ name: "Spike Growth injury", type: "buff", img: "icons/svg/trap.svg", system: { active: true, subType: "temp", duration: { value: "24", units: "hour" }, contextNotes: [{ text: "Land speed halved (feet and legs injured by spike growth) until the 24 hours pass or a cure spell heals it", target: "attack" }] } }]);
+      await actor.createEmbeddedDocuments("Item", [{ name: `${name} injury`, type: "buff", img: "icons/svg/trap.svg", system: { active: true, subType: "temp", duration: { value: "24", units: "hour" }, contextNotes: [{ text: `Land speed halved (feet and legs injured by ${name.toLowerCase()}) until the 24 hours pass or a cure spell heals it`, target: "attack" }] } }]);
       line("land speed halved for 24 hours");
+    },
+    /** Sawtooth terrain at the casting: Reflex negates 3d8 piercing, 2d6 bleed and half speed for 24 hours. */
+    async sawtooth() {
+      if (await c.save("ref")) return;
+      await c.damage("3d8", "piercing");
+      line(await setBleed(actor, await rollTotal("2d6"), zone.name));
+      await actor.createEmbeddedDocuments("Item", [{ name: `${zone.name} injury`, type: "buff", img: "icons/svg/trap.svg", system: { active: true, subType: "temp", duration: { value: "24", units: "hour" }, contextNotes: [{ text: `Speed halved (cut by ${zone.name.toLowerCase()}) until the 24 hours pass, a cure spell heals it, or a Heal check against the spell's DC`, target: "attack" }] } }]);
+      line("speed halved for 24 hours");
     },
     /** Create pit: falling in (1d6 per 10 feet of depth) and prone. */
     async pit(text) {
@@ -400,7 +753,7 @@ async function removeBuff(token, template) {
 /** The area's lasting spell, if this card's spell has one. */
 function spellKey(message) {
   const item = message.itemSource;
-  const name = (item?.type === "spell" ? item.name : item?.system?.spellName ?? item?.name ?? "").toLowerCase().replace(/^(scroll|wand|potion) of /, "");
+  const name = (item?.type === "spell" ? baseSpellName(item) : item?.system?.spellName ?? item?.name ?? "").toLowerCase().replace(/^(scroll|wand|potion) of /, "");
   return BY_NAME.get(name) ?? null;
 }
 
@@ -411,7 +764,8 @@ async function durationSeconds(message) {
   const per = UNIT_SECONDS[{ round: "round", rounds: "round", minute: "minute", hour: "hour" }[d?.units] ?? ""];
   if (!per || !d?.value) return null;
   const cl = message.system.config?.cl ?? item.system?.cl ?? 1;
-  return (await rollTotal(String(d.value).replace(/@cl/g, cl))) * per;
+  // Extend Spell: twice as long
+  return (await rollTotal(String(d.value).replace(/@cl/g, cl))) * per * extendFactor(metamagicOf(message));
 }
 
 // A lasting-area spell cast with a template: track it, and act on the creatures inside
@@ -427,17 +781,31 @@ Hooks.on("createChatMessage", async (message) => {
     dc: message.system.save?.dc ?? null, cl: message.system.config?.cl ?? 1,
     endsAt: seconds ? game.time.worldTime + seconds : null,
     inside: [], creatures: {},
+    metamagic: metamagicOf(message),
   };
+  if (SPELLS[key].sphere) zone.at = { x: template.x, y: template.y };
+  // Drifting clouds: away from where the caster stands now, through the cloud's center
+  if (SPELLS[key].drift) {
+    zone.at = { x: template.x, y: template.y };
+    const from = caster?.getActiveTokens?.(false, true).find((t) => t.parent === template.parent);
+    zone.drift = from ? directionOf(centerOf(from), zone.at, template.parent.grid.size / 2) : null;
+  }
+  if (SPELLS[key].wall) return castWall(template, zone, caster);
   await template.update({ [`flags.${MODULE_ID}.${FLAG}`]: zone });
   const inside = template.parent.tokens.filter((t) => tokenActor(t) && !t.hidden && insideTemplate(template, t));
   await template.update({ [`flags.${MODULE_ID}.${FLAG}.inside`]: inside.map((t) => t.id) });
   if (inside.length) await act(template, inside, "enter", "cast", { atCasting: true, newRound: true });
+  if (SPELLS[key].sphere) await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p><strong>${esc(zone.name)}</strong>: drag the sphere onto a creature to strike it (${esc(SPELLS[key].strikes)}); ${esc(SPELLS[key].reminder)}.</p>` });
 });
 
 /** Recheck who is inside a template: those entering and those leaving. */
-async function recheck(template) {
+async function recheck(template, { drifted = false } = {}) {
   const zone = zoneOf(template);
   if (!zone) return;
+  if (SPELLS[zone.key].wall) return wallMoves(template);
+  // A flaming sphere moved onto creatures strikes them (creatures walking into it don't count)
+  const sphereMoved = !!SPELLS[zone.key].sphere && !!zone.at && (zone.at.x !== template.x || zone.at.y !== template.y);
+  if (sphereMoved) await template.update({ [`flags.${MODULE_ID}.${FLAG}.at`]: { x: template.x, y: template.y } });
   const now = template.parent.tokens.filter((t) => tokenActor(t) && !t.hidden && insideTemplate(template, t)).map((t) => t.id);
   const entered = now.filter((id) => !zone.inside.includes(id)).map((id) => template.parent.tokens.get(id));
   const left = zone.inside.filter((id) => !now.includes(id)).map((id) => template.parent.tokens.get(id)).filter(Boolean);
@@ -453,7 +821,10 @@ async function recheck(template) {
   await template.update({ [`flags.${MODULE_ID}.${FLAG}.inside`]: now, [`flags.${MODULE_ID}.${FLAG}.-=pos`]: null });
   await template.update({ [`flags.${MODULE_ID}.${FLAG}.pos`]: nextPos });
   if (left.length) await act(template, left, "leave", "left the area");
-  for (const token of entered) await act(template, [token], "enter", "entered the area", { from: lastPos.get(token.uuid) });
+  for (const token of entered) {
+    if (sphereMoved) await act(template, [token], "strike", "the sphere rolled into it");
+    else await act(template, [token], "enter", drifted ? "the cloud reached it" : "entered the area", { from: lastPos.get(token.uuid), drifted });
+  }
   for (const token of moved) await act(template, [token], "moved", "moved in the area", { from: lastPos.get(token.uuid) });
 }
 
@@ -471,9 +842,155 @@ Hooks.on("updateToken", (token, changes) => {
   if ("x" in changes || "y" in changes || "hidden" in changes) soon(token.parent);
 });
 Hooks.on("createToken", (token) => soon(token.parent));
-Hooks.on("updateMeasuredTemplate", (template, changes) => {
-  if (["x", "y", "distance", "direction", "width"].some((k) => k in changes)) soon(template.parent);
+// Where everyone stands when the scene is shown: the start of their first move (walls)
+Hooks.on("canvasReady", (canvas) => {
+  for (const token of canvas.scene?.tokens ?? []) lastPos.set(token.uuid, centerOf(token));
 });
+Hooks.on("updateMeasuredTemplate", async (template, changes, options) => {
+  if (["x", "y", "distance", "direction", "width"].some((k) => k in changes)) soon(template.parent);
+  // A drifting cloud dragged by the GM: it goes on from there (its first drag sets its direction if it had none)
+  const zone = zoneOf(template);
+  if (!isActiveGM() || options[DRIFTED] || !zone?.at || !SPELLS[zone.key]?.drift || !("x" in changes || "y" in changes)) return;
+  const update = { [`flags.${MODULE_ID}.${FLAG}.at`]: { x: template.x, y: template.y } };
+  if (!zone.drift) update[`flags.${MODULE_ID}.${FLAG}.drift`] = directionOf(zone.at, template, 1);
+  await template.update(update, { [DRIFTED]: true });
+});
+
+/* -------------------------------------------- */
+/*  Walls                                       */
+/* -------------------------------------------- */
+
+const SIDE_CARD = "wallSide"; // card flag: the wall's template uuid (the GM's switch of the hot side)
+/** A line wall's ends, in pixels; null for a ring. */
+function wallEnds(template) {
+  if (template.t !== "ray") return null;
+  const len = (template.distance / template.parent.grid.distance) * template.parent.grid.size;
+  const a = Math.toRadians(template.direction);
+  return [{ x: template.x, y: template.y }, { x: template.x + len * Math.cos(a), y: template.y + len * Math.sin(a) }];
+}
+const toFeet = (template, px) => (px / template.parent.grid.size) * template.parent.grid.distance;
+/** How far a point is from the wall, in feet, and on which side (+1 / -1; a ring: -1 inside, +1 outside). */
+function wallPlace(template, p) {
+  const ends = wallEnds(template);
+  if (!ends) {
+    const r = (template.distance / template.parent.grid.distance) * template.parent.grid.size;
+    const d = Math.hypot(p.x - template.x, p.y - template.y);
+    return { feet: toFeet(template, Math.abs(d - r)), side: d < r ? -1 : 1, along: true };
+  }
+  const [a, b] = ends;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const len2 = dx * dx + dy * dy || 1;
+  const t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2;
+  const q = { x: a.x + Math.clamp(t, 0, 1) * dx, y: a.y + Math.clamp(t, 0, 1) * dy };
+  return { feet: toFeet(template, Math.hypot(p.x - q.x, p.y - q.y)), side: dx * (p.y - a.y) - dy * (p.x - a.x) < 0 ? -1 : 1, along: t >= 0 && t <= 1 };
+}
+/** In the wall's own squares: within half a square of it. */
+const inWall = (template, p) => {
+  const w = wallPlace(template, p);
+  return w.along && w.feet < template.parent.grid.distance / 2;
+};
+/** Does a move from a to b pass through the wall? Into its squares, or across it from one side to the other. */
+function crosses(template, a, b) {
+  if (inWall(template, a)) return false; // leaving the wall's squares isn't another crossing
+  if (inWall(template, b)) return true;
+  const ends = wallEnds(template);
+  if (!ends) return wallPlace(template, a).side !== wallPlace(template, b).side;
+  return foundry.utils.lineSegmentIntersects(a, b, ends[0], ends[1]);
+}
+/** The creatures the heat reaches: on the hot side (or in the wall), within 20 feet. */
+function heated(template, zone) {
+  const feet = {};
+  const tokens = template.parent.tokens.filter((t) => {
+    if (!tokenActor(t) || t.hidden) return false;
+    const p = centerOf(t);
+    const w = wallPlace(template, p);
+    if (!w.along || w.feet > 20 || (w.side !== zone.hot && !inWall(template, p))) return false;
+    feet[t.id] = w.feet;
+    return true;
+  });
+  return { tokens, feet };
+}
+
+/** A wall is raised: creatures where it appears pass through it, the heat goes out, and the GM gets its card. */
+async function castWall(template, zone, caster) {
+  const from = caster?.getActiveTokens?.(false, true).find((t) => t.parent === template.parent);
+  zone.hot = from ? -wallPlace(template, centerOf(from)).side : 1;
+  await template.update({ [`flags.${MODULE_ID}.${FLAG}`]: zone });
+  for (const token of template.parent.tokens) lastPos.set(token.uuid, centerOf(token));
+  const spell = SPELLS[zone.key];
+  const caught = template.parent.tokens.filter((t) => tokenActor(t) && !t.hidden && inWall(template, centerOf(t)));
+  if (caught.length) await act(template, caught, spell.appear ? "appear" : "cross", "where it appears", { atCasting: true });
+  if (spell.heat) {
+    const { tokens, feet } = heated(template, zoneOf(template));
+    if (tokens.length) await act(template, tokens, "heat", "its heat", { atCasting: true, feet });
+  }
+  const lines = [spell.heat ? `The heat faces the side away from the caster${from ? "" : " (no caster token: one side)"}.` : null, spell.reminder ? `${spell.reminder[0].toUpperCase()}${spell.reminder.slice(1)}.` : null].filter(Boolean);
+  if (lines.length) {
+    await ChatMessage.implementation.create({
+      whisper: gmWhisper(),
+      content: `<p><strong>${esc(zone.name)}</strong>: ${lines.map(esc).join(" ")}</p>${spell.heat ? `<button type="button" data-action="${MODULE_ID}-wall-side">Switch the hot side</button>` : ""}`,
+      flags: { [MODULE_ID]: { [SIDE_CARD]: template.uuid } },
+    });
+  }
+}
+
+/** Creatures that moved since the last check: those whose move passed through the wall. */
+async function wallMoves(template) {
+  for (const token of template.parent.tokens) {
+    const from = lastPos.get(token.uuid);
+    const to = centerOf(token);
+    if (!from || !tokenActor(token) || token.hidden || (from.x === to.x && from.y === to.y)) continue;
+    if (crosses(template, from, to)) await act(template, [token], "cross", "passed through it");
+  }
+}
+
+Hooks.on("renderChatMessageHTML", (message, html) => {
+  const uuid = message.getFlag(MODULE_ID, SIDE_CARD);
+  const button = uuid && html.querySelector(`[data-action="${MODULE_ID}-wall-side"]`);
+  if (!button) return;
+  const template = fromUuidSync(uuid);
+  if (!game.user.isGM || !zoneOf(template)) return void button.remove();
+  button.addEventListener("click", async () => {
+    const hot = -zoneOf(template).hot;
+    await template.update({ [`flags.${MODULE_ID}.${FLAG}.hot`]: hot });
+    ui.notifications.info(`${zoneOf(template).name}: the heat now faces the other side.`);
+  });
+});
+
+/* -------------------------------------------- */
+/*  Drifting clouds                             */
+/* -------------------------------------------- */
+
+const DRIFTED = `${MODULE_ID}.drifted`; // update option: the module moved the cloud (not the GM)
+/** The unit direction from a to b, or null when they're closer than `min` pixels. */
+function directionOf(a, b, min) {
+  const d = Math.hypot(b.x - a.x, b.y - a.y);
+  return d < min ? null : { x: (b.x - a.x) / d, y: (b.y - a.y) / d };
+}
+
+/** The cloud moves 10 feet away along its direction, stopping at a wall; then who's inside is checked. */
+async function drift(template) {
+  const zone = zoneOf(template);
+  const scene = template.parent;
+  if (!zone.drift) return `${zone.name}: no direction yet (cast on the caster's square); drag the template once to send it on its way`;
+  const step = (10 / scene.grid.distance) * scene.grid.size;
+  const from = { x: template.x, y: template.y };
+  let to = { x: from.x + zone.drift.x * step, y: from.y + zone.drift.y * step };
+  let note = null;
+  const hit = CONFIG.Canvas.polygonBackends.move.testCollision(from, to, { type: "move", mode: "closest" });
+  if (hit) {
+    // Stop just short of the wall
+    const back = Math.max(0, Math.hypot(hit.x - from.x, hit.y - from.y) - 2);
+    to = { x: from.x + zone.drift.x * back, y: from.y + zone.drift.y * back };
+    if (!zone.stopped) note = `${zone.name} reached a wall and stops there (it still spreads around corners)`;
+  }
+  if (Math.hypot(to.x - from.x, to.y - from.y) >= 1) {
+    await template.update({ x: to.x, y: to.y, [`flags.${MODULE_ID}.${FLAG}.at`]: to, [`flags.${MODULE_ID}.${FLAG}.stopped`]: !!hit }, { [DRIFTED]: true });
+  } else if (!zone.stopped) await template.update({ [`flags.${MODULE_ID}.${FLAG}.stopped`]: true }, { [DRIFTED]: true });
+  await recheck(template, { drifted: true });
+  return note;
+}
 
 // The caster's turn: start and end
 Hooks.on("updateCombat", async (combat, changes, options) => {
@@ -484,9 +1001,34 @@ Hooks.on("updateCombat", async (combat, changes, options) => {
   const ended = combat.previous?.combatantId ? combat.combatants.get(combat.previous.combatantId)?.actor : null;
   const started = combat.combatant?.actor;
   for (const template of zones) {
-    const zone = zoneOf(template);
-    const inside = zone.inside.map((id) => scene.tokens.get(id)).filter(Boolean);
+    let zone = zoneOf(template);
     const spell = SPELLS[zone.key];
+    // A drifting cloud moves first on the caster's turn (then acts on the creatures in its new spread)
+    if (spell.drift && started?.uuid === zone.caster) {
+      const note = await drift(template);
+      const reminder = spell.reminder && !zone.reminded ? `<p><em>${esc(zone.name)}: ${esc(spell.reminder)}.</em></p>` : "";
+      if (note || reminder) await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `${note ? `<p>${esc(note)}.</p>` : ""}${reminder}` });
+      if (reminder) await template.update({ [`flags.${MODULE_ID}.${FLAG}.reminded`]: true }, { [DRIFTED]: true });
+      zone = zoneOf(template);
+    }
+    // Wall of fire: the heat on the caster's turn
+    if (spell.heat && started?.uuid === zone.caster) {
+      const { tokens, feet } = heated(template, zone);
+      if (tokens.length) await act(template, tokens, "heat", "its heat, the caster's turn", { feet });
+    }
+    const inside = (zone.inside ?? []).map((id) => scene.tokens.get(id)).filter(Boolean);
+    // Web cloud: a creature in the cloud at the start of its own turn
+    if (spell.ownTurnStart && started) {
+      const turn = turnActors(combat);
+      const own = inside.filter((t) => turn.includes(t.actor));
+      if (own.length) await act(template, own, "ownTurnStart", "start of its turn");
+    }
+    // Sickening entanglement: a creature in the area at the end of its own turn
+    if (spell.ownTurnEnd && ended) {
+      const turn = turnActors(combat, combat.combatants.get(combat.previous.combatantId));
+      const own = inside.filter((t) => turn.includes(t.actor));
+      if (own.length) await act(template, own, "ownTurnEnd", "end of its turn");
+    }
     // Create pit: a creature ending its turn next to the pit (not in it)
     if (spell.adjacentTurnEnd && ended) {
       const pad = scene.grid.size;
@@ -530,7 +1072,16 @@ Hooks.on("deleteMeasuredTemplate", async (template, options, userId) => {
     await removeBuff(token, template);
     const held = zone.creatures?.[id]?.held ?? [];
     const still = held.filter((c) => actor.statuses.has(c));
-    if (still.length && zone.key !== "stinkingCloud") await actor.setConditions(Object.fromEntries(still.map((c) => [c, false])));
+    // What lasts after leaving lasts here too (Stinking Cloud's nausea: 1d4+1 rounds; Web Cloud's webbing: until escaped)
+    const lingers = SPELLS[zone.key]?.lingers ?? {};
+    const ends = still.filter((c) => !(c in lingers));
+    if (ends.length) await actor.setConditions(Object.fromEntries(ends.map((c) => [c, false])));
+    for (const c of still.filter((c) => lingers[c])) {
+      const rounds = await rollTotal(lingers[c]);
+      // PF1 doesn't give a duration to a condition the creature already has: lift it, then set it timed
+      await actor.setConditions({ [c]: false });
+      await actor.setConditions({ [c]: { duration: timed(rounds) } });
+    }
   }
 });
 
@@ -564,13 +1115,16 @@ registerMissSource((defender, attacker, { distance }) => {
     const zone = zoneOf(template);
     const fog = SPELLS[zone.key]?.fog;
     if (!fog) continue;
+    if (SPELLS[zone.key].casterSees && tokenActor(attacker)?.uuid === zone.caster) continue;
     const through = insidePoint(template, a.x, a.y) || insidePoint(template, d.x, d.y) || feetInside(template, a.x, a.y, d.x, d.y) > 0;
     if (!through) continue;
     const near = (distance ?? Infinity) <= 5;
-    const chance = fog === "total" || !near ? 50 : 20;
+    // Smoke (Burning Entanglement): clear within 5 feet, concealment beyond
+    if (fog === "smoke" && near) continue;
+    const chance = fog === "smoke" || fog === "concealment" ? 20 : fog === "total" || !near ? 50 : 20;
     out.push({ chance, label: `${zone.name} (${chance === 50 ? "total concealment" : "concealment"})`, concealment: true });
   }
   return out;
 });
 
-export const _test = { FLAG, SPELLS, insideTemplate, insidePoint, feetInside, recheck, endZone, act, zoneOf };
+export const _test = { FLAG, SPELLS, insideTemplate, insidePoint, feetInside, recheck, endZone, act, zoneOf, drift, castWall, crosses, heated };

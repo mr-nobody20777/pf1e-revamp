@@ -45,6 +45,9 @@ import { registerWornMagicTests } from "./worn-magic.test.mjs";
 import { registerTypedPenaltyTests } from "./typed-penalties.test.mjs";
 import { registerAfflictionTests } from "./afflictions.test.mjs";
 import { registerLastingAreaTests } from "./lasting-areas.test.mjs";
+import { registerPolymorphTests } from "./polymorph.test.mjs";
+import { registerSummonTests } from "./summons.test.mjs";
+import { registerAttackerTests } from "./attackers.test.mjs";
 import { registerSharedHelperTests } from "./shared-helpers.test.mjs";
 import { registerSituationalBonusTests } from "./situational-bonuses.test.mjs";
 
@@ -71,6 +74,9 @@ export function registerTests(quench) {
   registerWornMagicTests(quench);
   registerTypedPenaltyTests(quench);
   registerAfflictionTests(quench);
+  registerPolymorphTests(quench);
+  registerSummonTests(quench);
+  registerAttackerTests(quench);
   registerLastingAreaTests(quench);
   registerSharedHelperTests(quench);
   registerSituationalBonusTests(quench);

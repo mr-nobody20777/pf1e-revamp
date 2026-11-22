@@ -54,6 +54,8 @@ Everything the module automates carries a short **PF1e Revamp** note on its shee
 - **[Pathfinder 1e Archetypes and Abilities](https://foundryvtt.com/packages/pf1e-archetypes)**, for archetypes.
 - **[Roll Bonuses PF1](https://foundryvtt.com/packages/ckl-roll-bonuses)**, for range-increment penalties.
 - **Nevela's Automation Suite** works well alongside it; see [Compatibility](https://github.com/mr-nobody20777/pf1e-revamp/wiki/Compatibility).
+- **[Foundry Summons](https://foundryvtt.com/packages/foundry-summons)** (with its required **tcal**, **Sequencer** and **socketlib**), for *Summon Monster* and *Summon Nature's Ally*: the creatures come from this module's Summons compendium.
+- **[PF1 Mighty Morphin](https://foundryvtt.com/packages/pf1-mighty-morphin)**, for the polymorph spells and Wild Shape.
 
 ## 🔌 Installation
 
@@ -82,5 +84,5 @@ PF1e Revamp is written by **Claude**, Anthropic's AI, in [Claude Code](https://c
 
 - Code: [MIT License](LICENSE).
 - This module uses trademarks and/or copyrights owned by Paizo Inc., used under Paizo's Community Use Policy (paizo.com/communityuse). We are expressly prohibited from charging you to use or access this content. This module is not published, endorsed, or specifically approved by Paizo. For more information about Paizo Inc. and Paizo products, visit paizo.com.
-- Game rules text is Open Game Content, used under the Open Game License v1.0a.
+- Game rules text is Open Game Content, used under the Open Game License v1.0a. The Summons compendium's creatures are the Pathfinder Roleplaying Game Bestiary stat blocks (Open Game Content), converted with the Pathfinder 1e Statblock Converter from the Pathfinder 1e Statblock Library.
 - Built on the [Pathfinder 1e system for Foundry VTT](https://gitlab.com/foundryvtt_pathfinder1e/foundryvtt-pathfinder1).

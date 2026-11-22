@@ -9,7 +9,7 @@
 // creature prone. The fire, the save and its DC are kept in a flag; PF1's Burning condition shows it.
 
 import { MODULE_ID } from "./const.mjs";
-import { dealDamage, esc, isActiveGM, oncePerRound, ownerWhisper, rollTotal, saveResult, steppedBack, rollSaveAgainst } from "./util.mjs";
+import { dealDamage, esc, isActiveGM, oncePerRound, ownerWhisper, rollTotal, saveResult, steppedBack, rollSaveAgainst, turnActors } from "./util.mjs";
 
 const FLAG = "burning";
 const TICK = "burningTick";
@@ -69,9 +69,10 @@ export async function burnTurn(actor) {
 
 Hooks.on("combatTurnChange", async (combat, prior, current) => {
   if (!isActiveGM() || steppedBack(prior, current)) return;
-  const actor = combat.combatants.get(current?.combatantId)?.actor;
-  if (!burningOf(actor) || !(await oncePerRound(actor, TICK, combat))) return;
-  await burnTurn(actor);
+  for (const actor of turnActors(combat, combat.combatants.get(current?.combatantId))) {
+    if (!burningOf(actor) || !(await oncePerRound(actor, TICK, combat))) continue;
+    await burnTurn(actor);
+  }
 });
 
 Hooks.on("renderChatMessageHTML", (message, html) => {

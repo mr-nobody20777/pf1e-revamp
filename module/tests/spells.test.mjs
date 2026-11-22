@@ -3,6 +3,9 @@
 
 import { createTestActor, addItems, cleanup, useTestScene, placeToken, setTargets, deleteTokens, waitFor } from "./helpers.mjs";
 import { _test as spells } from "../spells.mjs";
+import { _test as ongoing } from "../ongoing-damage.mjs";
+import { _test as lightning } from "../call-lightning.mjs";
+import { _test as mm, metamagicRange } from "../metamagic.mjs";
 import { settled } from "../util.mjs";
 import { SPELLS } from "../spell-data.mjs";
 import { _test as effects } from "../roll-effects.mjs";
@@ -21,7 +24,7 @@ export function registerSpellTests(quench) {
       describe("Spells: effects on the creatures affected", function () {
         this.timeout(45000);
         let wizard, human, ogre, friend, zombie, wizardToken, humanToken, ogreToken, friendToken, zombieToken, sceneCtl, messagesBefore, uniform;
-        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation", "Hold Monster", "Litany of Madness", "Calcific Touch", "Waves of Fatigue", "Stunning Finale", "Eyebite", "Hold Person, Mass", "Fly, Mass", "Power Word Stun", "Power Word Kill", "Freedom", "Holy Smite", "Holy Word", "Heal", "Enervation", "Poison", "Contagion"];
+        const SPELL_NAMES = ["Daze", "Bless", "Bane", "Sleep", "Color Spray", "Cause Fear", "Ray of Enfeeblement", "Shield", "Flare", "Magic Missile", "Cure Light Wounds", "Chill Touch", "Hypnotism", "Hideous Laughter", "Touch of Fatigue", "Mudball", "Linebreaker", "Shadow Trap", "Doom", "Inflict Light Wounds", "Ray of Frost", "Light", "Read Magic", "Mending", "Brand", "Haunted Fey Aspect", "Disguise Self", "Endure Elements", "Resist Energy", "Death Knell", "Restoration, Lesser", "Produce Flame", "Animate Rope", "Crafter's Curse", "Hold Person", "Bull's Strength", "Touch of Idiocy", "Blindness/Deafness", "Aid", "Flame Blade", "Castigate", "Pox Pustules", "Prayer", "Fear", "Fungal Infestation", "Hold Monster", "Litany of Madness", "Calcific Touch", "Waves of Fatigue", "Stunning Finale", "Eyebite", "Hold Person, Mass", "Fly, Mass", "Power Word Stun", "Power Word Kill", "Freedom", "Holy Smite", "Holy Word", "Heal", "Enervation", "Poison", "Contagion", "Acid Arrow", "Heat Metal", "Call Lightning"];
         const spell = (level) => ({ system: { spellbook: "primary", level, preparation: { value: 9, max: 9 } } });
         const rows = (card) => card.getFlag(MODULE_ID, spells.FLAG)?.rows ?? [];
         const row = (card, actor) => rows(card).find((r) => r.name === actor.name);
@@ -102,7 +105,7 @@ export function registerSpellTests(quench) {
           const problems = [];
           for (const [name, def] of Object.entries(SPELLS)) {
             if (!spellNames.has(name)) problems.push(`${name}: no such spell`);
-            const effects = [def.effect, def.onSave, ...(def.tiers ?? []).map((t) => t[1])].filter(Boolean);
+            const effects = [def.effect, def.onSave, ...(def.tiers ?? []).map((t) => t[1]), ...Object.values(def.choice?.effects ?? {})].filter(Boolean);
             for (const e of effects) {
               if (e.buff && !buffNames.has(e.buff)) problems.push(`${name}: no buff "${e.buff}"`);
               for (const [id] of e.conditions ?? []) if (!pf1.registry.conditions.get(id)) problems.push(`${name}: no condition "${id}"`);
@@ -790,6 +793,178 @@ export function registerSpellTests(quench) {
           assert.isAbove(human.system.abilities.con.damage, 0);
           for (const b of afflictions(human)) await b.delete();
           await human.update({ "system.abilities.con.damage": 0 });
+        });
+
+        it("Acid Arrow: on a hit, more rounds of acid on the caster's turns (1 per 3 caster levels)", async () => {
+          dice(0.01);
+          const card = await cast("Acid Arrow", [humanToken]);
+          assert.isTrue(row(card, human).attack.hit);
+          const buff = await waitFor(() => human.itemTypes.buff.find((b) => b.name === "Acid Arrow"), { what: "the buff" });
+          assert.deepEqual(buff.getFlag(MODULE_ID, ongoing.FLAG).schedule, ["2d4"], "caster level 5: 1 more round");
+          const hp = human.system.attributes.hp.value;
+          assert.equal(await ongoing.tick(human, buff), 8);
+          assert.equal(human.system.attributes.hp.value, hp - 8);
+          assert.notOk(human.itemTypes.buff.find((b) => b.name === "Acid Arrow"), "its last round ends it");
+          await human.update({ "system.attributes.hp.offset": 0 });
+        });
+
+        it("Heat Metal: the table's damage on later rounds, only the minimum without metal worn or wielded", async () => {
+          dice(0.99);
+          const card = await cast("Heat Metal", [humanToken]);
+          await save(card, human);
+          const buff = await waitFor(() => human.itemTypes.buff.find((b) => b.name === "Heat Metal"), { what: "the buff" });
+          assert.equal(buff.getFlag(MODULE_ID, ongoing.FLAG).schedule.length, 5);
+          assert.isFalse(ongoing.hasMetal(human));
+          dice(0.01);
+          assert.equal(await ongoing.tick(human, buff), 1, "round 2: 1d4, but 1 without metal");
+          assert.equal(human.itemTypes.buff.find((b) => b.name === "Heat Metal").getFlag(MODULE_ID, ongoing.FLAG).next, 1);
+          await human.itemTypes.buff.find((b) => b.name === "Heat Metal").delete();
+          await human.update({ "system.attributes.hp.offset": 0 });
+        });
+
+        it("Call Lightning: a bolt on the targeted creatures, Reflex half, counted against the caster level", async () => {
+          const card = await cast("Call Lightning", [humanToken]);
+          const hp = human.system.attributes.hp.value;
+          dice(0.99); // the save fails, each die rolls 1
+          await lightning.callBolt(card, [(humanToken.document ?? humanToken).uuid], false);
+          assert.equal(human.system.attributes.hp.value, hp - 3);
+          assert.equal(card.getFlag(MODULE_ID, lightning.CALLED), 1);
+          await human.update({ "system.attributes.hp.offset": 0 });
+        });
+
+        /** A prepared metamagic copy of one of the wizard's spells, cast at these targets; deleted afterwards by the caller. */
+        async function castCopy(name, choice, targets) {
+          const copy = await mm.prepareMetamagic(wizard.items.getName(name), choice);
+          setTargets(targets);
+          const before = new Set(game.messages.keys());
+          Hooks.once("pf1CreateActionUse", (use) => (use.shared.useMeasureTemplate = false));
+          await copy.use({ skipDialog: true });
+          const card = await waitFor(() => game.messages.contents.find((m) => !before.has(m.id) && m.type === "action"));
+          await waitFor(() => !card.getFlag(MODULE_ID, spells.FLAG) || card.getFlag(MODULE_ID, spells.FLAG).resolved, { what: "the rows" });
+          return { copy, card };
+        }
+
+        it("Metamagic: Empower and Maximize formulas, slot levels, ranges", () => {
+          assert.equal(mm.metamagicFormula("2d6 + 3", { feats: ["empower"] }), "floor((2d6 + 3) * 1.5)", "the level-based bonus too (FAQ)");
+          assert.equal(mm.metamagicFormula("2d6 + 3", { feats: ["maximize"] }), "15");
+          assert.equal(mm.metamagicFormula("2d6", { feats: ["maximize", "empower"] }), "12 + floor((2d6) / 2)");
+          assert.equal(mm.metamagicFormula("4", { feats: ["empower"] }), "4", "no random variable: unchanged");
+          assert.equal(mm.slotAdjustment({ feats: ["empower", "extend", "merciful"], heighten: 2 }), 5);
+          assert.equal(mm.describe({ feats: ["empower", "extend"] }), "Empowered, Extended");
+          assert.equal(metamagicRange("close", 6, { feats: ["enlarge"] }), 80);
+          assert.equal(metamagicRange("touch", 6, { feats: ["reach"] }), 40, "touch becomes close");
+        });
+
+        it("Metamagic: a prepared Extended copy sits in the higher slot, keeps its DC level, and its buff lasts twice as long", async () => {
+          const { copy } = await castCopy("Shield", { feats: ["extend"], heighten: 0 }, []);
+          try {
+            assert.equal(copy.system.level, 2);
+            assert.equal(copy.spellLevel, 1, "only Heighten changes the spell's level");
+            const buff = await waitFor(() => wizard.itemTypes.buff.find((b) => b.name === "Shield"), { what: "the buff" });
+            assert.deepInclude(buff.system.duration, { value: "10", units: "minute" }, "5 minutes at caster level 5, doubled");
+            await buff.delete();
+          } finally {
+            await copy.delete();
+          }
+        });
+
+        it("Metamagic: Maximize on PF1's damage roll (Magic Missile, after the module's own missile count)", async () => {
+          const { copy, card } = await castCopy("Magic Missile", { feats: ["maximize"], heighten: 0 }, [humanToken]);
+          try {
+            const damage = card.systemRolls.attacks[0].damage.reduce((sum, d) => sum + d.total, 0);
+            assert.equal(damage, 15, "caster level 5: three missiles of 1d4+1, maximized");
+          } finally {
+            await copy.delete();
+            await human.update({ "system.attributes.hp.offset": 0 });
+          }
+        });
+
+        it("Metamagic: Persistent makes a creature that saves save again; Selective leaves the excluded out", async () => {
+          const { copy, card } = await castCopy("Hold Person", { feats: ["persistent"], heighten: 0 }, [humanToken]);
+          try {
+            dice(0.01); // the first save succeeds
+            const data = card.getFlag(MODULE_ID, spells.FLAG);
+            await human.rollSavingThrow(data.save.type, { skipDialog: true, dc: data.save.dc, reference: card.uuid });
+            await waitFor(() => row(card, human)?.persistent, { what: "the second save asked" });
+            assert.equal(row(card, human).state, "save");
+            dice(0.99); // the second fails: the full effect
+            await save(card, human);
+            assert.isTrue(human.statuses.has("paralyzed"));
+          } finally {
+            await human.setConditions({ paralyzed: false });
+            await copy.delete();
+          }
+          // The creatures Selective Spell left out (chosen in a dialog at the casting; set here directly)
+          const sel = await castCopy("Hold Person", { feats: ["merciful"], heighten: 0, excluded: [(humanToken.document ?? humanToken).uuid] }, [humanToken]);
+          try {
+            assert.equal(row(sel.card, human).state, "unaffected");
+          } finally {
+            await sel.copy.delete();
+          }
+        });
+
+        it("Metamagic: Dazing on a damaging spell without a save: a Will save, or dazed for the spell's original level in rounds", async () => {
+          const { copy, card } = await castCopy("Magic Missile", { feats: ["dazing"], heighten: 0 }, [humanToken]);
+          try {
+            assert.equal(card.getFlag(MODULE_ID, spells.FLAG).save.type, "will");
+            dice(0.99);
+            await save(card, human);
+            assert.isTrue(human.statuses.has("dazed"));
+          } finally {
+            await human.setConditions({ dazed: false });
+            await human.update({ "system.attributes.hp.offset": 0 });
+            await copy.delete();
+          }
+        });
+
+        it("Metamagic: Dazing's added save negates only the daze; the spell's own effect still applies (Acid Arrow's later rounds)", async () => {
+          dice(0.01); // the attack hits, and the Will save against the daze succeeds
+          const { copy, card } = await castCopy("Acid Arrow", { feats: ["dazing"], heighten: 0 }, [humanToken]);
+          try {
+            await save(card, human);
+            assert.isFalse(human.statuses.has("dazed"));
+            assert.isTrue(human.itemTypes.buff.some((b) => b.flags?.[MODULE_ID]?.[ongoing.FLAG]), "the later rounds of acid still start");
+          } finally {
+            for (const b of human.itemTypes.buff.filter((b) => b.flags?.[MODULE_ID]?.[ongoing.FLAG])) await b.delete();
+            await human.update({ "system.attributes.hp.offset": 0 });
+            await copy.delete();
+          }
+        });
+
+        it("Intensified raises only a cap on the number of dice; Heat Metal counts bows and clubs as not metal; two Acid Arrows each keep their rounds", async () => {
+          assert.equal(mm.intensify("min(10, @cl)d6"), "min(15, @cl)d6");
+          assert.equal(mm.intensify("(min(@cl, 5))d4"), "(min(10, @cl))d4");
+          assert.equal(mm.intensify("1d8 + min(5, @cl)"), "1d8 + min(5, @cl)", "a flat bonus's cap stays");
+          const archer = await createTestActor("Quench Longbow Archer", { items: [["pf1.classes", "Fighter", { system: { level: 1 } }]] });
+          try {
+            await archer.createEmbeddedDocuments("Item", [{ name: "Longbow", type: "weapon", system: { equipped: true } }, { name: "Greatclub", type: "weapon", system: { equipped: true } }]);
+            assert.isFalse(ongoing.hasMetal(archer));
+            const arrow = { formula: "2d4", rounds: "2", type: "acid" };
+            await ongoing.startOngoing(archer, arrow, { name: "Acid Arrow", cl: 6 }, wizard, {});
+            await ongoing.startOngoing(archer, arrow, { name: "Acid Arrow", cl: 6 }, human, {});
+            const casters = archer.itemTypes.buff.map((b) => b.flags?.[MODULE_ID]?.[ongoing.FLAG]?.caster).filter(Boolean);
+            assert.sameMembers(casters, [wizard.uuid, human.uuid], "each casting keeps its own schedule");
+          } finally {
+            await archer.delete();
+          }
+        });
+
+        it("Metamagic rods: their level cap, three uses a day counted on the rod, reset by a rest", async () => {
+          const [lesser, greater] = await wizard.createEmbeddedDocuments("Item", [
+            { name: "Empower Metamagic Rod, Lesser", type: "equipment", system: { subType: "other" } },
+            { name: "Maximize Metamagic Rod, Greater", type: "equipment", system: { subType: "other" } },
+          ]);
+          try {
+            assert.sameMembers(mm.rodsOf(wizard, 3).map((r) => r.key), ["empower", "maximize"]);
+            assert.sameMembers(mm.rodsOf(wizard, 4).map((r) => r.key), ["maximize"], "a lesser rod: 3rd level or lower");
+            assert.equal(mm.rodUsesLeft(lesser), 3);
+            await lesser.setFlag(MODULE_ID, "rodUsed", 2);
+            assert.equal(mm.rodUsesLeft(wizard.items.get(lesser.id)), 1);
+            Hooks.callAll("pf1ActorRest", wizard);
+            await waitFor(() => mm.rodUsesLeft(wizard.items.get(lesser.id)) === 3, { what: "the uses back after a rest" });
+          } finally {
+            await wizard.deleteEmbeddedDocuments("Item", [lesser.id, greater.id]);
+          }
         });
 
         it("Contagion: the caster's chosen disease, contracted at once", async () => {

@@ -44,7 +44,7 @@
 //     affliction persists": PF1's rest leaves that damage (ruling: put back, with a note).
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, isActiveGM, onGmRequest, requestedByOwner, saveResult, rollTotal, ownerWhisper, timed, plainText, applyCondition, rollSaveAgainst, activeBuff, gmWhisper } from "./util.mjs";
+import { esc, isActiveGM, onGmRequest, requestedByOwner, saveResult, rollTotal, ownerWhisper, timed, plainText, applyCondition, rollSaveAgainst, activeBuff, gmWhisper, turnActors } from "./util.mjs";
 import { registerFootnote, footnoteButton } from "./footnote.mjs";
 import { creatureTypes } from "./creature-types.mjs";
 
@@ -415,14 +415,15 @@ async function endAffliction(buff, data = buff.flags[MODULE_ID][FLAG]) {
 // "/round" afflictions in combat: at the start of the creature's turn, once a round
 Hooks.on("updateCombat", async (combat, changes, options) => {
   if (!isActiveGM() || !("turn" in changes || "round" in changes) || options.direction === -1) return;
-  const actor = combat.combatant?.actor;
-  for (const buff of afflictionsOf(actor)) {
-    const data = buff.flags[MODULE_ID][FLAG];
-    if (data.frequency?.unit !== "round") continue;
-    const tick = `${combat.id}.${combat.round}`;
-    if (data.tick === tick) continue;
-    await buff.update({ [`flags.${MODULE_ID}.${FLAG}.tick`]: tick });
-    await checkDue(actor, buff, { turnStart: true });
+  for (const actor of turnActors(combat)) {
+    for (const buff of afflictionsOf(actor)) {
+      const data = buff.flags[MODULE_ID][FLAG];
+      if (data.frequency?.unit !== "round") continue;
+      const tick = `${combat.id}.${combat.round}`;
+      if (data.tick === tick) continue;
+      await buff.update({ [`flags.${MODULE_ID}.${FLAG}.tick`]: tick });
+      await checkDue(actor, buff, { turnStart: true });
+    }
   }
 });
 
