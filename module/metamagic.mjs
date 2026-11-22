@@ -127,7 +127,13 @@ export function describe(mm) {
   return parts.join(", ");
 }
 const has = (mm, key) => !!mm?.feats?.includes(key);
-export const extendFactor = (mm) => (has(mm, "extend") ? 2 : 1);
+// "A spell with a duration of concentration, instantaneous, or permanent is not affected" (Extend Spell)
+export const extendFactor = (mm) => (has(mm, "extend") && !mm.noDuration ? 2 : 1);
+/** Does Extend Spell leave this spell alone (instantaneous, permanent or concentration)? */
+export function durationless(item) {
+  const d = item?.system?.duration ?? {};
+  return ["inst", "perm"].includes(d.units) || (!!d.concentration && !d.value);
+}
 export const metamagicOf = (message) => message?.getFlag?.(MODULE_ID, FLAG) ?? message?.flags?.[MODULE_ID]?.[FLAG] ?? null;
 export const hasMetamagic = has;
 
@@ -184,9 +190,23 @@ const isSpell = (item) => item?.type === "spell" && item.system?.spellbook !== "
 
 // The casting window: a Metamagic section with the caster's feats (spontaneous spells; prepared copies carry
 // theirs already)
+// Nevela's Automation Suite has its own metamagic (more feats, class features and traits): when it is active, the
+// casting choice is Nevela's, and this module only reads it for its own engines (DECISIONS.md, "Metamagic with Nevela")
+const NEVELA = "nevelas-automation-suite";
+export const nevelaMetamagic = () => !!game.modules.get(NEVELA)?.active;
+// Nevela's feat names, and the ones this module's engines act on (areas, summons, later rounds, bolts, placement
+// ranges). Dazing, Persistent and Selective run through Nevela's own card; Quicken, Still, Silent and Heighten need
+// nothing here (notes, and the save DC Nevela already sets).
+const NEVELA_KEYS = { "Extend Spell": "extend", "Empower Spell": "empower", "Maximize Spell": "maximize", "Intensified Spell": "intensified", "Enlarge Spell": "enlarge", "Reach Spell": "reach" };
+/** The feats Nevela applied to this casting that the module's engines act on. */
+function nevelaFeats(use) {
+  const names = use.shared?.nasSpellContext?.metamagicNames ?? use.shared?.rollData?.nasMeta?.metamagicNames ?? [];
+  return [...new Set(names.map((n) => NEVELA_KEYS[n]).filter(Boolean))];
+}
+
 Hooks.on("renderAttackDialog", (app, html) => {
   const item = app.item;
-  if (!isSpell(item)) return;
+  if (!isSpell(item) || nevelaMetamagic()) return;
   const copy = item.flags?.[MODULE_ID]?.[FLAG];
   const spellLevel = copy?.baseLevel ?? item.system.level ?? 0;
   const rods = rodsOf(item.actor, spellLevel);
@@ -232,16 +252,25 @@ Hooks.on("renderAttackDialog", (app, html) => {
 
 Hooks.once("init", () => {
   // After the dialog: the choice into the roll data; Heighten raises the spell level (DCs) of a spontaneous casting
-  wrapMethod("pf1.actionUse.ActionUse.prototype.alterRollData", async function (wrapped, ...args) {
+  wrapMethod("pf1.actionUse.ActionUse.prototype.alterRollData", function (wrapped, ...args) {
+    if (!isSpell(this.item)) return wrapped(...args); // attacks and abilities: no extra async step
+    return withMetamagic.call(this, wrapped, args);
+  });
+  async function withMetamagic(wrapped, args) {
     const result = await wrapped(...args);
     const mm = isSpell(this.item) ? choiceOf(this) : null;
     if (mm && (mm.feats?.length || mm.heighten)) {
+      if (durationless(this.item)) mm.noDuration = true;
       this.shared.rollData.metamagic = mm;
+      // A spontaneous casting with metamagic uses a higher slot: PF1 mustn't ask for the spell's own level first
+      // (its charge check runs before pf1PreActionUse, which checks and spends the higher slot)
+      const own = this.shared[STATE]; // the caster's own feats (a rod doesn't raise the slot)
+      if (own && !this.item.flags?.[MODULE_ID]?.[FLAG] && slotAdjustment({ ...own, feats: own.feats ?? [] })) this.shared.cost = 0;
       // A prepared copy's heightened level is already its spell level
       if (mm.heighten && !this.item.flags?.[MODULE_ID]?.[FLAG]) this.shared.rollData.sl = (this.shared.rollData.sl ?? 0) + mm.heighten;
     }
     return result;
-  });
+  }
   // Selective: once the targets are known, the caster picks the ones the spell leaves out
   wrapMethod("pf1.actionUse.ActionUse.prototype.getTargets", async function (wrapped, ...args) {
     const result = await wrapped(...args);
@@ -293,6 +322,20 @@ async function chooseExcluded(use) {
 export const intensify = (formula) =>
   String(formula).replace(/min\(\s*(?:(\d+)\s*,\s*@cl|@cl\s*,\s*(\d+))\s*\)(?=\)?\s*d\d)/g, (m, a, b) => `min(${Number(a ?? b) + 5}, @cl)`);
 
+/**
+ * A damage roll's types with Elemental Spell (its energy replaces the spell's) and Merciful Spell (nonlethal, which
+ * PF1's applyDamage reads from the types): for PF1's rolls and the module's own (lasting areas, later rounds, bolts).
+ */
+export function metamagicTypes(types, mm) {
+  const out = new Set(types ?? []);
+  if (has(mm, "elemental") && mm.energy && [...out].some((t) => ENERGY_TYPES.has(t))) {
+    for (const t of [...out]) if (ENERGY_TYPES.has(t)) out.delete(t);
+    out.add(mm.energy);
+  }
+  if (has(mm, "merciful")) out.add("nonlethal");
+  return [...out];
+}
+
 // PF1's damage rolls: Intensified, Maximize, Empower, Elemental, Merciful. Registered once everything is loaded, so
 // it runs after the module's own corrections of a spell's damage (Magic Missile's missiles)
 Hooks.once("ready", () => Hooks.on("pf1PreDamageRoll", metamagicDamage));
@@ -307,12 +350,8 @@ function metamagicDamage(action, rollData, parts) {
     if (has(mm, "intensified")) base = intensify(base);
     base = metamagicFormula(base, mm, rollData);
     part.base = base;
-    const types = part.damageType instanceof Set ? part.damageType : new Set(Array.isArray(part.damageType) ? part.damageType : []);
-    if (has(mm, "elemental") && mm.energy && [...types].some((t) => ENERGY_TYPES.has(t))) {
-      for (const t of [...types]) if (ENERGY_TYPES.has(t)) types.delete(t);
-      types.add(mm.energy);
-    }
-    if (has(mm, "merciful")) types.add("nonlethal");
+    // A copy: PF1 passes the action's own Set (changing it would change every later casting)
+    const types = new Set(metamagicTypes(part.damageType instanceof Set || Array.isArray(part.damageType) ? part.damageType : [], mm));
     if (part.damageType instanceof Set || types.size) part.damageType = types;
   }
 }
@@ -360,8 +399,18 @@ Hooks.on("pf1PostActionUse", async (use) => {
 
 // The card: the choice in its flags (the module's engines read it) and shown under the spell's name
 Hooks.on("pf1PreDisplayActionUse", (use) => {
+  if (!use.shared.chatData) return;
+  // Nevela's choice: its feats on the card for the module's engines (its slot and DC are its own)
+  const fromNevela = nevelaMetamagic() && isSpell(use.item) ? nevelaFeats(use) : [];
+  if (fromNevela.length) {
+    const own = use.shared.rollData?.metamagic; // a metamagic copy prepared before Nevela was turned on
+    const data = { ...(own ?? { heighten: 0 }), feats: [...new Set([...(own?.feats ?? []), ...fromNevela])], byNevela: fromNevela, originalLevel: use.item.system.level ?? 0 };
+    if (durationless(use.item)) data.noDuration = true;
+    foundry.utils.setProperty(use.shared.chatData, `flags.${MODULE_ID}.${FLAG}`, data);
+    return;
+  }
   const mm = use.shared.rollData?.metamagic;
-  if (!mm || !use.shared.chatData) return;
+  if (!mm) return;
   const original = use.item.flags?.[MODULE_ID]?.[FLAG]?.baseLevel ?? use.item.system.level ?? 0;
   const ownFeats = (mm.feats ?? []).filter((k) => k !== mm.rod?.key || (use.item.flags?.[MODULE_ID]?.[FLAG]?.feats ?? use.shared[STATE]?.feats ?? []).includes(k));
   const data = { ...mm, slot: original + slotAdjustment({ ...mm, feats: ownFeats }), originalLevel: original };
@@ -381,7 +430,9 @@ Hooks.on("renderChatMessageHTML", (message, html) => {
   if (has(mm, "silent")) notes.push("no verbal components");
   if (has(mm, "reach")) notes.push("one range category longer; melee touch becomes ranged touch");
   if (has(mm, "enlarge")) notes.push("double range");
-  tag.innerHTML = `<em>${esc(describe(mm))}</em> (level ${mm.slot} slot${mm.rod ? `; ${esc(mm.rod.name)}` : ""})${notes.length ? `: ${esc(notes.join("; "))}` : ""}`;
+  // Nevela's own card shows its metamagic and slot: only say which of them the module's features follow
+  if (mm.byNevela) tag.innerHTML = `<em>${esc(describe(mm))}</em> (from Nevela's Automation Suite: lasting areas, summons and later rounds follow it)`;
+  else tag.innerHTML = `<em>${esc(describe(mm))}</em> (level ${mm.slot} slot${mm.rod ? `; ${esc(mm.rod.name)}` : ""})${notes.length ? `: ${esc(notes.join("; "))}` : ""}`;
   header.after(tag);
 });
 
@@ -425,8 +476,8 @@ async function metamagicDialog(item) {
 // The spell sheet's header: "Metamagic" for a spell of a prepared spellbook
 Hooks.on("getItemSheetPFHeaderButtons", (sheet, buttons) => {
   const item = sheet.item ?? sheet.document;
-  if (!isSpell(item) || !item.actor?.isOwner || item.spellbook?.spontaneous || item.flags?.[MODULE_ID]?.[FLAG]) return;
+  if (!isSpell(item) || !item.actor?.isOwner || item.spellbook?.spontaneous || item.flags?.[MODULE_ID]?.[FLAG] || nevelaMetamagic()) return;
   buttons.unshift({ label: "Metamagic", class: `${MODULE_ID}-metamagic`, icon: "fas fa-wand-magic-sparkles", onclick: () => metamagicDialog(item) });
 });
 
-export const _test = { intensify, FEATS, knownMetamagic, slotAdjustment, describe, metamagicFormula, prepareMetamagic, STATE, rodsOf, rodUsesLeft, choiceOf };
+export const _test = { nevelaFeats, intensify, metamagicTypes, durationless, extendFactor, FEATS, knownMetamagic, slotAdjustment, describe, metamagicFormula, prepareMetamagic, STATE, rodsOf, rodUsesLeft, choiceOf };

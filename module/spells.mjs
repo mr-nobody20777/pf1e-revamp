@@ -49,7 +49,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { remainingSeconds, dealDamage, restoreDamage, ownerWhisper } from "./util.mjs";
-import { baseSpellName, metamagicOf, metamagicFormula, extendFactor, hasMetamagic } from "./metamagic.mjs";
+import { baseSpellName, metamagicOf, metamagicFormula, metamagicTypes, extendFactor, hasMetamagic } from "./metamagic.mjs";
 import { cureAfflictions, contract, afflictionOfItem } from "./afflictions.mjs";
 import { LASTING_SPELLS } from "./lasting-areas.mjs";
 import { SPELLS } from "./spell-data.mjs";
@@ -887,7 +887,7 @@ async function applyEffect(actor, effect, data, caster, token = null) {
   if (effect.damage) {
     const total = (await new Roll(metamagicFormula(effect.damage.formula, data.metamagic, rollData), rollData).evaluate()).total;
     if (total > 0) {
-      await dealDamage(actor, total, effect.damage.type ? [effect.damage.type] : []);
+      await dealDamage(actor, total, metamagicTypes(effect.damage.type ? [effect.damage.type] : [], data.metamagic));
       out.push(`${total} damage`);
     }
   }

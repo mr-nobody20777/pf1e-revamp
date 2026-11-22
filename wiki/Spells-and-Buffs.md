@@ -1,6 +1,8 @@
 # Spells and Buffs
 
 - [Spells on their targets](#spells-on-their-targets)
+- [Damage on later rounds](#damage-on-later-rounds)
+- [Saves against abilities](#saves-against-abilities)
 - [Miss chances](#miss-chances)
 - [Alignment wards](#alignment-wards)
 - [One-roll buffs](#one-roll-buffs)
@@ -11,6 +13,8 @@
 PF1e Revamp recognizes spell buffs from PF1 and **Pathfinder 1e Content** by name, so there is nothing special to use: put the buff on a character as usual and it does what the spell says.
 
 ---
+
+**Also see:** [Lasting Areas](Lasting-Areas) for clouds, walls and other areas that stay on the map; [Summons and Shapes](Summons-and-Shapes) for summoning, spell-created attackers and polymorph; [Metamagic](Metamagic) for metamagic feats and rods.
 
 ## Spells on their targets
 
@@ -30,6 +34,15 @@ PF1 rolls a spell's attack and damage and adds a save button, but it doesn't say
 - **Fear stacks**: a shaken creature made shaken again becomes frightened, and a frightened creature made shaken or frightened becomes panicked.
 - **A row for a hidden token** is shown to the GM only.
 - **Scrolls, wands and potions** of a spell work the same way.
+
+**Which spells**
+
+Every spell in PF1's compendium, from the *Core Rulebook* to the campaign setting books (about 2,900), has been reviewed against its rules text. Each falls into one of three kinds:
+- **Automated:** a failed save (or a willing target) gets the spell's conditions, penalties, bonuses, ability damage or damage, with their durations. The table below lists the core examples.
+- **Tracked:** where the effect is for the table to judge (*Calm Emotions*, *Charm Person*, *Detect Thoughts*'s target), the spell's buff is put on the creature for its duration, with a one-line reminder of what it does.
+- **No rows:** spells that affect no creature (objects, information, travel, *Mending*, *Prestidigitation*) keep PF1's card as it is.
+
+Spells that offer a choice ask the caster when cast: *Bestow Curse*'s curse, *Blindness/Deafness*, *Human Potential*'s ability score.
 
 **Spells with automated effects**
 
@@ -132,101 +145,6 @@ With **Nevela's Automation Suite**, a spell buff that Nevela applies itself is l
 ## Damage on later rounds
 
 *Acid Arrow*, *Corrosive Consumption*, *Caustic Eruption*, *Heat Metal* and *Chill Metal* put a buff named after the spell on the creature they affect. At the start of the caster's turn in combat, the creature takes that round's damage (typed: resistances and damage reduction apply), and a card shows it with an Undo for the GM. *Corrosive Consumption*'s card has a **Scrape it off** button (a full-round action): the next round deals half and the acid ends. *Heat Metal* and *Chill Metal* deal only their 1- or 2-point minimum to a creature not wearing metal armor or wielding a metal weapon or shield. Outside combat nothing ticks; delete the buff to end it early (neutralized acid, *Dispel Magic*).
-
-## Lasting areas
-
-**Flaming Sphere.** The spell places a 5-foot sphere. Drag it into a creature's space to strike it: a Reflex save or 3d6 fire. A creature walking into the sphere isn't struck. Stopping for the round after a strike, the 30-foot move and the torchlight are left to the table.
-
-**Call Lightning.** *Call Lightning* and *Call Lightning Storm* put a **Call a bolt** button on the spell's card (for the caster's owner and the GM), with the number of bolts left. Target the creatures in the bolt's square, tick "Outdoors in a storm" if it applies, and click: one damage roll for the bolt, a Reflex save for half for each creature, and a card with an Undo.
-
-**Walls.** *Wall of Fire* and *Blade Barrier* place a line template 20 feet per caster level long; shorten it, or change it to a circle for the ring form. A creature passes through the wall when its move crosses the line or ends in the wall's squares (moving out of them isn't another crossing): *Wall of Fire* deals 2d6 + caster level (max +20) fire, *Blade Barrier* 1d6 per caster level (max 15d6, Reflex half). Creatures caught where the wall appears take the same; against *Blade Barrier* a Reflex save avoids it entirely. *Wall of Fire*'s heat hits creatures on its hot side (2d4 within 10 feet, 1d4 within 20) when it appears and on each of the caster's turns. The hot side faces away from the caster; the GM's card has a **Switch the hot side** button. Undead take double from the fire.
-
-**Drifting clouds.** *Cloudkill*, *Incendiary Cloud*, *Web Cloud* and *Plague Storm* move 10 feet at the start of the caster's turn, straight away from where the caster stood when casting, then act on the creatures in their new spread (creatures they roll over count as entering). A wall stops the cloud's center there; the spread still flows around corners. A cloud cast on the caster's own square has no direction: drag it once and it keeps going that way. You can drag a cloud any time (*Incendiary Cloud* moved by concentration, wind, a slope); it goes on from where you leave it. Slopes, wind and *Incendiary Cloud*'s range limit are left to the GM.
-
-**Areas and walls.** A template is the most a spell's area can reach; the walls decide who it really catches. Bursts, emanations, cones and lines need a clear straight line from the point of origin to a creature (they don't go around corners). Spreads (*Fireball*, *Web*, *Cloudkill*) do turn corners, but only as far as their radius measured around the walls. Walls that block movement count, and doors only while closed. This applies to the spell rows and to the lasting areas below. Limits: the map is flat (height isn't counted), a square counts by its center, and on a gridless scene spreads use the straight-line rule.
-
-*Entangle*, *Stinking Cloud*, *Cloudkill*, *Black Tentacles*, *Web*, *Solid Fog* and *Silence* keep working for their whole duration. Their template is tracked from the casting, and the GM's game checks who is inside whenever a token or the template moves:
-- **Casting and entering:** creatures inside when the spell is cast, and those that move in later, make its save (or, for *Black Tentacles*, face the tentacles' grapple check; for *Web*, a combat maneuver or Escape Artist check when moving in), and the result is applied. A card lists what happened, with an **Undo** for the GM.
-- **Every round:** on the caster's turn, *Entangle* (end of the turn) and *Stinking Cloud* give another save to those who saved and stayed; *Cloudkill* deals 1d4 Con; *Black Tentacles* rolls once for everyone inside.
-- **While inside:** *Solid Fog* gives −2 on melee attacks and damage, and *Silence* a reminder that spells with verbal components can't be cast, as a buff that goes when the creature leaves. Entangled, grappled and nauseated end on leaving (*Stinking Cloud*'s nausea lasts 1d4+1 rounds more).
-- **Ending:** when the spell's duration has passed, its template is removed and everyone it held is released; deleting the template by hand does the same.
-- **Moving through:** *Grease* and *Sleet Storm* ask for DC 10 Acrobatics each time a creature moves in them (failing stops it; failing by 5 or more, or a failed Reflex save on *Grease*, is a fall). *Spike Growth* deals 1d4 piercing per 5 feet moved through it (the straight line of the move), then a Reflex save or half land speed for 24 hours.
-- ***Create Pit*:** creatures in it at the casting save or fall in (1d6 per 10 feet of depth, prone); one walking in falls; one ending its turn next to it saves at +2.
-- **Templates:** many spells (*Web*, *Fog Cloud*, *Obscuring Mist*, *Stinking Cloud*, *Cloudkill*, *Solid Fog*) state their area only in text in PF1's data, so PF1 offered no template. PF1e Revamp supplies one when the area is a fixed radius, a fixed line or a detect spell's cone (as long as its range); areas that grow with caster level, cubes and walls are placed by hand.
-- **From the other books:** clouds (*Euphoric Cloud* fascinates, *Cloud of Seasickness* sickens, *Drunkard's Breath* nauseates without fog, *Poisonous Cloud* deals 1d2 Con), fogs (*Barrow Haze*, which its caster sees through, *Twilight Haze*, *Virulent Miasma*), entangle variants (*Thorny*, *Sickening*, *Burning* and *Thirsting Entanglement*), damage at the start of each creature's turn inside (*Hungry Darkness*, *Winter Grasp*, *Flashfire*), *Condensed Ether*, *Impossible Angles*, *Sawtooth Terrain*, *Gravel Vortex* and *Greater Grease*; *Greater Flaming Sphere* and both *Aggressive Thunderclouds* strike like *Flaming Sphere*, and *Wall of Clockwork* works like *Blade Barrier* (it can't appear on a creature).
-- **Fog:** *Fog Cloud*, *Obscuring Mist*, *Solid Fog*, *Stinking Cloud* and *Cloudkill* give concealment (20% within 5 feet, 50% beyond) when either creature is in the fog or it lies between them; *Sleet Storm* gives 50%. The miss chance is rolled with the others.
-
-## Summons
-
-With the **Foundry Summons** module active (it needs **tcal**, **Sequencer** and **socketlib**), *Summon Monster* I–IX and *Summon Nature's Ally* I–IX summon for you. The creatures come from PF1e Revamp's **Summons** compendium: every creature on the Core Rulebook's summoning tables, from the Bestiary.
-
-1. **Cast the spell.** Choose the option: 1 creature from the spell's level, 1d3 from the level below, or 1d4+1 from a lower level. The count is rolled.
-2. **Choose the creature** from the list (type in the search box to narrow it). On *Summon Monster*'s table, creatures marked * get the celestial template if the caster is good and the fiendish template if evil; a neutral caster is asked.
-3. **Place each creature** with the crosshair. It can't go beyond the spell's range (close: 25 feet + 5 feet per 2 caster levels), drawn on the map from the caster's token. A spot the caster has no line of effect to (a wall in the way) asks you to place it again. When a player summons, the GM may be asked to approve it (Foundry Summons' own setting).
-
-**Templates.** Celestial: resist acid, cold and electricity 5 (1–4 HD), 10 (5–10 HD) or 15 (11+ HD); DR 5/evil from 5 HD, 10/evil from 11 HD; spell resistance equal to its CR (+1 from 5 HD) + 5; darkvision 60 feet; *smite evil* once a day. Fiendish: the same with cold and fire, DR/good and *smite good*. **Augment Summoning** adds +4 Strength and Constitution.
-
-**While they're here.** The caster's player owns the summoned creatures: double-click a token for its sheet. They aren't added to the combat tracker; they act on their summoner's turn, and the summoner's owner gets a reminder listing them when that turn starts. Effects that happen at the start of a creature's turn (bleed, burning, fast healing, poisons and diseases, *Web Cloud*'s save) happen to a summoned creature at the start of its summoner's turn.
-
-**When they go.** After the spell's rounds (1 per caster level) the creatures vanish and the GM gets a card. The casting's card has a **Dismiss** button for the caster's player and the GM. Each creature's temporary actor is deleted with its last token.
-
-## Metamagic
-
-**Spontaneous casters** (sorcerer, oracle, bard…): PF1's casting window has a **Metamagic** section with a box for each metamagic feat the character has, a Heighten amount and an energy for Elemental Spell. It shows the slot level the casting will use (above 9th can't be cast), and casting spends that slot instead of the spell's own.
-
-**Prepared casters** (wizard, cleric…): open the spell's sheet and use **Metamagic** at the top. Tick the feats; a copy ("Empowered Fireball") is prepared in the higher slot. Its save DC stays the spell's own (only Heighten raises it), and each casting of the copy applies its feats.
-
-| Feat | Slot | What happens |
-|---|---|---|
-| Extend | +1 | every duration the module applies is doubled (not concentration, instantaneous or permanent) |
-| Empower | +2 | damage, healing and other rolled numbers ×1.5, including the level-based bonus |
-| Maximize | +3 | rolled numbers at their maximum; with Empower, the maximum plus half a normal roll |
-| Enlarge | +1 | close, medium and long range doubled (placing summons and attackers) |
-| Widen | +3 | a burst, cone, emanation or spread's template twice as large (lines don't change) |
-| Heighten | +1 to +9 | the spell counts as that much higher for save DCs |
-| Quicken / Still / Silent | +4 / +1 / +1 | a swift action / no somatic / no verbal components, noted on the card |
-| Reach | +1 per step | one range category longer; melee touch becomes ranged touch |
-| Intensified | +1 | the cap on damage dice 5 levels higher |
-| Persistent | +2 | a creature that saves must save again; failing the second, it takes the full effect |
-| Selective | +1 | an instantaneous area spell: choose up to your casting ability's modifier of creatures to leave out |
-| Dazing | +3 | a creature damaged and failing its save is dazed for the spell's original level in rounds; a spell without a save gets a Will save against the daze |
-| Elemental | +1 | the damage becomes the chosen energy (acid, cold, electricity or fire) |
-| Merciful | +0 | the damage is nonlethal |
-
-Metamagic doesn't work on spell-like abilities.
-
-**Metamagic rods.** Any caster's casting window lists the metamagic rods they carry that fit the spell's level (lesser: 3rd or lower, normal: 6th, greater: 9th), with the uses left today. Pick one (one rod per spell): its feat applies without raising the slot, and it combines with the caster's own metamagic feats. A rod's three uses a day come back when the character rests.
-
-## Spell-created attackers
-
-*Spiritual Weapon*, *Spiritual Ally*, *Mage's Sword*, *Twilight Knife* and *Chain of Perdition* are placed like summoned creatures (Foundry Summons needed): within the spell's range and line of effect, owned by the caster's player, gone when the spell ends or is dismissed. Each has a small sheet; open it from the token and use its attack on the caster's turn.
-
-| Spell | Attack | Damage | Critical | Other |
-|---|---|---|---|---|
-| *Spiritual Weapon* | base attack bonus + Wisdom modifier, with iterative attacks | 1d8 force + 1 per 3 caster levels (max +5) | the weapon form's | touch AC 12 |
-| *Spiritual Ally* | base attack bonus + Wisdom bonus, with iterative attacks | 1d10 force + 1 per 3 caster levels (max +5) | the weapon form's | touch AC 10; speed 30, fly 30 |
-| *Mage's Sword* | caster level + Intelligence or Charisma bonus + 3 | 4d6+3 force | 19–20/×2 | AC 13 |
-| *Twilight Knife* | base attack bonus + the better of Intelligence or Charisma bonus | 1d4 force | 19–20/×2 | sneak attack 1d6 per 4 caster levels; touch AC 12 + your Dexterity |
-| *Chain of Perdition* | dirty trick, drag, reposition, trip: caster level + casting modifier | | | reach 10 feet |
-
-- **The weapon's form**: casting *Spiritual Weapon* or *Spiritual Ally* asks for the weapon (searchable), which sets the critical range and multiplier. The default is the caster's alignment's: law longsword, chaos battleaxe, good warhammer, evil light flail.
-- **The caster's modifiers**: each attack adds the caster's attack and weapon damage modifiers from buffs and conditions at the moment it's rolled (*bless*, *inspire courage*, shaken), but never the caster's feats ("Your feats or combat actions do not affect the weapon"). This follows Paizo's FAQs on weapon-like spells.
-- **Spell resistance**: the first attack against a creature with spell resistance rolls the caster level check; if it fails, the card offers to dismiss the spell.
-- **Force**: the damage is force, which damage reduction doesn't stop. The sheet notes that physical attacks can't harm it.
-
-## Polymorph
-
-With the *PF1 Mighty Morphin* module active, polymorph spells pick their form for you:
-
-- **Casting** *Alter Self*, *Beast Shape*, *Magical Beast Shape*, *Elemental Body*, *Plant Shape*, *Vermin Shape*, *Giant Form* or *Form of the Dragon* opens Mighty Morphin's form picker for the caster, at the spell's level and caster level. Pick the form; Mighty Morphin applies its size, ability scores, natural armor, attacks, speeds and senses, and the token's size follows.
-- ***Polymorph*, *Greater Polymorph* and *Shapechange*** ask first which kind of form the spell should play (for *Polymorph*: an animal as *Beast Shape II*, an elemental as *Elemental Body I*, a humanoid as *Alter Self*). Target the willing creature you touch; if you don't own it, the picker opens on the GM's screen.
-- ***Wild Shape***: using the class ability opens the picker at the druid's level, with the kinds of form that level allows.
-- ***Baleful Polymorph***: on a failed Fortitude save the picker opens on the GM's screen (choose a Small or smaller animal of 1 HD); the target's other polymorphs end. Its Will save is a reminder on the card.
-- **Ending**: when the form's buff ends (its duration, turned off, deleted), the form reverts.
-- **One at a time**: a creature already transformed asks before taking a new form, and spells that change size (*Enlarge Person*, *Reduce Person*, *Righteous Might*, *Animal Growth*, *Legendary Proportions*) have no effect on a polymorphed creature.
-- ***Monstrous Physique* and *Undead Anatomy*** (not in Mighty Morphin, so they work without it): pick the form's size; the buff applies the spell's size bonuses, natural armor, size change and save bonus, and lists the abilities the spell level allows. Add the form's attacks, speeds and senses by hand.
-
-The form's token keeps its picture unless Mighty Morphin's image folder has one named after the form. Without Mighty Morphin, the polymorph spells other than *Monstrous Physique* and *Undead Anatomy* keep their reminders.
 
 ## Saves against abilities
 Abilities that aren't spells but have a saving throw (class abilities and hexes, monster and template abilities, racial traits, alchemical items and technology) get the same rows when used with targets: each creature rolls its save from its row, and a failed save applies what the ability's text describes.

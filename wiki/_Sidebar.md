@@ -9,6 +9,9 @@
 
 **Play**
 - [Spells and Buffs](Spells-and-Buffs)
+- [Lasting Areas](Lasting-Areas)
+- [Summons and Shapes](Summons-and-Shapes)
+- [Metamagic](Metamagic)
 - [Combat Rules](Combat-Rules)
 - [Magic Items](Magic-Items)
 

@@ -14,7 +14,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { dealDamage, restoreDamage, esc, gmWhisper, onGmRequest, requestedByOwner, saveResult, rollTotal } from "./util.mjs";
-import { baseSpellName, metamagicOf, metamagicFormula } from "./metamagic.mjs";
+import { baseSpellName, metamagicOf, metamagicFormula, metamagicTypes } from "./metamagic.mjs";
 
 const BOLTS = { "call lightning": { dice: 3, max: 10 }, "call lightning storm": { dice: 5, max: 15 } };
 const CALLED = "boltsCalled"; // spell card flag: the number of bolts called
@@ -58,7 +58,7 @@ async function boltOn(message, spell, tokenUuids, stormy) {
     if (!actor) continue;
     const r = saveResult(await actor.rollSavingThrow("ref", { skipDialog: true, dc, reference: message.uuid }), dc);
     const amount = r.passed ? Math.floor(total / 2) : total;
-    const lost = await dealDamage(actor, amount, ["electric"]); // PF1's id for electricity
+    const lost = await dealDamage(actor, amount, metamagicTypes(["electric"], metamagicOf(message))); // PF1's id for electricity
     undo.push({ actor: actor.uuid, lost });
     const taken = lost.hp + lost.temp;
     lines.push(`${token.name}: Reflex ${r.total ?? "?"} vs DC ${dc}, ${r.passed ? "half" : "failed"}: ${amount} electricity${taken < amount ? ` (${taken} after resistance)` : ""}`);

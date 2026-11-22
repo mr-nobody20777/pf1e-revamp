@@ -4,7 +4,11 @@ Current limitations. If you hit something not listed here, please [open an issue
 
 ## Spells
 - **Players can see an NPC's save total** on a spell's row, and on PF1's save card when the GM rolls publicly. Roll NPC saves as a GM or blind roll to keep them private. Hiding the number from players is planned.
-- **Wall of Fire**, **Silence** centered on a moving creature, **Command**'s chosen command and splitting **Magic Missile** between targets are left to the GM.
+- **Silence** centered on a moving creature, **Command**'s chosen command and splitting **Magic Missile** between targets are left to the GM.
+- **Lasting areas** treat the map as flat (a creature flying above a cloud counts as inside), and wind, slopes and range limits on moving clouds and spheres are left to the GM. See [Lasting Areas](Lasting-Areas#limits).
+- **Summoning spells** other than *Summon Monster* and *Summon Nature's Ally* (*Summon Cacodaemon*, *Summon Genie*...), and the dragon, fey, ooze and naga form spells, are applied by hand. Summoned creatures and polymorph forms don't change the token's picture yet.
+- **Metamagic** covers the 16 feats of the *Core Rulebook* and *Advanced Player's Guide*; the others are applied by hand. See [Metamagic](Metamagic#not-covered-yet).
+- **Tracked spells**: many spells from the later books are tracked as a buff with a reminder rather than automated, where their effect is for the table to judge. See [Spells and Buffs](Spells-and-Buffs#spells-on-their-targets).
 - **New saves to end an effect** (Hideous Laughter, Mudball and others) are offered on the creature's turn in combat only.
 
 ## Rules the module can't judge

@@ -95,7 +95,7 @@
 
 import { MODULE_ID } from "./const.mjs";
 import { esc, isActiveGM, saveResult, rollTotal, timed, dealDamage, restoreDamage, activeBuff, gmWhisper, turnActors } from "./util.mjs";
-import { baseSpellName, metamagicOf, extendFactor, metamagicFormula } from "./metamagic.mjs";
+import { baseSpellName, metamagicOf, extendFactor, metamagicFormula, metamagicTypes, intensify, hasMetamagic } from "./metamagic.mjs";
 import { creatureTypes, isLiving } from "./creature-types.mjs";
 import { registerMissSource } from "./miss-chance.mjs";
 import { reaches } from "./area-reach.mjs";
@@ -358,8 +358,8 @@ const SPELLS = {
     names: ["blade barrier"],
     wall: true,
     // Caught where it appears: a Reflex save avoids it entirely; otherwise as passing through, unhalved
-    appear: async (c) => ((await c.save("ref")) ? c.note("avoids the wall (ends on the side of its choice)") : c.damage(`${Math.min(15, c.zone.cl)}d6`, null)),
-    cross: async (c) => c.damage(`${Math.min(15, c.zone.cl)}d6`, null, { half: "ref" }),
+    appear: async (c) => ((await c.save("ref")) ? c.note("avoids the wall (ends on the side of its choice)") : c.damage("(min(15, @cl))d6", null)),
+    cross: async (c) => c.damage("(min(15, @cl))d6", null, { half: "ref" }),
     reminder: "cover through it (+4 AC, +2 on Reflex saves) against attacks made through the wall",
   },
   // Wall of Clockwork: "Any creature passing through the wall takes 1d6 points of piercing and slashing damage per 2
@@ -554,13 +554,16 @@ function context(template, zone, token, { atCasting = false, lines, undo, ...opt
     note: (text) => line(text),
     /** Typed damage from the area, halved on a successful save when `half` names one; doubled for undead if asked. */
     async damage(formula, type, { half = null, undeadDouble = false } = {}) {
-      // Empower and Maximize: the area's damage is the spell's variable number
-      let amount = await rollTotal(metamagicFormula(formula, zone.metamagic));
+      // Intensified raises a dice cap written with @cl; Empower and Maximize: the area's damage is the spell's variable
+      // number; Elemental and Merciful: its damage types
+      const capped = hasMetamagic(zone.metamagic, "intensified") ? intensify(formula) : formula;
+      let amount = await rollTotal(metamagicFormula(capped.replace(/@cl\b/g, String(zone.cl)), zone.metamagic));
+      const types = metamagicTypes(type ? [type] : [], zone.metamagic);
       if (half && (await c.save(half))) amount = Math.floor(amount / 2);
       const undead = undeadDouble && creatureTypes(actor).types.has("undead");
       if (undead) amount *= 2;
-      const taken = amount > 0 ? await hurt(amount, type ? [type] : []) : 0;
-      line(`${amount}${type ? ` ${type}` : ""} damage${undead ? " (doubled: undead)" : ""}${taken < amount ? ` (${taken} after resistance)` : ""}`);
+      const taken = amount > 0 ? await hurt(amount, types) : 0;
+      line(`${amount}${types.length ? ` ${types.join(" ")}` : ""} damage${undead ? " (doubled: undead)" : ""}${taken < amount ? ` (${taken} after resistance)` : ""}`);
     },
     /** Thirsting entanglement: a failed Reflex save entangles and drains 1d2 Con. */
     async thirst() {
@@ -844,8 +847,10 @@ Hooks.on("updateToken", (token, changes) => {
 Hooks.on("createToken", (token) => soon(token.parent));
 // Where everyone stands when the scene is shown: the start of their first move (walls)
 Hooks.on("canvasReady", (canvas) => {
+  lastPos.clear(); // only the shown scene's tokens (other scenes' positions would pile up over a session)
   for (const token of canvas.scene?.tokens ?? []) lastPos.set(token.uuid, centerOf(token));
 });
+Hooks.on("deleteToken", (token) => lastPos.delete(token.uuid));
 Hooks.on("updateMeasuredTemplate", async (template, changes, options) => {
   if (["x", "y", "distance", "direction", "width"].some((k) => k in changes)) soon(template.parent);
   // A drifting cloud dragged by the GM: it goes on from there (its first drag sets its direction if it had none)
@@ -1032,7 +1037,7 @@ Hooks.on("updateCombat", async (combat, changes, options) => {
     // Create pit: a creature ending its turn next to the pit (not in it)
     if (spell.adjacentTurnEnd && ended) {
       const pad = scene.grid.size;
-      const next = scene.tokens.filter((t) => t.actor === ended && !zone.inside.includes(t.id) && insidePoint(template, centerOf(t).x, centerOf(t).y, pad));
+      const next = scene.tokens.filter((t) => t.actorId === ended.id && t.actor === ended && !zone.inside.includes(t.id) && insidePoint(template, centerOf(t).x, centerOf(t).y, pad));
       if (next.length) await act(template, next, "adjacentTurnEnd", "ended its turn at the edge");
     }
     if (ended?.uuid === zone.caster && spell.casterTurnEnd && inside.length) await act(template, inside, "casterTurnEnd", "end of the caster's turn");
@@ -1062,9 +1067,9 @@ Hooks.on("updateWorldTime", () => {
 });
 
 // A template deleted by hand: what it held ends
-Hooks.on("deleteMeasuredTemplate", async (template, options, userId) => {
+Hooks.on("deleteMeasuredTemplate", async (template) => {
   const zone = zoneOf(template);
-  if (!zone || game.user.id !== userId) return;
+  if (!zone || !isActiveGM()) return;
   for (const id of zone.inside ?? []) {
     const token = template.parent.tokens.get(id);
     const actor = tokenActor(token);

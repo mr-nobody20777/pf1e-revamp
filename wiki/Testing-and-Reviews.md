@@ -9,7 +9,7 @@ PF1e Revamp is written by **Claude**, Anthropic's AI, working in Claude Code. Cl
 Every automation starts from the **full rules text** of the ability, feat, trait or spell, and the rule is quoted at the top of the code that implements it. When PF1's or Pathfinder 1e Content's data disagrees with the rules, the rules win and the item's note says so. Examples: the auras' always-on bonuses, and Magical Knack's missing Hit Dice cap.
 
 ## Automated tests
-The module includes a test suite of **almost 300 tests in 35 groups**, run with the **Quench** module. Each group:
+The module includes a test suite of **over 520 tests in 51 groups**, run with the **Quench** module. Each group:
 1. creates throwaway characters, tokens and combats on a dedicated test scene;
 2. uses features through PF1's real actions and rolls, the same way a player would;
 3. checks the results on the chat cards and character sheets;
@@ -20,10 +20,10 @@ New features ship with their tests, and the **whole suite runs before every rele
 To run it yourself: install and enable **Quench**, open it from the sidebar, select the *PF1e Revamp* groups and click **Run**. Use a test world, since tests briefly create and delete characters, tokens and chat messages.
 
 ## Playing as a player
-Most automated tests run as a GM, and a GM can change anything, so permission problems would never show up there. Before release, every feature that touches another character was also played through **logged in as a regular player**, with a separate GM connected. That covered buffs on allies, channel energy, spontaneous casting, Prescience, Rewind, Forewarned, raging songs, Studied Target, miss chances, sneak attack talents, and spells cast by and at a player (saves rolled from the card, templates placed on the map). For 0.21.0: auras started from a player's Use button and ended from their buff, and damage a player applies to a creature they don't control. All worked. See [Compatibility](Compatibility#multiplayer) for how the GM's client handles those changes.
+Most automated tests run as a GM, and a GM can change anything, so permission problems would never show up there. Before release, every feature that touches another character was also played through **logged in as a regular player**, with a separate GM connected. That covered buffs on allies, channel energy, spontaneous casting, Prescience, Rewind, Forewarned, raging songs, Studied Target, miss chances, sneak attack talents, and spells cast by and at a player (saves rolled from the card, templates placed on the map). For 0.21.0: auras started from a player's Use button and ended from their buff, and damage a player applies to a creature they don't control. For the spells release: a player's summons, a player deleting their own lasting area (the GM's game releases the creatures inside), a polymorph cast with an enemy targeted, and metamagic cast through Nevela's Automation Suite. All worked. See [Compatibility](Compatibility#multiplayer) for how the GM's client handles those changes.
 
 ## Code review and a fight on the map
-Before release, the new code gets a review for bugs, and the features are tried on monsters straight from the Bestiary (unlinked tokens, real damage reduction and Hit Dice) and in a full combat with the test party: auras turned on and walked in and out of, damage applied from the card against DR and resistances, regeneration stopped by fire, and buffs running out on their owner's turn. For 0.21.0 this found and fixed twelve problems before release.
+Before release, the new code gets a review for bugs, and the features are tried on monsters straight from the Bestiary (unlinked tokens, real damage reduction and Hit Dice) and in a full combat with the test party: auras turned on and walked in and out of, damage applied from the card against DR and resistances, regeneration stopped by fire, and buffs running out on their owner's turn. For 0.21.0 this found and fixed twelve problems before release. For the spells release (summons, metamagic, polymorph, lasting areas and every spell of the other books), two review passes found and fixed nineteen problems, among them a summon misplaced behind a wall that a player couldn't remove, a second *Acid Arrow* replacing the first one's rounds, *Elemental Spell* changing a spell for good, and a player's deleted area leaving its conditions in place.
 
 ## Performance reviews
 After every **ten new features**, the code gets a review aimed at keeping games running smoothly, without the slowdowns that make people refresh Foundry mid-session:
@@ -38,8 +38,11 @@ Each review is measured with a benchmark (`module/tests/benchmark.mjs`). It simu
 | #1 | 0.53% → **0.17%** |
 | #2 | 0.29% → **0.20%** (after ten more features) |
 | #3 | 0.23% → **0.22%** (after ten more features, including the roll windows' buff manager) |
+| #4 | 2.85% → **0.50%** (a fuller workload: magic arms, every hook found by its source) |
+| #5 | 0.75% → **0.60%** (afflictions, lasting areas, token moves and game-time ticks added) |
+| #6 | 0.97% → **1.0%** (combat turns with a summoned creature and spell casts added; summon lookups indexed, so turns no longer scan every actor and token in large worlds) |
 
-Every handler costs well under a millisecond per call, and memory showed no growth.
+Every handler costs well under a millisecond per call, and memory showed no lasting growth. A full combat turn costs the module about 2.6 ms.
 
 ## Technical notes (for the curious)
 - **Your existing items.** Automation recognizes PF1's and Pathfinder 1e Content's own items in place, by compendium source, tag or name, so there's nothing to swap in or keep in sync.

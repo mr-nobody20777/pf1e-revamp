@@ -54,6 +54,8 @@ function spreadSquares(template) {
   const scene = template.parent;
   const key = `${template.uuid}|${template.x}|${template.y}|${template.distance}`;
   if (spreadCache.has(key)) return spreadCache.get(key);
+  // One entry per template: a moved cloud or sphere replaces its old position
+  for (const k of spreadCache.keys()) if (k.startsWith(`${template.uuid}|`)) spreadCache.delete(k);
   const grid = scene.grid;
   const step = grid.distance;
   const radius = template.distance;
@@ -67,28 +69,38 @@ function spreadSquares(template) {
     const c = center(o.i, o.j);
     if (!blocked(origin, c)) starts.set(`${o.i},${o.j}`, o);
   }
-  // Dijkstra over (square, diagonal parity); the cost includes the square itself
-  const best = new Map(); // "i,j,p" -> cost
-  const queue = [...starts.values()].map((o) => ({ i: o.i, j: o.j, p: 0, cost: step }));
+  // Dijkstra over (square, diagonal parity); the cost includes the square itself. Costs are whole squares (one
+  // or two steps), so a bucket per cost replaces sorting the queue
+  const best = new Map(); // "i,j,p" -> lowest cost queued
+  const buckets = [];
+  const push = (n) => {
+    const k = `${n.i},${n.j},${n.p}`;
+    if (best.has(k) && best.get(k) <= n.cost) return false;
+    best.set(k, n.cost);
+    (buckets[Math.round(n.cost / step)] ??= []).push(n);
+    return true;
+  };
+  for (const o of starts.values()) push({ i: o.i, j: o.j, p: 0, cost: step });
   const reached = new Set();
-  while (queue.length) {
-    queue.sort((a, b) => a.cost - b.cost);
-    const cur = queue.shift();
-    const k = `${cur.i},${cur.j},${cur.p}`;
-    if (cur.cost > radius || (best.has(k) && best.get(k) <= cur.cost)) continue;
-    best.set(k, cur.cost);
-    reached.add(`${cur.i},${cur.j}`);
-    const from = center(cur.i, cur.j);
-    for (let di = -1; di <= 1; di++) {
-      for (let dj = -1; dj <= 1; dj++) {
-        if (!di && !dj) continue;
-        const diagonal = di && dj;
-        const cost = cur.cost + (diagonal ? (cur.p ? 2 * step : step) : step);
-        if (cost > radius) continue;
-        const ni = cur.i + di;
-        const nj = cur.j + dj;
-        if (blocked(from, center(ni, nj))) continue;
-        queue.push({ i: ni, j: nj, p: diagonal ? 1 - cur.p : cur.p, cost });
+  for (let b = 0; b < buckets.length; b++) {
+    for (const cur of buckets[b] ?? []) {
+      if (best.get(`${cur.i},${cur.j},${cur.p}`) < cur.cost) continue; // reached more cheaply since
+      reached.add(`${cur.i},${cur.j}`);
+      const from = center(cur.i, cur.j);
+      for (let di = -1; di <= 1; di++) {
+        for (let dj = -1; dj <= 1; dj++) {
+          if (!di && !dj) continue;
+          const diagonal = di && dj;
+          const cost = cur.cost + (diagonal ? (cur.p ? 2 * step : step) : step);
+          if (cost > radius) continue;
+          const ni = cur.i + di;
+          const nj = cur.j + dj;
+          const p = diagonal ? 1 - cur.p : cur.p;
+          const k = `${ni},${nj},${p}`;
+          if (best.has(k) && best.get(k) <= cost) continue; // no better: skip the wall test
+          if (blocked(from, center(ni, nj))) continue;
+          push({ i: ni, j: nj, p, cost });
+        }
       }
     }
   }

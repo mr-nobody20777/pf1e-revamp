@@ -17,11 +17,11 @@
 //     wielding such an item": full when it wears metal armor or wields a metal weapon or shield.
 
 import { MODULE_ID } from "./const.mjs";
-import { dealDamage, restoreDamage, esc, isActiveGM, oncePerRound, steppedBack, ownerWhisper, gmWhisper } from "./util.mjs";
-import { extendFactor, metamagicFormula } from "./metamagic.mjs";
+import { dealDamage, restoreDamage, esc, isActiveGM, oncePerRound, steppedBack, ownerWhisper, gmWhisper, summonsOf } from "./util.mjs";
+import { extendFactor, metamagicFormula, metamagicTypes } from "./metamagic.mjs";
 import { wearsMetalArmor } from "./situational-bonuses.mjs";
 
-export const FLAG = "ongoing"; // buff flag: { caster, schedule: [formula], next, type, cl, minimum, metal, scraped }
+export const FLAG = "ongoing"; // buff flag: { caster, schedule: [formula], next, types, cl, minimum, metal, scraped }
 const CARD = "ongoingTick"; // card flag: { actor, lost, amount }
 const TICK = "ongoingTick"; // actor flag: once per round
 
@@ -44,7 +44,7 @@ export async function startOngoing(actor, ongoing, data, caster, rollData, img) 
     ? [...ongoing.schedule]
     : Array(Math.max(0, (await new Roll(String(ongoing.rounds), rollData).evaluate()).total) * extendFactor(mm)).fill(ongoing.formula)).map((f) => metamagicFormula(f, mm, rollData));
   if (!schedule.length) return null;
-  const flag = { caster: caster?.uuid ?? null, schedule: schedule.map((f) => String(f).replace(/@cl\b/g, String(data.cl ?? 1))), next: 0, type: ongoing.type ?? null, minimum: ongoing.minimum ?? null, scrape: !!ongoing.scrape };
+  const flag = { caster: caster?.uuid ?? null, schedule: schedule.map((f) => String(f).replace(/@cl\b/g, String(data.cl ?? 1))), next: 0, types: metamagicTypes(ongoing.type ? [ongoing.type] : [], mm), minimum: ongoing.minimum ?? null, scrape: !!ongoing.scrape };
   // No duration of its own: the last round deletes it (an expiring duration could beat the last tick)
   // The spell's own buff when it has one; another casting already running keeps its schedule (each arrow deals its own)
   const existing = actor.itemTypes.buff.find((b) => b.name === data.name && !b.flags?.[MODULE_ID]?.[FLAG]);
@@ -71,7 +71,8 @@ async function tick(actor, buff) {
     total = Math.floor(total / 2);
     notes.push("scraped off: half, and it ends");
   }
-  const lost = total > 0 ? await dealDamage(actor, total, flag.type ? [flag.type] : []) : null;
+  const types = flag.types ?? (flag.type ? [flag.type] : []); // (flag.type: a buff from before metamagic types)
+  const lost = total > 0 ? await dealDamage(actor, total, types) : null;
   flag.next += 1;
   const done = flag.scraped || flag.next >= flag.schedule.length;
   if (done) await buff.delete();
@@ -80,7 +81,7 @@ async function tick(actor, buff) {
   await ChatMessage.implementation.create({
     speaker: ChatMessage.implementation.getSpeaker({ actor }),
     whisper: [...new Set([...ownerWhisper(actor), ...gmWhisper()])],
-    content: `<p><strong>${esc(buff.name)}</strong>: ${esc(actor.name)} takes ${total}${flag.type ? ` ${esc(flag.type)}` : ""} damage${notes.length ? ` (${esc(notes.join("; "))})` : ""}. ${done ? "It ends." : `${left} more round${left === 1 ? "" : "s"}.`}</p>${!done && flag.scrape ? `<button type="button" data-action="${MODULE_ID}-ongoing-scrape">Scrape it off (full-round action)</button>` : ""}${lost ? `<button type="button" data-action="${MODULE_ID}-ongoing-undo">Undo</button>` : ""}`,
+    content: `<p><strong>${esc(buff.name)}</strong>: ${esc(actor.name)} takes ${total}${types.length ? ` ${esc(types.join(" "))}` : ""} damage${notes.length ? ` (${esc(notes.join("; "))})` : ""}. ${done ? "It ends." : `${left} more round${left === 1 ? "" : "s"}.`}</p>${!done && flag.scrape ? `<button type="button" data-action="${MODULE_ID}-ongoing-scrape">Scrape it off (full-round action)</button>` : ""}${lost ? `<button type="button" data-action="${MODULE_ID}-ongoing-undo">Undo</button>` : ""}`,
     flags: { [MODULE_ID]: { [CARD]: { actor: actor.uuid, buff: done ? null : buff.uuid, lost } } },
   });
   return total;
@@ -91,8 +92,8 @@ Hooks.on("combatTurnChange", async (combat, prior, current) => {
   if (!isActiveGM() || steppedBack(prior, current)) return;
   const caster = combat.combatants.get(current?.combatantId)?.actor;
   if (!caster) return;
-  const scene = combat.scene ?? canvas.scene;
-  const actors = new Set([...(scene?.tokens ?? [])].map((t) => t.actor).filter(Boolean));
+  // The creatures in the combat (and their summons): not every token on the scene, whose actors would be built
+  const actors = new Set(combat.combatants.contents.flatMap((c) => (c.actor ? [c.actor, ...summonsOf(c.actor)] : [])));
   const due = [...actors].flatMap((actor) => actor.itemTypes.buff.filter((b) => b.isActive && b.flags[MODULE_ID]?.[FLAG]?.caster === caster.uuid).map((buff) => [actor, buff]));
   // The once-a-round mark only when something is due (no update on every turn)
   if (!due.length || !(await oncePerRound(caster, TICK, combat))) return;

@@ -254,10 +254,38 @@ export async function oncePerRound(actor, flag, combat, round = combat.round) {
 export function turnActors(combat, combatant = combat?.combatant) {
   const actor = combatant?.actor;
   if (!actor) return [];
-  // Summons and spell-created attackers are linked world actors (summons.mjs, attackers.mjs): no token scan needed
-  const summons = game.actors.filter((a) => a.flags?.[MODULE_ID]?.summon?.summoner === actor.uuid);
+  const scene = combat.scene ?? canvas?.scene;
+  const summons = summonsOf(actor).filter((a) => {
+    const ends = a.flags[MODULE_ID].summon.endsAt;
+    if (ends != null && game.time.worldTime >= ends) return false;
+    if (combat.combatants.some((c) => c.actorId === a.id)) return false; // in the tracker: its own turn
+    return !scene || scene.tokens.some((t) => t.actorId === a.id);
+  });
   return [actor, ...summons];
 }
+
+// Summons and spell-created attackers are linked world actors flagged with their summoner (summons.mjs,
+// attackers.mjs). Turn hooks ask for them every turn, so they're indexed by summoner uuid, rebuilt only when an
+// actor is created, deleted or has its flags changed.
+let summonIndex = null;
+/** The world actors summoned by this actor (its summons and spell-created attackers). */
+export function summonsOf(actor) {
+  if (!actor) return [];
+  if (!summonIndex) {
+    summonIndex = new Map();
+    for (const a of game.actors) {
+      const summoner = a.flags?.[MODULE_ID]?.summon?.summoner;
+      if (summoner) summonIndex.set(summoner, [...(summonIndex.get(summoner) ?? []), a]);
+    }
+  }
+  return summonIndex.get(actor.uuid) ?? [];
+}
+const resetSummons = () => (summonIndex = null);
+Hooks.on("createActor", resetSummons);
+Hooks.on("deleteActor", resetSummons);
+Hooks.on("updateActor", (actor, changes) => {
+  if (changes.flags?.[MODULE_ID] && ("summon" in changes.flags[MODULE_ID] || "-=summon" in changes.flags[MODULE_ID])) resetSummons();
+});
 
 /** combatTurnChange: the tracker was stepped back, not forward. */
 export const steppedBack = (prior, current) => !!prior && !!current && (current.round < prior.round || (current.round === prior.round && current.turn < prior.turn));

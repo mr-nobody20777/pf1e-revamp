@@ -935,6 +935,17 @@ export function registerSpellTests(quench) {
           assert.equal(mm.intensify("min(10, @cl)d6"), "min(15, @cl)d6");
           assert.equal(mm.intensify("(min(@cl, 5))d4"), "(min(10, @cl))d4");
           assert.equal(mm.intensify("1d8 + min(5, @cl)"), "1d8 + min(5, @cl)", "a flat bonus's cap stays");
+          // Elemental replaces the energy, Merciful adds nonlethal; the action's own types are never changed
+          const own = new Set(["electric"]);
+          assert.sameMembers(mm.metamagicTypes(own, { feats: ["elemental", "merciful"], energy: "fire" }), ["fire", "nonlethal"]);
+          assert.sameMembers([...own], ["electric"]);
+          // Extend leaves instantaneous, permanent and concentration spells alone
+          assert.isTrue(mm.durationless({ system: { duration: { units: "inst" } } }));
+          assert.isFalse(mm.durationless({ system: { duration: { units: "round", value: "@cl" } } }));
+          assert.equal(mm.extendFactor({ feats: ["extend"], noDuration: true }), 1);
+          // With Nevela's Automation Suite, its chosen feats reach the module's engines (Dazing, Persistent and
+          // Selective stay Nevela's own)
+          assert.sameMembers(mm.nevelaFeats({ shared: { nasSpellContext: { metamagicNames: ["Empower Spell", "Extend Spell", "Dazing Spell", "Selective Spell"] } } }), ["empower", "extend"]);
           const archer = await createTestActor("Quench Longbow Archer", { items: [["pf1.classes", "Fighter", { system: { level: 1 } }]] });
           try {
             await archer.createEmbeddedDocuments("Item", [{ name: "Longbow", type: "weapon", system: { equipped: true } }, { name: "Greatclub", type: "weapon", system: { equipped: true } }]);

@@ -18,7 +18,7 @@
 // ruling); the summoner's owner gets a reminder of them at the start of that turn.
 
 import { MODULE_ID } from "./const.mjs";
-import { esc, gmWhisper, onGmRequest, isActiveGM } from "./util.mjs";
+import { esc, gmWhisper, onGmRequest, isActiveGM, summonsOf, steppedBack } from "./util.mjs";
 import { baseSpellName, metamagicOf, extendFactor, metamagicRange } from "./metamagic.mjs";
 
 const PACK = `${MODULE_ID}.summons`;
@@ -308,10 +308,11 @@ Hooks.on("updateWorldTime", () => {
 
 // The summoner's turn: a reminder of the creatures that act on it
 Hooks.on("combatTurnChange", async (combat, prior, current) => {
-  if (!isActiveGM()) return;
+  if (!isActiveGM() || steppedBack(prior, current)) return;
   const summoner = combat.combatants.get(current?.combatantId)?.actor;
   if (!summoner) return;
-  const mine = (combat.scene ?? canvas.scene)?.tokens.filter((tk) => tk.actor?.flags?.[MODULE_ID]?.[FLAG]?.summoner === summoner.uuid) ?? [];
+  const ids = new Set(summonsOf(summoner).map((a) => a.id));
+  const mine = ids.size ? (combat.scene ?? canvas.scene)?.tokens.filter((tk) => ids.has(tk.actorId)) ?? [] : [];
   if (!mine.length) return;
   const owners = game.users.filter((u) => !u.isGM && summoner.testUserPermission(u, "OWNER")).map((u) => u.id);
   await ChatMessage.implementation.create({ whisper: [...owners, ...gmWhisper()], content: `<p>${esc(summoner.name)}'s summons act now: ${esc(mine.map((tk) => tk.name).join(", "))}.</p>` });

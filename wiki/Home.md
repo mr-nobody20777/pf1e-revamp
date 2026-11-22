@@ -6,7 +6,10 @@ PF1e Revamp makes Pathfinder 1e content in Foundry VTT work the way its rules te
 
 | Page | Covers |
 |---|---|
-| [Spells and Buffs](Spells-and-Buffs) | Spells on their targets (saves, spell resistance, effects), miss chances, alignment wards, one-roll buffs |
+| [Spells and Buffs](Spells-and-Buffs) | Spells on their targets (saves, spell resistance, effects), damage on later rounds, miss chances, alignment wards, one-roll buffs |
+| [Lasting Areas](Lasting-Areas) | Clouds, fogs, entangling plants, walls, spheres and storms that keep working for their duration; how walls shape every spell's area |
+| [Summons and Shapes](Summons-and-Shapes) | Summon Monster and Summon Nature's Ally, spell-created attackers such as Spiritual Weapon, polymorph spells |
+| [Metamagic](Metamagic) | Metamagic feats and rods when casting |
 | [Magic Items](Magic-Items) | The Magic Qualities section on weapons, armor and shields: abilities, rules checks, price, name and special materials |
 | [Combat Rules](Combat-Rules) | Sneak attack, ranged combat, auras, damage reduction and resistances, bonuses against kinds of creatures, creature types, fast healing, fortification, bleed, save bonuses |
 | [Classes](Classes) | Cleric, skald, slayer, sorcerer, wizard and their options |

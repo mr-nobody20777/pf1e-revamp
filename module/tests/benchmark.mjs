@@ -154,6 +154,16 @@ export async function runBenchmark({ rounds = 3 } = {}) {
   const areas = await canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [zone("fogCloud", "Fog Cloud", 4), zone("entangle", "Entangle", 9)]);
   const goblinStart = { x: goblinToken.x, y: goblinToken.y };
 
+  // A summoned creature acting on the slayer's turn, and a combat to turn through (bleed, burning, fast healing,
+  // afflictions and lasting areas all look for the turn's creatures and their summons)
+  const summon = await createTestActor("Bench Summon", { items: [["pf1.classes", "Warrior", { system: { level: 1 } }]] });
+  await summon.setFlag(MODULE_ID, "summon", { summoner: slayer.uuid, endsAt: null });
+  const combat = await Combat.implementation.create({ scene: canvas.scene.id, active: true });
+  await combat.createEmbeddedDocuments("Combatant", [slayerToken, goblinToken, fighterToken].map((t, i) => ({ tokenId: t.id, sceneId: canvas.scene.id, actorId: t.actorId, initiative: 20 - i })));
+  await combat.startCombat();
+  // A spell with rows on its card (Hold Person on the goblin): the spell card hooks and the casting wrappers
+  const holdPerson = cleric.items.getName("Hold Person");
+
   const workload = {
     "actor prepare ×450": async () => { for (let i = 0; i < 150; i++) { sorc.reset(); slayer.reset(); fighter.reset(); } },
     "magic attacks ×10": async () => { for (let i = 0; i < 10; i++) await flaming.use({ skipDialog: true }); },
@@ -165,6 +175,8 @@ export async function runBenchmark({ rounds = 3 } = {}) {
     "cleric sheet renders ×10": async () => { for (let i = 0; i < 10; i++) await cleric.sheet._render(true); await cleric.sheet.close(); },
     // Afflictions and lasting areas check on every game-time change (without changing the world's time here)
     "world time ticks ×30": async () => { for (let i = 0; i < 30; i++) Hooks.callAll("updateWorldTime", game.time.worldTime, 0); },
+    "combat turns ×30": async () => { for (let i = 0; i < 30; i++) await combat.nextTurn(); },
+    "spell casts ×10": async () => { for (let i = 0; i < 10; i++) await holdPerson.use({ skipDialog: true }); },
     "token moves ×10": async () => { for (let i = 0; i < 10; i++) { await goblinToken.update({ x: goblinStart.x + (i % 2 ? size : 0) }, { animate: false }); await new Promise((r) => setTimeout(r, 350)); } },
     // The area recheck runs from a timer, outside any hook: timed directly
     "area rechecks ×200": async () => {
@@ -199,6 +211,8 @@ export async function runBenchmark({ rounds = 3 } = {}) {
   results.heapEndMB = heap();
 
   for (const t of areas) if (canvas.scene.templates.has(t.id)) await t.delete();
+  await combat.delete();
+  await summon.delete();
   await deleteTokens([slayerToken, goblinToken, fighterToken]);
   await cleanup([sorc, slayer, goblin, cleric, fighter], messagesBefore);
   await sceneCtl.restore();

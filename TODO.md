@@ -28,7 +28,7 @@ Next, the focus moves to:
 Leftovers: *Aqueous Orb* (engulfing creatures it rolls over), shading only the squares an area really reaches on the template, and token elevation for flying creatures.
 
 ### Metamagic: phase 2 and rods
-Phase 1 (the Core Rulebook's nine feats and six from the Advanced Player's Guide) is done. Metamagic rods are done. Next: the other metamagic feats of *Pathfinder 1e Content* (mostly notes on the card), and *Elemental Spell*'s option to split the damage half and half.
+Phase 1 (the Core Rulebook's nine feats and six from the Advanced Player's Guide) is done. Metamagic rods are done. With Nevela's Automation Suite active, its metamagic is used instead (DECISIONS.md), so the next steps matter for worlds without it. Next: the other metamagic feats of *Pathfinder 1e Content* (mostly notes on the card), and *Elemental Spell*'s option to split the damage half and half.
 
 ### Polymorph token art (to revisit)
 Token art for polymorph forms. Options discussed: a folder of images named after the forms (PF1 Mighty Morphin's own setting), a one-time art picker that remembers the choice per form, and looking the form up by name in *Pathfinder Tokens: Bestiaries* when it is installed (check its license for use on the PF1 system first). Token size already follows the form.
@@ -135,7 +135,7 @@ The design reference gives every feat, trait, class and archetype feature, racia
 - **Save roll window: the racial bonus chip has no visible label.** The elf's +2 against enchantment shows as a ticked chip with blank text (the tooltip reads "Racial · vs Enchantment Effects"). The total is correct. Found in the 2026-11-18 field test.
 - **Attack bonuses listed for spells with no attack roll.** *Bless* (+1 on attack rolls) is listed and ticked in the roll window for *Magic Missile*, which never rolls to hit. Harmless, but misleading. Found in the 2026-11-18 field test.
 - **Intense Spells is granted but not automated.** The evoker's +½ level damage on evocation spells is not added to the damage roll. Found in the 2026-11-18 field test.
-- **Test flake: the monster burn test.** "Burn: fire damage, a failed Reflex save sets the target on fire" failed once in a full run (2026-11-18) with "Cannot read properties of undefined (reading 'text')" and passed when its batch ran alone.
+- **Test flake: the monster burn test.** "Burn: fire damage, a failed Reflex save sets the target on fire" failed in full runs (2026-11-18 and 2026-11-22) with "Cannot read properties of undefined (reading 'text')" and passes when its batch runs alone (three runs in a row on 2026-11-22): the burn entry isn't on the card yet when the test reads it under full-suite load.
 - **Test flake: Staggering Critical's added duration.** "Another hit adds to it" failed once in a full run (5 rounds where at least 6 were expected) and passes on its own; possibly game time moving between the two hits during a full run.
 - **Snap Shot archers don't threaten.** With Snap Shot, an archer threatens squares within 5 feet (more with Improved Snap Shot), which affects flanking and the warning for shooting while threatened. The Snap Shot feat is also missing from the installed compendiums (only the rogue talent of the same name exists).
 

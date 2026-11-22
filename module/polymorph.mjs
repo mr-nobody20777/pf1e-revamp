@@ -32,6 +32,7 @@ export const morphinActive = () => !!game.modules.get(MM)?.active && !!game.migh
 const FLAG = "polymorph"; // our own buffs' flag (Monstrous Physique, Undead Anatomy)
 
 // Spells Mighty Morphin applies: its function and the spell level it plays (several: the caster picks the family)
+const TOUCHED = new Set(["polymorph", "greater polymorph"]); // "willing living creature touched"
 const SHAPES = {
   "alter self": [["alterSelf", 1]],
   ...Object.fromEntries(["i", "ii", "iii", "iv"].map((n, i) => [`beast shape ${n}`, [["beastShape", i + 1]]])),
@@ -210,7 +211,8 @@ Hooks.on("createChatMessage", async (message, options, userId) => {
   if (key in OWN && caster) return void (await ownForm(caster, name, cl, { minutes: span }));
   if (!(key in SHAPES) || !morphinActive()) return;
   // Polymorph and Greater Polymorph: the willing creature touched (the caster chooses the form)
-  const targetUuid = message.system.targets?.[0];
+  // The other polymorphs (Alter Self, Beast Shape, Form of the Dragon...) are personal: the caster, whoever is targeted
+  const targetUuid = TOUCHED.has(key) ? message.system.targets?.[0] : null;
   const target = (targetUuid ? fromUuidSync(targetUuid)?.actor : null) ?? caster;
   if (!target) return;
   const pick = await pickFamily(name, SHAPES[key]);

@@ -3,15 +3,17 @@
 ## Requirements
 - **Foundry VTT** v13 (tested on build 351)
 - **Pathfinder 1e** system 11.x (tested on 11.11)
+- **Pathfinder 1e Content** (`pf-content`): the spell buffs the module applies (*Resistance*, *Virtue*, *Guidance* and many more) come from its buff compendium.
 
-Nothing else is required. Features that use another module simply stay inactive without it.
+Features that use another module simply stay inactive without it.
 
 ## Recommended modules
 
 | Module | Without it |
 |---|---|
 | **libWrapper** | PF1e Revamp hooks into PF1's attack and proficiency code directly instead. It still works, but is more likely to conflict with other modules that change the same code. |
-| **Pathfinder 1e Content** (`pf-content`) | No racial-trait review, and the pf-content spell buffs (Blur, Displacement, Protection from Evil, Guidance, Remove Fear...) aren't there to recognize. |
+| **Foundry Summons** (with **tcal**, **Sequencer** and **socketlib**) | *Summon Monster*, *Summon Nature's Ally* and the spell-created attackers (*Spiritual Weapon*, *Mage's Sword*...) place nothing; summon by hand. See [Summons and Shapes](Summons-and-Shapes). |
+| **PF1 Mighty Morphin** | The polymorph spells (except *Monstrous Physique* and *Undead Anatomy*) and Wild Shape keep their reminders; apply the form by hand. |
 | **Pathfinder 1e Archetypes and Abilities** (`pf1e-archetypes`) | No archetypes to apply. |
 | **Roll Bonuses PF1** (`ckl-roll-bonuses`) | No range-increment penalties, so the range changes in [Combat Rules](Combat-Rules#ranged-combat) do nothing. It also ticks Flanking for you. |
 
@@ -24,15 +26,20 @@ The two modules complement each other. Where they overlap, PF1e Revamp steps asi
 | Its *Concealed* condition's miss chance | **Nevela**. PF1e Revamp only rolls when a buff gives a *higher* miss chance, and then strikes Nevela's roll through. |
 | A spell's buff on its targets | **Nevela**, when it applies the buff itself. By default Nevela applies a buff for every spell, using the buffs in the compendiums chosen in its settings (PF1's and its own). PF1e Revamp applies the buffs Nevela doesn't have, such as Pathfinder 1e Content's Linebreaker or Protection from Evil. The spell's row says which module applied it. |
 | A spell's saves, spell resistance and conditions | **PF1e Revamp** |
+| Metamagic feats, rods and metamagic class features | **Nevela**. PF1e Revamp hides its own metamagic and reads Nevela's choices for its lasting areas, summons and later rounds of damage. See [Metamagic](Metamagic#with-nevelas-automation-suite). |
 | Energy resistance in PF1's Apply Damage dialog | **Nevela / PF1**. PF1e Revamp only adds resistance to damage applied straight from a card, so nothing is reduced twice. |
 
 ## Also tested alongside
-These were active through all testing with no conflicts found: **Koboldworks – Little Helper**, **Koboldworks – Item Hints**, **PF1 Buff Bundles**, **PF1 Mighty Morphin**, **Target Context Notes**, **Statblock Converter**, **Statblock Library**, **socketlib**.
+These were active through all testing with no conflicts found: **Koboldworks – Little Helper**, **Koboldworks – Item Hints**, **PF1 Buff Bundles**, **Target Context Notes**, **Statblock Converter**, **Statblock Library**, **socketlib**.
 
 ## Multiplayer
 
 Foundry doesn't let players change what they don't own: another character's hit points, an enemy's items, a combatant's initiative. Features that need to are passed to the **GM's client**, which makes the change:
 - a spell's effects on its targets, and its spell resistance checks;
+- lasting areas (clouds, walls, spheres): who is inside, their saves and damage, and releasing them;
+- *Call Lightning*'s bolts called by a player;
+- summoned creatures placed by a player (Foundry Summons may ask the GM to approve), and removing them;
+- a polymorph form chosen for a creature the player doesn't own (the form picker opens on the GM's screen);
 - buffs on allies (Bit of Luck, Guidance, Resistant Touch, raging songs);
 - channel energy's healing, damage and saves;
 - sneak attack talents' effects, bleed, and fortification or deflection used by a defender;
