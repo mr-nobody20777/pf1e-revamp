@@ -208,6 +208,7 @@ export async function castSummon(message, spell) {
     if (!tokenDoc) break;
     const actor = tokenDoc.actor ?? game.actors.get(tokenDoc.actorId);
     await actor?.setFlag(MODULE_ID, FLAG, flag);
+    await shareWithOwners(actor, caster);
     placed.push(tokenDoc.uuid);
   }
   if (!placed.length) return;
@@ -251,6 +252,16 @@ export async function placeOne(uuid, updateData, casterToken, range, label) {
     await requestDismiss([tokenDoc.uuid]);
   }
   return null;
+}
+
+/**
+ * The summoner's owners control the creature. Foundry Summons gives it to whoever cast; when a GM casts for a
+ * player's character, the player gets it too (a player casting already owns it, and can't change ownership).
+ */
+export async function shareWithOwners(actor, caster) {
+  if (!actor || !caster || !game.user.isGM) return;
+  const owners = Object.entries(caster.ownership ?? {}).filter(([id, level]) => id !== "default" && level >= CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER);
+  if (owners.some(([id]) => (actor.ownership?.[id] ?? 0) < CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER)) await actor.update({ ownership: { ...actor.ownership, ...Object.fromEntries(owners) } });
 }
 
 /* -------------------------------------------- */

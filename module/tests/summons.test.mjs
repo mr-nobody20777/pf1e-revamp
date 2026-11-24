@@ -3,7 +3,7 @@
 
 import { useTestScene, waitFor, createTestActor, cleanup, placeToken, deleteTokens } from "./helpers.mjs";
 import { turnActors } from "../util.mjs";
-import { _test as S, summonsActive } from "../summons.mjs";
+import { _test as S, summonsActive, shareWithOwners } from "../summons.mjs";
 
 const MODULE_ID = "pf1e-revamp";
 
@@ -64,6 +64,20 @@ export function registerSummonTests(quench) {
           } finally {
             await combat.delete();
             await deleteTokens(tokens);
+            await cleanup([caster, dog], new Set(game.messages.keys()));
+          }
+        });
+
+        it("a summoned creature is shared with its summoner's owners (a GM casting for a player's character)", async function () {
+          const player = game.users.find((u) => !u.isGM);
+          if (!player) this.skip();
+          const caster = await createTestActor("Quench Summoner");
+          const dog = await createTestActor("Quench Summoned Dog");
+          try {
+            await caster.update({ [`ownership.${player.id}`]: CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER });
+            await shareWithOwners(dog, caster);
+            assert.equal(dog.ownership[player.id], CONST.DOCUMENT_OWNERSHIP_LEVELS.OWNER);
+          } finally {
             await cleanup([caster, dog], new Set(game.messages.keys()));
           }
         });

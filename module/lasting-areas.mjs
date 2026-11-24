@@ -521,6 +521,8 @@ const centerOf = (token) => {
 const zoneOf = (template) => template?.flags?.[MODULE_ID]?.[FLAG] ?? null;
 const zonesIn = (scene) => (scene?.templates ?? []).filter((t) => zoneOf(t));
 const tokenActor = (token) => token?.actor ?? null;
+// A creature an area acts on: shown, with an actor, and not dead (a corpse in a cloud or a web isn't affected)
+const present = (token) => !!tokenActor(token) && !token.hidden && !tokenActor(token).statuses.has("dead");
 
 /* -------------------------------------------- */
 /*  Acting on one creature                      */
@@ -795,7 +797,7 @@ Hooks.on("createChatMessage", async (message) => {
   }
   if (SPELLS[key].wall) return castWall(template, zone, caster);
   await template.update({ [`flags.${MODULE_ID}.${FLAG}`]: zone });
-  const inside = template.parent.tokens.filter((t) => tokenActor(t) && !t.hidden && insideTemplate(template, t));
+  const inside = template.parent.tokens.filter((t) => present(t) && insideTemplate(template, t));
   await template.update({ [`flags.${MODULE_ID}.${FLAG}.inside`]: inside.map((t) => t.id) });
   if (inside.length) await act(template, inside, "enter", "cast", { atCasting: true, newRound: true });
   if (SPELLS[key].sphere) await ChatMessage.implementation.create({ whisper: gmWhisper(), content: `<p><strong>${esc(zone.name)}</strong>: drag the sphere onto a creature to strike it (${esc(SPELLS[key].strikes)}); ${esc(SPELLS[key].reminder)}.</p>` });
@@ -809,7 +811,7 @@ async function recheck(template, { drifted = false } = {}) {
   // A flaming sphere moved onto creatures strikes them (creatures walking into it don't count)
   const sphereMoved = !!SPELLS[zone.key].sphere && !!zone.at && (zone.at.x !== template.x || zone.at.y !== template.y);
   if (sphereMoved) await template.update({ [`flags.${MODULE_ID}.${FLAG}.at`]: { x: template.x, y: template.y } });
-  const now = template.parent.tokens.filter((t) => tokenActor(t) && !t.hidden && insideTemplate(template, t)).map((t) => t.id);
+  const now = template.parent.tokens.filter((t) => present(t) && insideTemplate(template, t)).map((t) => t.id);
   const entered = now.filter((id) => !zone.inside.includes(id)).map((id) => template.parent.tokens.get(id));
   const left = zone.inside.filter((id) => !now.includes(id)).map((id) => template.parent.tokens.get(id)).filter(Boolean);
   // Creatures that stayed inside but moved (grease, sleet storm, spike growth)
@@ -907,7 +909,7 @@ function crosses(template, a, b) {
 function heated(template, zone) {
   const feet = {};
   const tokens = template.parent.tokens.filter((t) => {
-    if (!tokenActor(t) || t.hidden) return false;
+    if (!present(t)) return false;
     const p = centerOf(t);
     const w = wallPlace(template, p);
     if (!w.along || w.feet > 20 || (w.side !== zone.hot && !inWall(template, p))) return false;
@@ -924,7 +926,7 @@ async function castWall(template, zone, caster) {
   await template.update({ [`flags.${MODULE_ID}.${FLAG}`]: zone });
   for (const token of template.parent.tokens) lastPos.set(token.uuid, centerOf(token));
   const spell = SPELLS[zone.key];
-  const caught = template.parent.tokens.filter((t) => tokenActor(t) && !t.hidden && inWall(template, centerOf(t)));
+  const caught = template.parent.tokens.filter((t) => present(t) && inWall(template, centerOf(t)));
   if (caught.length) await act(template, caught, spell.appear ? "appear" : "cross", "where it appears", { atCasting: true });
   if (spell.heat) {
     const { tokens, feet } = heated(template, zoneOf(template));

@@ -80,7 +80,10 @@ function spreadSquares(template) {
     (buckets[Math.round(n.cost / step)] ??= []).push(n);
     return true;
   };
-  for (const o of starts.values()) push({ i: o.i, j: o.j, p: 0, cost: step });
+  // A point of origin on a grid intersection (the rules' placement): its four squares are 5 feet away. A template
+  // placed on a square's center (PF1 can snap circles there): that square is the origin, and its neighbours 5 feet
+  const startCost = starts.size === 1 ? 0 : step;
+  for (const o of starts.values()) push({ i: o.i, j: o.j, p: 0, cost: startCost });
   const reached = new Set();
   for (let b = 0; b < buckets.length; b++) {
     for (const cur of buckets[b] ?? []) {
@@ -124,12 +127,15 @@ export function reaches(template, token) {
   if (!kind || !canvas.ready || canvas.scene !== scene || !token) return true;
   const grid = scene.grid;
   const squares = squaresOf(token);
+  const origin = { x: template.x, y: template.y };
+  // Within the template with a clear line from the point of origin: reached, whatever the kind of area
+  if (squares.some((o) => !blocked(origin, grid.getCenterPoint(o)))) return true;
+  // A spread also turns corners, as far as its radius walked around the walls
   if (kind === "spread" && grid.type === CONST.GRID_TYPES.SQUARE) {
     const reached = spreadSquares(template);
     return squares.some((o) => reached.has(`${o.i},${o.j}`));
   }
-  const origin = { x: template.x, y: template.y };
-  return squares.some((o) => !blocked(origin, grid.getCenterPoint(o)));
+  return false;
 }
 
 export const _test = { areaKind, spreadSquares, spreadCache };

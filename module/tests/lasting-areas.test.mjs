@@ -4,7 +4,7 @@
 import { createTestActor, cleanup, useTestScene, placeToken, deleteTokens, waitFor } from "./helpers.mjs";
 import * as LA from "../lasting-areas.mjs";
 import { missChances } from "../miss-chance.mjs";
-import { reaches, KIND_FLAG, areaKind } from "../area-reach.mjs";
+import { reaches, KIND_FLAG, areaKind, _test as AR } from "../area-reach.mjs";
 import { burningOf } from "../burning.mjs";
 import { bleedOf, stopBleed } from "../bleed.mjs";
 
@@ -95,6 +95,27 @@ export function registerLastingAreaTests(quench) {
           } finally {
             await wall.delete();
           }
+        });
+
+        it("a spread placed on a square's center reaches its full radius (that square is the point of origin)", async () => {
+          const g = size();
+          const at = (c, r) => ({ x: canvas.dimensions.sceneX + (c + 0.5) * g, y: canvas.dimensions.sceneY + (r + 0.5) * g });
+          const [t] = await canvas.scene.createEmbeddedDocuments("MeasuredTemplate", [{ t: "circle", ...at(6, 6), distance: 20, flags: { [MODULE_ID]: { [KIND_FLAG]: "spread" } } }]);
+          templates.push(t);
+          const reached = AR.spreadSquares(t);
+          const key = (c, r) => { const o = canvas.grid.getOffset(at(c, r)); return `${o.i},${o.j}`; };
+          assert.isTrue(reached.has(key(10, 6)), "4 squares away: 20 feet");
+          assert.isFalse(reached.has(key(11, 6)), "5 squares away: 25 feet");
+        });
+
+        it("a dead creature in a lasting area is a corpse: nothing happens to it", async () => {
+          await area("stinkingCloud", "Stinking Cloud");
+          forceDice(0.999);
+          await walker.setConditions({ dead: true });
+          await into(tokens.walker);
+          await new Promise((r) => setTimeout(r, 1500));
+          assert.isFalse(walker.statuses.has("nauseated"));
+          assert.isFalse(game.messages.contents.some((m) => /Stinking Cloud/.test(m.content) && /Quench Area Walker/.test(m.content)), "no line for it");
         });
 
         it("knows who is inside a circle or a rectangle", async () => {

@@ -349,9 +349,14 @@ async function resolveCard(message) {
       row.state = "unaffected";
       continue;
     }
+    // An area spell's dead creatures are corpses, not creatures it affects (a targeted spell may want a corpse)
+    if (areaTemplate && actor.statuses.has("dead")) {
+      Object.assign(row, { state: "unaffected", why: "dead" });
+      continue;
+    }
     // A burst doesn't go around corners; a spread does, but only as far as its radius walked around the walls
     if (areaTemplate && token && !reaches(areaTemplate, token)) {
-      Object.assign(row, { state: "unaffected", why: "out of the area's reach: a wall is in the way" });
+      Object.assign(row, { state: "unaffected", why: "out of the area's reach (a wall in the way, or too far around one)" });
       continue;
     }
     const willing = data.harmless && accepts(data, row, caster);

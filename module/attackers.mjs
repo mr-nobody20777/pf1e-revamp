@@ -36,7 +36,7 @@
 import { MODULE_ID } from "./const.mjs";
 import { esc, gmWhisper } from "./util.mjs";
 import { baseSpellName, metamagicOf, extendFactor, metamagicRange } from "./metamagic.mjs";
-import { FLAG, CARD, placeOne, closeRange, summonsActive } from "./summons.mjs";
+import { FLAG, CARD, placeOne, closeRange, summonsActive, shareWithOwners } from "./summons.mjs";
 
 const PACK = `${MODULE_ID}.summons`;
 const mediumRange = (cl) => 100 + 10 * cl;
@@ -237,6 +237,7 @@ export async function castAttacker(message, key) {
   if (!tokenDoc) return;
   const actor = tokenDoc.actor ?? game.actors.get(tokenDoc.actorId);
   await actor?.setFlag(MODULE_ID, FLAG, { summoner: caster.uuid, spell: item?.name, endsAt, message: message.uuid, attacker: key, cl, srChecked: [] });
+  await shareWithOwners(actor, caster);
   await ChatMessage.implementation.create({
     speaker: message.speaker,
     content: `<p><strong>${esc(item?.name ?? built.name)}</strong>: ${esc(built.name)} for ${cl * extendFactor(mm)} round${cl * extendFactor(mm) === 1 ? "" : "s"}. It acts on ${esc(caster.name)}'s turn: open its sheet from the token to attack.</p><button type="button" data-action="${MODULE_ID}-dismiss">Dismiss</button>`,

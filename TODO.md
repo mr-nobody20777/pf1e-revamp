@@ -64,6 +64,7 @@ The design reference gives every feat, trait, class and archetype feature, racia
 
 ### Interface (from the PF2e design study, `docs/PF2E-UX-STUDY.md`)
 - **Spell cards (round 5 of the study).** Hide NPC save totals from players (they see saved or failed); a GM button that rolls every NPC row's save; the save margin in each row; a template helper (target enemies, allies or all inside a placed template, then remove it); retargeting a posted card; draggable condition links in the effect line.
+- **Apply all for damage PF1 rolls.** On area spells whose damage PF1 rolls (*Fireball*), the card's rows already know who saved; one button should apply full damage to the failed rows and half to the saved ones, instead of selecting tokens and using PF1's buttons twice. Found in a simulated fight.
 - **Modifiers that mattered.** Note on the card when a ticked bonus changed the outcome ("Bless made this hit", "the +2 against fear made the save").
 - **An effects panel.** The selected token's buffs and conditions with time left, click to change a value, right-click to remove, and a tooltip with the source.
 - **Concentration reminders.** For spells with a concentration duration, a reminder on the caster's turn that maintaining it is a standard action, with an End button.
